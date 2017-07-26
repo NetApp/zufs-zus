@@ -1,0 +1,13 @@
+.dependencies
+*.kdev4
+.config
+
+# Headers lineked (ln -s) from Kernel
+zus_api.h
+
+# targets
+zus
+b_io
+
+# common ignores
+*.o

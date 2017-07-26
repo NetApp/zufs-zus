@@ -1,0 +1,37 @@
+# Zufs configuration file, Makefile syntax.
+# This file, in turn is included by the top-level Makfile
+#
+# Copy into ${ZUSDIR}/.config to let top Makefile include it
+#
+
+# Edit for the Kernel you are working with.
+# Default: /usr/src/kernel/$(uname -r)/
+ZUF_KERN_DIR=../zuf/
+ZUS_API_INC=$(ZUF_KERN_DIR)/fs/zuf/zus_api.h
+
+# Enable debugging info Master switch
+DEBUG=1
+
+CONFIG_C_INCLUDE =
+CONFIG_C_DEFINE =
+CONFIG_C_LIBS =
+
+# Flags appended to CWARN for extra warnings
+CONFIG_CWARN =
+
+# Turn some warning off
+CONFIG_CNO_WARN =
+
+# Flags appended to CFLAGS for pedantic mode
+CONFIG_PEDANTIC_FLAGS =
+# CONFIG_PEDANTIC_FLAGS += -pedantic
+# CONFIG_PEDANTIC_FLAGS += -Wformat=2 -Wsign-conversion -Wconversion
+# CONFIG_PEDANTIC_FLAGS += -Wstrict-prototypes -Wold-style-definition
+# CONFIG_PEDANTIC_FLAGS += -Wpointer-arith
+
+# Flags appended to OPTIMIZE_FLAGS for optimization level
+# CONFIG_OPTIMIZE_FLAGS = -O0
+
+# Flags appended to CDEBUG_FLAGS if DEBUG=1
+CONFIG_CDEBUG_FLAGS =
+# CONFIG_CDEBUG_FLAGS += -D_FORTIFY_SOURCE=1
