@@ -11,6 +11,7 @@
 
 #define _GNU_SOURCE
 
+#include <unistd.h>
 #include <getopt.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -21,6 +22,7 @@
 
 bool g_DBG = false;
 bool g_verify = false;
+bool g_daemon = false;
 
 static void usage(void)
 {
@@ -42,6 +44,8 @@ static void usage(void)
 	"	And sets the nice value to NICE_VAL. Default NICE_VAL is 0\n"
 	"	Only one of --policyRR --policyFIFO or --nice should be\n"
 	"	specified, last one catches\n"
+	"--daemon\n"
+	"	Run as daemon process\n"
 	"\n"
 	"FILE_PATH is the path to a mounted ZUS directory\n"
 	"\n"
@@ -65,6 +69,7 @@ int main(int argc, char *argv[])
 		{.name = "nice", .has_arg = 2, .flag = NULL, .val = 'n'} ,
 		{.name = "verbose", .has_arg = 0, .flag = NULL, .val = 'd'} ,
 		{.name = "verify", .has_arg = 0, .flag = NULL, .val = 'v'} ,
+		{.name = "daemon", .has_arg = 0, .flag = NULL, .val = 'D'} ,
 		{.name = 0, .has_arg = 0, .flag = 0, .val = 0} ,
 	};
 	char op;
@@ -74,7 +79,7 @@ int main(int argc, char *argv[])
 	};
 	int err;
 
-	while ((op = getopt_long(argc, argv, "w::rm::d", opt, NULL)) != -1) {
+	while ((op = getopt_long(argc, argv, "w::rm::dD", opt, NULL)) != -1) {
 		switch (op) {
 		case 'r':
 			tp.policy = SCHED_RR;
@@ -96,6 +101,10 @@ int main(int argc, char *argv[])
 			break;
 		case 'v':
 			g_verify = true;
+			break;
+		case 'D':
+			g_daemon = true;
+			break;
 		default:;
 			/* Just ignore we are not the police */
 		}
@@ -111,6 +120,9 @@ int main(int argc, char *argv[])
 
 	if (signal(SIGINT, sig_handler) == SIG_ERR)
 		ERROR("signal SIGINT not installed\n");
+
+	if (g_daemon && daemon(0, 1))
+		ERROR("daemon failed\n");
 
 	tp.path = argv[0];
 	err = zus_mount_thread_start(&tp);
