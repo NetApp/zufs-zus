@@ -64,14 +64,16 @@ CFLAGS = -fPIC -pthread -std=gnu11 $(CONFIG_CFLAGS)	\
 CFLAGS += "-DKERNEL=0"
 
 # List of -L -l libs
-C_LIBS = -lrt -lcurses -lc $(CONFIG_C_LIBS)
+C_LIBS = -lrt -lcurses -lc -luuid $(CONFIG_C_LIBS)
 
 # Targets
 ALL = zus
-all: $(DEPEND) $(ALL)
+zus_OBJ = $(NULL)
+all: $(DEPEND) $(ALL) $(zus_OBJ)
 
 clean:
-	rm -vf $(LINKED_HEADERS) $(DEPEND) $(ALL)  *.o fs/*.o
+	rm -vf $(LINKED_HEADERS) $(DEPEND) $(ALL)   $(zus_OBJ) fs/*.o
+
 # =========== Headers from the running Kernel ==================================
 ZUS_API_H=zus_api.h
 LINUX_STAT_H=linux/stat.h
@@ -81,20 +83,19 @@ $(ZUS_API_H):
 	ln -sTf $(abspath $(ZUS_API_INC)) $(ZUS_API_H)
 
 $(LINUX_STAT_H):
-	if ! grep -q STATX_ /usr/include/linux/stat.h; then		\
-		mkdir -p linux/;					\
-		ln -sTf $(abspath 					\
-			$(ZUS_API_INC)/../../../include/uapi/$(LINUX_STAT_H)) 	\
-			$(LINUX_STAT_H) ; \
-	fi
+	mkdir -p linux/ ;					\
+	ln -sTf $(abspath 					\
+		$(ZUS_API_INC)/../../../include/uapi/$(LINUX_STAT_H)) 	\
+		$(LINUX_STAT_H) ; 
 
 # ============== sub-projects===================================================
 -include fs/Makefile
 
-# ============== zus ===========================================================
-zus_OBJ = zus-core.o zus-vfs.o main.o module.o $(fs_builtin)
 
-zus:  $(zus_OBJ)
+# ============== zus ===========================================================
+zus_OBJ += zus-core.o zus-vfs.o main.o module.o
+
+zus: $(zus_OBJ)
 	$(CC) $(LDFLAGS) $(CFLAGS) $(C_LIBS) -o $@ $^
 
 $(DEPEND): $(zus_OBJ:.o=.c)
