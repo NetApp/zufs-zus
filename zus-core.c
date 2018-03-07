@@ -80,7 +80,7 @@ static int _zu_mmap(struct _zu_thread *zt)
 	int flags = MAP_SHARED;
 
 	zt->api_mem = mmap(NULL, ZUS_API_MAP_MAX_SIZE, prot, flags, zt->fd, 0);
-	if (!zt->api_mem) {
+	if (zt->api_mem == MAP_FAILED) {
 		ERROR("mmap failed=> %d: %s\n", errno, strerror(errno));
 		return errno ?: ENOMEM;
 	}

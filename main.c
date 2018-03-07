@@ -60,7 +60,6 @@ static void sig_handler(int signo)
 int main(int argc, char *argv[])
 {
 	struct option opt[] = {
-		{.name = "numcpu", .has_arg = 1, .flag = NULL, .val = 'c'} ,
 		{.name = "policyRR", .has_arg = 2, .flag = NULL, .val = 'r'} ,
 		{.name = "policyFIFO", .has_arg = 2, .flag = NULL, .val = 'f'} ,
 		{.name = "nice", .has_arg = 2, .flag = NULL, .val = 'n'} ,
@@ -75,7 +74,7 @@ int main(int argc, char *argv[])
 	};
 	int err;
 
-	while ((op = getopt_long(argc, argv, "w::rm::", opt, NULL)) != -1) {
+	while ((op = getopt_long(argc, argv, "w::rm::d", opt, NULL)) != -1) {
 		switch (op) {
 		case 'r':
 			tp.policy = SCHED_RR;
