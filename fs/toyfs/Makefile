@@ -14,4 +14,12 @@ toyfs_OBJ = $(addprefix fs/toyfs/, \
 
 fs_builtin += $(toyfs_OBJ)
 
+toyfs_mkfs_OBJ = fs/toyfs/mkfs.o
+toyfs_mkfs_PROG = fs/toyfs/mkfs.toyfs
+
+$(toyfs_mkfs_PROG):  $(toyfs_mkfs_OBJ)
+	$(CC) $(LDFLAGS) $(CFLAGS) $(C_LIBS) -o $@ $^
+
+$(DEPEND): $(toyfs_mkfs_OBJ:.o=.c)
+FS_PROGS += $(toyfs_mkfs_PROG)
 
