@@ -1,0 +1,37 @@
+#!/bin/sh
+#
+# Print gdb command to load a module's symbols
+#
+# Usage: add-symbol-file module
+#   module can be either the module name or path to the module object.
+#
+progname=`basename $0`
+mod=$1
+if [ "$mod" = "" ]; then
+	echo Usage: `$progname` module 1>&2
+	exit 1
+fi
+if [[ -e "$mod" || "$mod" == */* ]]; then
+	obj="$mod"
+else
+	rel=`uname -r`
+	modpath="/lib/modules/$rel/kernel"
+	obj=`find $modpath -name "$mod" -o -name "$mod.ko" -o -name "$mod.o" | head -1`
+	if [ ! -e "$obj" ]; then
+		echo "$progname: $mod was not found in $modpath" 1>&2
+		exit 1
+	fi
+fi
+mod=`basename $mod | sed 's/\..*o$//'`
+dir=/sys/module/$mod/sections
+if [ ! -d $dir ]; then
+	echo "$progname: $dir not found" 1>&2
+	exit 1
+fi
+
+s="`cat $dir/.text`"
+for i in .rodata .data .bss; do
+	s="$s -s $i `cat $dir/$i`"
+done
+
+echo "add-symbol-file $obj $s"

@@ -1,0 +1,7 @@
+zudo()
+{
+	local DIR=$(dirname $(which zudo))
+	local FUNCS=$(cat $DIR/zudo | awk -F\) '/\)$/ && !/\(/ && !/\*/ && !/^main / {print $1}')
+	COMPREPLY=( $(compgen -W "$FUNCS" $2) )
+}
+type zudo &>/dev/null && complete -F _zudo zudo

@@ -1,0 +1,81 @@
+#!/bin/bash
+
+PROGRAM=`basename $0`
+DESCRIPTION="updates specified modules"
+OPTIONS="[-hn] [-s source-dir] [-O build-dir] [-m modules]..."
+
+MODS=(fs/zuf/zuf.ko)
+
+usage()
+{
+	[ $1 -ne 0 ] && exec >&2
+
+	cat << EOF
+$PROGRAM - $DESCRIPTION
+usage: $PROGRAM $OPTIONS
+Options:
+-h      help: show this help message and exit.
+-n	dryrun: just echo what will be done.
+-O	alternate BUILD directory
+	(kernel's make O=, Default ./)
+-s	SOURCE directory. (Default ./)
+-m	modules names relative to SOURCE/BUILD.
+	(Must be last param, supports multiple modules)
+EOF
+
+	exit $1
+}
+
+DRYRUN=0
+SOURCE="."
+BUILD="."
+KERNVER=`uname -r`
+while [[ "$1" = -* ]]; do
+	case $1 in
+	-n)
+		DRYRUN=1;;
+	-O)
+		BUILD="$2"; shift;;
+	-s)
+		SOURCE="$2"; shift;;
+	-m)
+		shift;
+		MODS=("$@");;
+	-h)	usage 0;;
+	*)
+		usage 255;;
+	esac
+        shift
+done
+
+update_mod()
+{
+	local KERNVER="$1"
+	local MOD="$2"
+
+	[ -e /lib/modules/$KERNVER/kernel/$MOD ] || return 1
+	[ -e $SOURCE/$BUILD/$MOD ] || return 2
+	# Quit if they're the same
+	diff -q /lib/modules/$KERNVER/kernel/$MOD $SOURCE/$BUILD/$MOD > /dev/null && return 3
+	if [ $DRYRUN -eq 1 ]; then
+		return 0;
+	fi
+	cp $SOURCE/$BUILD/$MOD /lib/modules/$KERNVER/kernel/$MOD || return 4
+	return 0
+}
+
+for i in ${MODS[@]}; do
+	update_mod "$KERNVER" "$i"
+	RET=$?
+	if [ "$RET" -eq 1 ]; then
+		echo "Failed $RET /lib/modules/$KERNVER/kernel/$i - new module(?)"
+	elif [ "$RET" -eq 2 ]; then
+		echo "Failed $RET on $i from $SOURCE/$BUILD/ - no source module"
+	elif [ "$RET" -eq 3 ]; then
+		echo "Module `basename $i` is uptodate"
+	elif [ "$RET" -eq 4 ]; then
+		echo "Failed $RET on $i from $SOURCE/$BUILD/ - cannot copy"
+	else
+		echo "Succesfully copy `basename $i`"
+	fi
+done
