@@ -52,7 +52,6 @@
 
 #include "zus_api.h"
 #include "_pr.h"
-#include "list.h"
 
 /* FIXME: Move to K_in_U include structure */
 #ifndef likely
@@ -206,8 +205,6 @@ struct zus_sb_info {
 
 	struct zus_inode_info	*z_root;
 	ulong			flags;
-
-	struct list_head	sb_list;
 };
 
 enum E_zus_sbi_flags {
@@ -238,7 +235,6 @@ struct zus_fs_info {
 
 	uint			user_page_size;
 	uint			next_sb_id;
-	struct list_head	sb_list; /* All mounts belong to this fs-type */
 };
 
 static inline
