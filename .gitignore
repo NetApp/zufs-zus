@@ -4,6 +4,7 @@
 
 # Headers lineked (ln -s) from Kernel
 zus_api.h
+linux/stat.h
 
 # targets
 zus

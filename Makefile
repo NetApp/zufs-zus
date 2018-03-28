@@ -71,12 +71,22 @@ ALL = zus
 all: $(DEPEND) $(ALL)
 
 clean:
-	rm -vf $(DEPEND) $(ALL)  *.o
+	rm -vf $(LINKED_HEADERS) $(DEPEND) $(ALL)  *.o fs/*.o
 # =========== Headers from the running Kernel ==================================
 ZUS_API_H=zus_api.h
+LINUX_STAT_H=linux/stat.h
+LINKED_HEADERS=$(ZUS_API_H) $(LINUX_STAT_H)
 
 $(ZUS_API_H):
 	ln -sTf $(abspath $(ZUS_API_INC)) $(ZUS_API_H)
+
+$(LINUX_STAT_H):
+	if ! grep -q STATX_ /usr/include/linux/stat.h; then		\
+		mkdir -p linux/;					\
+		ln -sTf $(abspath 					\
+			$(ZUS_API_INC)/../../../include/uapi/$(LINUX_STAT_H)) 	\
+			$(LINUX_STAT_H) ; \
+	fi
 
 # ============== sub-projects===================================================
 -include fs/Makefile
@@ -91,7 +101,7 @@ $(DEPEND): $(zus_OBJ:.o=.c)
 
 # =============== common rules =================================================
 # every thing should compile if Makefile or .config changed
-MorC = Makefile $(ZUS_API_H)
+MorC = Makefile
 ifneq ($(realpath .config),)
 MorC += .config
 endif
@@ -100,7 +110,7 @@ endif
 	$(CC) $(CFLAGS) -c -o $@ $(@:.o=.c)
 
 #.============== dependencies genaration =======================================
-$(DEPEND):
+$(DEPEND): $(LINKED_HEADERS)
 	$(CC) -MM $(CFLAGS) $^ > $@
 
 ifneq (clean, $(MAKECMDGOALS))
