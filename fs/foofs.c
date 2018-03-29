@@ -16,6 +16,7 @@
 #include <unistd.h>
 #include <sys/mman.h>
 #include <dirent.h>
+#include <time.h>
 
 #include "zus.h"
 #include "b-minmax.h"
@@ -32,66 +33,10 @@
  * to a single t1 in that case. (Silently destroy anything there)
  */
 enum {
-	M1FS_MAJOR_VERSION	= 14,
-	M1FS_MINOR_VERSION	= 1,
+	M1FS_MAJOR_VERSION	= 15,
+	M1FS_MINOR_VERSION	= 0,
 	M1FS_SUPER_MAGIC	= 0x5346314d /* M1FS in BE */
 };
-
-static const struct zus_zii_operations	foofs_zii_operations;
-static const struct zus_sbi_operations	foofs_sbi_operations;
-static const struct zus_zfi_operations	foofs_zfi_operations;
-
-/* ~~~~ foofs_sbi_operations ~~~~ */
-static
-struct zus_sb_info *foofs_sbi_alloc(struct zus_fs_info *zfi)
-{
-	struct zus_sb_info *sbi = calloc(1, sizeof(struct zus_sb_info));
-
-	if (!sbi)
-		return NULL;
-
-	sbi->op = &foofs_sbi_operations;
-	return sbi;
-}
-
-static void foofs_sbi_free(struct zus_sb_info *sbi)
-{
-	free(sbi);
-}
-
-static
-int foofs_sbi_init(struct zus_sb_info *sbi, struct zufs_ioc_mount *zim)
-{
-	sbi->z_root = zus_iget(sbi, FOOFS_ROOT_NO);
-	if (unlikely(!sbi->z_root))
-		return -ENOMEM;
-
-	return 0;
-}
-
-static int foofs_sbi_fini(struct zus_sb_info *sbi)
-{
-	// zus_iput(sbi->z_root); was this done already
-	return 0;
-}
-
-static
-struct zus_inode_info *foofs_zii_alloc(struct zus_sb_info *sbi)
-{
-	struct zus_inode_info *zii = calloc(1, sizeof(struct zus_inode_info));
-
-	if (!zii)
-		return NULL;
-
-	zii->op = &foofs_zii_operations;
-	return zii;
-}
-
-static
-void foofs_zii_free(struct zus_inode_info *zii)
-{
-	free(zii);
-}
 
 static struct zus_inode *find_zi(struct zus_sb_info *sbi, ulong ino)
 {
@@ -172,7 +117,82 @@ static struct __foo_dir_ent *_find_empty_de(struct zus_inode_info *dir_ii)
 	return NULL; /* ENOSPC */
 }
 
+static void _init_root(struct zus_sb_info *sbi)
+{
+	struct zus_inode *root = find_zi(sbi, FOOFS_ROOT_NO);
+	struct timespec now;
+
+	memset(root, 0, sizeof(*root));
+
+	root->i_nlink = 2;
+	root->i_mode = S_IFDIR | 0644;
+	root->i_uid = 0;
+	root->i_gid = 0;
+
+	clock_gettime(CLOCK_REALTIME, &now);
+	timespec_to_mt(&root->i_atime, &now);
+	timespec_to_mt(&root->i_mtime, &now);
+	timespec_to_mt(&root->i_ctime, &now);
+}
+
 /* ~~~~~~~~~~~~~~~~ Vectors ~~~~~~~~~~~~~~~~~~~~~*/
+static const struct zus_zii_operations	foofs_zii_operations;
+static const struct zus_sbi_operations	foofs_sbi_operations;
+static const struct zus_zfi_operations	foofs_zfi_operations;
+
+/* ~~~~ foofs_sbi_operations ~~~~ */
+static
+struct zus_sb_info *foofs_sbi_alloc(struct zus_fs_info *zfi)
+{
+	struct zus_sb_info *sbi = calloc(1, sizeof(struct zus_sb_info));
+
+	if (!sbi)
+		return NULL;
+
+	sbi->op = &foofs_sbi_operations;
+	return sbi;
+}
+
+static void foofs_sbi_free(struct zus_sb_info *sbi)
+{
+	free(sbi);
+}
+
+static
+int foofs_sbi_init(struct zus_sb_info *sbi, struct zufs_ioc_mount *zim)
+{
+	_init_root(sbi);
+	sbi->z_root = zus_iget(sbi, FOOFS_ROOT_NO);
+	if (unlikely(!sbi->z_root))
+		return -ENOMEM;
+
+	return 0;
+}
+
+static int foofs_sbi_fini(struct zus_sb_info *sbi)
+{
+	// zus_iput(sbi->z_root); was this done already
+	return 0;
+}
+
+static
+struct zus_inode_info *foofs_zii_alloc(struct zus_sb_info *sbi)
+{
+	struct zus_inode_info *zii = calloc(1, sizeof(struct zus_inode_info));
+
+	if (!zii)
+		return NULL;
+
+	zii->op = &foofs_zii_operations;
+	return zii;
+}
+
+static
+void foofs_zii_free(struct zus_inode_info *zii)
+{
+	free(zii);
+}
+
 static int foofs_statfs(struct zus_sb_info *sbi, struct zufs_ioc_statfs *ioc)
 {
 	uint num_files = _get_fill(sbi);
