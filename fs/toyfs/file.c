@@ -324,9 +324,11 @@ int toyfs_read(void *buf, struct zufs_ioc_IO *ioc_io)
 int toyfs_get_block(struct zus_inode_info *zii,
 		    struct zufs_ioc_get_block *get_block)
 {
+	int err = 0;
 	loff_t off;
 	const size_t blkidx = get_block->index;
 	struct toyfs_page *page;
+	struct toyfs_iblkref *iblkref;
 	struct toyfs_inode_info *tii = Z2II(zii);
 
 	if (!zi_isreg(tii->zii.zi))
@@ -334,15 +336,32 @@ int toyfs_get_block(struct zus_inode_info *zii,
 
 	off = (loff_t)(blkidx * PAGE_SIZE);
 	page = _fetch_page(tii, off);
-	if (page)
+	if (page) {
 		get_block->pmem_bn = toyfs_addr2bn(tii->sbi, page);
-	else
+		get_block->ret_flags = 0;
+		DBG("get_block(exists): ino=%ld off=%ld pmem_bn=%ld\n",
+		    tii->ino, (long)off, (long)get_block->pmem_bn);
+		goto out;
+	} else if (get_block->rw) {
+		iblkref = _require_iblkref(tii, off);
+		if (iblkref) {
+			get_block->pmem_bn = iblkref->dblkref->bn;
+			get_block->ret_flags = ZUFS_GBF_NEW;
+			DBG("get_block(wr): ino=%ld off=%ld pmem_bn=%ld\n",
+			    tii->ino, (long)off, (long)get_block->pmem_bn);
+		} else {
+			ERROR("get_block(new): ino=%ld off=%ld FAILED\n",
+					tii->ino, (long)off);
+			err = -ENOSPC;
+		}
+	} else {
 		get_block->pmem_bn = 0;
-
-	DBG("get_block: ino=%ld blkidx=%lu pmem_bn=%ld\n",
-	    tii->ino, blkidx, (long)get_block->pmem_bn);
-
-	return 0;
+		get_block->ret_flags = 0;
+		DBG("get_block(rd): ino=%ld off=%ld pmem_bn=%ld\n",
+		    tii->ino, (long)off, (long)get_block->pmem_bn);
+	}
+out:
+	return err;
 }
 
 static void _clone_data(struct toyfs_sb_info *sbi,
