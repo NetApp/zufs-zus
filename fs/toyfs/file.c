@@ -19,7 +19,6 @@
 #include <linux/falloc.h>
 
 #include "_pr.h"
-#include "list.h"
 #include "zus.h"
 #include "toyfs.h"
 
@@ -37,15 +36,12 @@
 #endif
 
 
-static void
-_drop_iblkref(struct toyfs_inode_info *tii,
-	      struct toyfs_iblkref *iblkref);
+static void _drop_iblkref(struct toyfs_inode_info *tii,
+			  struct toyfs_iblkref *iblkref);
 
+static struct toyfs_iblkref *
+_require_iblkref(struct toyfs_inode_info *tii, loff_t off);
 
-static void list_add_before(struct list_head *elem, struct list_head *head)
-{
-	_list_add(elem, head->prev, head);
-}
 
 static struct toyfs_dblkref *_new_dblkref(struct toyfs_sb_info *sbi)
 {
@@ -258,8 +254,8 @@ static loff_t _tin_offset(loff_t off, size_t len, size_t isize)
 static struct toyfs_iblkref *
 _fetch_iblkref(struct toyfs_inode_info *tii, loff_t off)
 {
-	struct list_head *itr;
-	struct list_head *iblkrefs;
+	struct toyfs_list_head *itr;
+	struct toyfs_list_head *iblkrefs;
 	struct toyfs_iblkref *iblkref;
 	struct toyfs_inode_reg *reg_ti = &tii->ti->ti.reg;
 	const loff_t boff = _off_to_boff(off);
@@ -366,10 +362,10 @@ static void _clone_data(struct toyfs_sb_info *sbi,
 static struct toyfs_iblkref *
 _require_iblkref(struct toyfs_inode_info *tii, loff_t off)
 {
-	struct list_head *itr;
+	struct toyfs_list_head *itr;
 	struct toyfs_dblkref *dblkref;
 	struct toyfs_iblkref *iblkref = NULL;
-	struct list_head *iblkrefs;
+	struct toyfs_list_head *iblkrefs;
 	struct toyfs_inode_reg *reg_ti = &tii->ti->ti.reg;
 	const loff_t boff = _off_to_boff(off);
 
@@ -390,7 +386,7 @@ _require_iblkref(struct toyfs_inode_info *tii, loff_t off)
 		iblkref = _new_iblkref(tii, boff);
 		if (!iblkref)
 			return NULL;
-		list_add_before(&iblkref->head, itr);
+		toyfs_list_add_before(&iblkref->head, itr);
 	} else if (iblkref->dblkref->refcnt > 1) {
 		dblkref = _new_dblkref(tii->sbi);
 		if (!dblkref)
@@ -623,18 +619,18 @@ static void _drop_iblkref(struct toyfs_inode_info *tii,
 {
 	if (iblkref) {
 		DBG_("drop page: ino=%lu off=%ld bn=%lu\n",
-		    tii->ino, iblkref->off, iblkref->dblkref->bn);
-		list_del(&iblkref->head);
+		     tii->ino, iblkref->off, iblkref->dblkref->bn);
+		toyfs_list_del(&iblkref->head);
 		_free_iblkref(tii, iblkref);
 	}
 }
 
 static void _drop_range(struct toyfs_inode_info *tii, loff_t pos)
 {
-	struct list_head *itr;
+	struct toyfs_list_head *itr;
 	struct toyfs_iblkref *iblkref = NULL;
 	struct toyfs_inode_reg *reg_ti = &tii->ti->ti.reg;
-	struct list_head *iblkrefs = &reg_ti->r_iblkrefs;
+	struct toyfs_list_head *iblkrefs = &reg_ti->r_iblkrefs;
 
 	if (pos % PAGE_SIZE)
 		pos = _next_page(pos);
@@ -669,12 +665,12 @@ int toyfs_truncate(struct toyfs_inode_info *tii, size_t size)
 static int _clone_entire_file_range(struct toyfs_inode_info *src_tii,
 				    struct toyfs_inode_info *dst_tii)
 {
-	struct list_head *itr;
+	struct toyfs_list_head *itr;
 	struct toyfs_iblkref *src_iblkref, *dst_iblkref;
 	struct zus_inode *src_zi = src_tii->zii.zi;
 	struct zus_inode *dst_zi = dst_tii->zii.zi;
-	struct list_head *src_iblkrefs = &src_tii->ti->ti.reg.r_iblkrefs;
-	struct list_head *dst_iblkrefs = &dst_tii->ti->ti.reg.r_iblkrefs;
+	struct toyfs_list_head *src_iblkrefs = &src_tii->ti->ti.reg.r_iblkrefs;
+	struct toyfs_list_head *dst_iblkrefs = &dst_tii->ti->ti.reg.r_iblkrefs;
 
 	_drop_range(dst_tii, 0);
 
@@ -692,7 +688,7 @@ static int _clone_entire_file_range(struct toyfs_inode_info *src_tii,
 		dst_iblkref->off = src_iblkref->off;
 		dst_iblkref->dblkref = src_iblkref->dblkref;
 		dst_iblkref->dblkref->refcnt++;
-		list_add_tail(&dst_iblkref->head, dst_iblkrefs);
+		toyfs_list_add_tail(&dst_iblkref->head, dst_iblkrefs);
 		dst_zi->i_blocks++;
 	}
 	toyfs_sbi_unlock(dst_tii->sbi);

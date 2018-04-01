@@ -33,7 +33,10 @@
 #ifndef STR
 #define STR(x_)		MAKESTR(x_)
 #endif
-
+#ifndef container_of
+#define container_of(ptr, type, member) \
+	(type *)((void *)((char *)ptr - offsetof(type, member)))
+#endif
 
 #define toyfs_panic(fmt, ...) \
 	toyfs_panicf(__FILE__, __LINE__, fmt, __VA_ARGS__)
@@ -53,6 +56,27 @@
 #define Z2II(zii) toyfs_zii_to_tii(zii)
 
 
+struct toyfs_list_head {
+	struct toyfs_list_head *next;
+	struct toyfs_list_head *prev;
+};
+
+void toyfs_list_init(struct toyfs_list_head *list);
+
+void toyfs_list_add(struct toyfs_list_head *elem, struct toyfs_list_head *head);
+
+void toyfs_list_del(struct toyfs_list_head *entry);
+
+int toyfs_list_empty(const struct toyfs_list_head *head);
+
+void toyfs_list_add_tail(struct toyfs_list_head *elem,
+			 struct toyfs_list_head *head);
+
+void toyfs_list_add_before(struct toyfs_list_head *elem,
+			   struct toyfs_list_head *head);
+
+
+
 struct toyfs_page {
 	uint8_t dat[PAGE_SIZE];
 };
@@ -60,10 +84,10 @@ struct toyfs_page {
 struct toyfs_pool {
 	pthread_mutex_t mutex;
 	union toyfs_pool_page *pages;
-	struct list_head free_dblkrefs;
-	struct list_head free_iblkrefs;
-	struct list_head free_dirents;
-	struct list_head free_inodes;
+	struct toyfs_list_head free_dblkrefs;
+	struct toyfs_list_head free_iblkrefs;
+	struct toyfs_list_head free_dirents;
+	struct toyfs_list_head free_inodes;
 	void	*mem;
 	size_t	msz;
 	bool	pmem;
@@ -98,13 +122,13 @@ struct toyfs_sb_info {
 
 
 struct toyfs_inode_dir {
-	struct list_head d_childs;
+	struct toyfs_list_head d_childs;
 	size_t d_ndentry;
 	loff_t d_off_max;
 };
 
 struct toyfs_inode_reg {
-	struct list_head r_iblkrefs;
+	struct toyfs_list_head r_iblkrefs;
 	ino_t r_first_parent;
 };
 
@@ -124,7 +148,7 @@ struct toyfs_inode {
 };
 
 union toyfs_inode_head {
-	struct list_head head;
+	struct toyfs_list_head head;
 	struct toyfs_inode inode;
 };
 
@@ -138,7 +162,7 @@ struct toyfs_inode_info {
 };
 
 struct toyfs_dirent {
-	struct list_head d_head;
+	struct toyfs_list_head d_head;
 	loff_t  d_off;
 	ino_t   d_ino;
 	size_t  d_nlen;
@@ -147,13 +171,13 @@ struct toyfs_dirent {
 };
 
 struct toyfs_dblkref {
-	struct list_head head;
+	struct toyfs_list_head head;
 	size_t refcnt;
 	size_t bn;
 };
 
 struct toyfs_iblkref {
-	struct list_head head;
+	struct toyfs_list_head head;
 	struct toyfs_dblkref *dblkref;
 	loff_t off;
 };

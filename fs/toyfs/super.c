@@ -21,7 +21,6 @@
 #include <errno.h>
 
 #include "_pr.h"
-#include "list.h"
 #include "zus.h"
 #include "toyfs.h"
 
@@ -196,10 +195,10 @@ static void _pool_init(struct toyfs_pool *pool)
 	pool->mem = NULL;
 	pool->msz = 0;
 	pool->pages = NULL;
-	list_init(&pool->free_dblkrefs);
-	list_init(&pool->free_iblkrefs);
-	list_init(&pool->free_dirents);
-	list_init(&pool->free_inodes);
+	toyfs_list_init(&pool->free_dblkrefs);
+	toyfs_list_init(&pool->free_iblkrefs);
+	toyfs_list_init(&pool->free_dirents);
+	toyfs_list_init(&pool->free_inodes);
 	toyfs_mutex_init(&pool->mutex);
 }
 
@@ -290,12 +289,12 @@ static int _pool_add_free_inodes(struct toyfs_pool *pool)
 
 	ipage = (union toyfs_inodes_page *)page;
 	for (i = 0; i < ARRAY_SIZE(ipage->inodes); ++i)
-		list_add(&ipage->inodes[i].head, &pool->free_inodes);
+		toyfs_list_add(&ipage->inodes[i].head, &pool->free_inodes);
 
 	return 0;
 }
 
-static struct toyfs_inode *_list_head_to_inode(struct list_head *head)
+static struct toyfs_inode *_list_head_to_inode(struct toyfs_list_head *head)
 {
 	union toyfs_inode_head *ihead;
 
@@ -307,9 +306,9 @@ static struct toyfs_inode *_pool_pop_free_inode(struct toyfs_pool *pool)
 {
 	struct toyfs_inode *ti = NULL;
 
-	if (!list_empty(&pool->free_inodes)) {
+	if (!toyfs_list_empty(&pool->free_inodes)) {
 		ti = _list_head_to_inode(pool->free_inodes.next);
-		list_del(pool->free_inodes.next);
+		toyfs_list_del(pool->free_inodes.next);
 	}
 	return ti;
 }
@@ -342,7 +341,7 @@ static void _pool_push_inode(struct toyfs_pool *pool, struct toyfs_inode *inode)
 	memset(ihead, 0, sizeof(*ihead));
 
 	_pool_lock(pool);
-	list_add_tail(&ihead->head, &pool->free_inodes);
+	toyfs_list_add_tail(&ihead->head, &pool->free_inodes);
 	_pool_unlock(pool);
 }
 
@@ -370,19 +369,19 @@ static int _pool_add_free_dirents(struct toyfs_pool *pool)
 	dpage = (union toyfs_dirents_page *)page;
 	for (i = 0; i < ARRAY_SIZE(dpage->dirents); ++i) {
 		dirent = &dpage->dirents[i];
-		list_add_tail(&dirent->d_head, &pool->free_dirents);
+		toyfs_list_add_tail(&dirent->d_head, &pool->free_dirents);
 	}
 	return 0;
 }
 
 static struct toyfs_dirent *_pool_pop_free_dirent(struct toyfs_pool *pool)
 {
-	struct list_head *elem;
+	struct toyfs_list_head *elem;
 	struct toyfs_dirent *dirent = NULL;
 
-	if (!list_empty(&pool->free_dirents)) {
+	if (!toyfs_list_empty(&pool->free_dirents)) {
 		elem = pool->free_dirents.next;
-		list_del(elem);
+		toyfs_list_del(elem);
 		dirent = container_of(elem, struct toyfs_dirent, d_head);
 	}
 	return dirent;
@@ -408,7 +407,7 @@ static void _pool_push_dirent(struct toyfs_pool *pool,
 			      struct toyfs_dirent *dirent)
 {
 	_pool_lock(pool);
-	list_add_tail(&dirent->d_head, &pool->free_dirents);
+	toyfs_list_add_tail(&dirent->d_head, &pool->free_dirents);
 	_pool_unlock(pool);
 }
 
@@ -426,19 +425,19 @@ static int _pool_add_free_dblkrefs(struct toyfs_pool *pool)
 	ppage = (union toyfs_dblkrefs_page *)page;
 	for (i = 0; i < ARRAY_SIZE(ppage->dblkrefs); ++i) {
 		dblkref = &ppage->dblkrefs[i];
-		list_add_tail(&dblkref->head, &pool->free_dblkrefs);
+		toyfs_list_add_tail(&dblkref->head, &pool->free_dblkrefs);
 	}
 	return 0;
 }
 
 static struct toyfs_dblkref *_pool_pop_free_dblkref(struct toyfs_pool *pool)
 {
-	struct list_head *elem;
+	struct toyfs_list_head *elem;
 	struct toyfs_dblkref *dblkref = NULL;
 
-	if (!list_empty(&pool->free_dblkrefs)) {
+	if (!toyfs_list_empty(&pool->free_dblkrefs)) {
 		elem = pool->free_dblkrefs.next;
-		list_del(elem);
+		toyfs_list_del(elem);
 		dblkref = container_of(elem, struct toyfs_dblkref, head);
 	}
 	return dblkref;
@@ -464,7 +463,7 @@ static void _pool_push_dblkref(struct toyfs_pool *pool,
 			       struct toyfs_dblkref *dblkref)
 {
 	_pool_lock(pool);
-	list_add(&dblkref->head, &pool->free_dblkrefs);
+	toyfs_list_add(&dblkref->head, &pool->free_dblkrefs);
 	_pool_unlock(pool);
 }
 
@@ -482,19 +481,19 @@ static int _pool_add_free_iblkrefs(struct toyfs_pool *pool)
 	bpage = (union toyfs_iblkrefs_page *)page;
 	for (i = 0; i < ARRAY_SIZE(bpage->iblkrefs); ++i) {
 		iblkref = &bpage->iblkrefs[i];
-		list_add_tail(&iblkref->head, &pool->free_iblkrefs);
+		toyfs_list_add_tail(&iblkref->head, &pool->free_iblkrefs);
 	}
 	return 0;
 }
 
 static struct toyfs_iblkref *_pool_pop_free_iblkref(struct toyfs_pool *pool)
 {
-	struct list_head *elem;
+	struct toyfs_list_head *elem;
 	struct toyfs_iblkref *iblkref = NULL;
 
-	if (!list_empty(&pool->free_iblkrefs)) {
+	if (!toyfs_list_empty(&pool->free_iblkrefs)) {
 		elem = pool->free_iblkrefs.next;
-		list_del(elem);
+		toyfs_list_del(elem);
 		iblkref = container_of(elem, struct toyfs_iblkref, head);
 	}
 	return iblkref;
@@ -520,7 +519,7 @@ static void _pool_push_iblkref(struct toyfs_pool *pool,
 			       struct toyfs_iblkref *iblkref)
 {
 	_pool_lock(pool);
-	list_add(&iblkref->head, &pool->free_iblkrefs);
+	toyfs_list_add(&iblkref->head, &pool->free_iblkrefs);
 	_pool_unlock(pool);
 }
 
@@ -678,8 +677,8 @@ struct toyfs_page *toyfs_acquire_page(struct toyfs_sb_info *sbi)
 	sbi->s_statvfs.f_bfree--;
 	sbi->s_statvfs.f_bavail--;
 	DBG_("alloc_page: blocks=%lu bfree=%lu pmem_bn=%lu\n",
-	    sbi->s_statvfs.f_blocks, sbi->s_statvfs.f_bfree,
-	    toyfs_addr2bn(sbi, page));
+		sbi->s_statvfs.f_blocks, sbi->s_statvfs.f_bfree,
+	     toyfs_addr2bn(sbi, page));
 out:
 	toyfs_sbi_unlock(sbi);
 	return page;
@@ -692,8 +691,8 @@ void toyfs_release_page(struct toyfs_sb_info *sbi, struct toyfs_page *page)
 	sbi->s_statvfs.f_bfree++;
 	sbi->s_statvfs.f_bavail++;
 	DBG_("free_page: blocks=%lu bfree=%lu pmem_bn=%lu\n",
-	    sbi->s_statvfs.f_blocks, sbi->s_statvfs.f_bfree,
-	    toyfs_addr2bn(sbi, page));
+	     sbi->s_statvfs.f_blocks, sbi->s_statvfs.f_bfree,
+	     toyfs_addr2bn(sbi, page));
 	toyfs_sbi_unlock(sbi);
 }
 
@@ -800,7 +799,7 @@ static int _new_root_inode(struct toyfs_sb_info *sbi,
 	root_ti->i_parent_ino = TOYFS_ROOT_INO;
 	root_ti->ti.dir.d_ndentry = 0;
 	root_ti->ti.dir.d_off_max = 2;
-	list_init(&root_ti->ti.dir.d_childs);
+	toyfs_list_init(&root_ti->ti.dir.d_childs);
 
 	_itable_insert(&sbi->s_itable, root_tii);
 	*out_ii = root_tii;

@@ -17,7 +17,6 @@
 #include <errno.h>
 
 #include "_pr.h"
-#include "list.h"
 #include "zus.h"
 #include "toyfs.h"
 
@@ -41,7 +40,7 @@ static void _set_dirent(struct toyfs_dirent *dirent,
 	toyfs_assert(nlen < sizeof(dirent->d_name));
 
 	memset(dirent, 0, sizeof(*dirent)); /* TODO: rm */
-	list_init(&dirent->d_head);
+	toyfs_list_init(&dirent->d_head);
 	dirent->d_nlen = nlen;
 	dirent->d_ino = tii->ino;
 	dirent->d_type = IFTODT(_mode_of(tii));
@@ -61,7 +60,7 @@ int toyfs_add_dentry(struct zus_inode_info *dir_zii,
 {
 	loff_t doff;
 	struct toyfs_dirent *dirent;
-	struct list_head *childs;
+	struct toyfs_list_head *childs;
 	struct toyfs_inode_info *dir_tii = Z2II(dir_zii);
 	struct toyfs_inode_info *tii = Z2II(zii);
 	const ino_t dirino = dir_tii->ino;
@@ -77,7 +76,7 @@ int toyfs_add_dentry(struct zus_inode_info *dir_zii,
 
 	doff = _next_doff(dir_tii);
 	_set_dirent(dirent, str->name, str->len, tii, doff);
-	list_add_tail(&dirent->d_head, childs);
+	toyfs_list_add_tail(&dirent->d_head, childs);
 	dir_tii->ti->ti.dir.d_ndentry++;
 	dir_tii->ti->zi.i_size = (size_t)(doff + PAGE_SIZE + 2);
 	zus_std_add_dentry(dir_tii->zii.zi, tii->zii.zi);
@@ -96,7 +95,7 @@ int toyfs_remove_dentry(struct zus_inode_info *dir_zii, struct zufs_str *str)
 	ino_t ino;
 	mode_t mode;
 	struct toyfs_dirent *dirent = NULL;
-	struct list_head *childs, *itr;
+	struct toyfs_list_head *childs, *itr;
 	struct toyfs_inode_info *tii;
 	struct zus_inode *zi;
 	const char *symval;
@@ -134,7 +133,7 @@ int toyfs_remove_dentry(struct zus_inode_info *dir_zii, struct zufs_str *str)
 		DBG("remove_dentry: ino=%lu mode=%o\n", ino, mode);
 	}
 
-	list_del(&dirent->d_head);
+	toyfs_list_del(&dirent->d_head);
 	dir_tii->ti->ti.dir.d_ndentry--;
 	zus_std_remove_dentry(dir_tii->zii.zi, zi);
 	toyfs_release_dirent(dir_tii->sbi, dirent);
@@ -213,7 +212,7 @@ static bool _iterate_dir(struct toyfs_inode_info *dir_tii,
 {
 	bool ok = true;
 	struct toyfs_dirent *dirent;
-	struct list_head *itr, *childs;
+	struct toyfs_list_head *itr, *childs;
 	struct toyfs_inode *dir_ti = dir_tii->ti;
 
 	if (ctx->pos == 0) {

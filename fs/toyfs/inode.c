@@ -21,7 +21,6 @@
 #include <sys/stat.h>
 
 #include "_pr.h"
-#include "list.h"
 #include "zus.h"
 #include "toyfs.h"
 
@@ -69,7 +68,7 @@ int toyfs_new_inode(struct zus_sb_info *zsbi, struct zus_inode_info *zii,
 
 	if (zi_isdir(zi)) {
 		DBG("new_inode(dir): ino=%lu\n", ino);
-		list_init(&ti->ti.dir.d_childs);
+		toyfs_list_init(&ti->ti.dir.d_childs);
 		ti->ti.dir.d_ndentry = 0;
 		ti->ti.dir.d_off_max = 2;
 		ti->zi.i_size = PAGE_SIZE;
@@ -77,7 +76,7 @@ int toyfs_new_inode(struct zus_sb_info *zsbi, struct zus_inode_info *zii,
 		zus_std_new_dir(dir_tii->zii.zi, &ti->zi);
 	} else if (zi_isreg(zi)) {
 		DBG("new_inode(reg): ino=%lu\n", ino);
-		list_init(&ti->ti.reg.r_iblkrefs);
+		toyfs_list_init(&ti->ti.reg.r_iblkrefs);
 		ti->ti.reg.r_first_parent = dir_tii->zii.zi->i_ino;
 		if (ioc_new->flags & ZI_TMPFILE)
 			ti->zi.i_nlink = 1;

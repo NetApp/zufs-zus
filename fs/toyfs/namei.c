@@ -18,7 +18,6 @@
 #include <errno.h>
 
 #include "_pr.h"
-#include "list.h"
 #include "zus.h"
 #include "toyfs.h"
 
@@ -33,7 +32,7 @@ static ino_t _lookup(struct toyfs_inode_info *dir_tii, struct zufs_str *str)
 {
 	ino_t ino = TOYFS_NULL_INO;
 	struct toyfs_dirent *dirent = NULL;
-	struct list_head *childs, *itr;
+	struct toyfs_list_head *childs, *itr;
 
 	DBG("lookup: dirino=%lu %.*s\n",
 	    dir_tii->ino, str->len, str->name);

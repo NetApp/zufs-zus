@@ -12,11 +12,60 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stddef.h>
 #include <string.h>
 #include <unistd.h>
 #include <limits.h>
 #include <errno.h>
 #include "toyfs.h"
+
+void toyfs_list_init(struct toyfs_list_head *list)
+{
+	list->next = list;
+	list->prev = list;
+}
+
+static void _link_elem(struct toyfs_list_head *elem,
+		       struct toyfs_list_head *prev,
+		       struct toyfs_list_head *next)
+{
+	next->prev = elem;
+	elem->next = next;
+	elem->prev = prev;
+	prev->next = elem;
+}
+
+void toyfs_list_add(struct toyfs_list_head *new,
+		    struct toyfs_list_head *head)
+{
+	_link_elem(new, head->prev, head);
+}
+
+void toyfs_list_del(struct toyfs_list_head *elem)
+{
+	elem->next->prev = elem->prev;
+	elem->prev->next = elem->next;
+}
+
+int toyfs_list_empty(const struct toyfs_list_head *head)
+{
+	return (head->next == head);
+}
+
+void toyfs_list_add_tail(struct toyfs_list_head *elem,
+			 struct toyfs_list_head *head)
+{
+	_link_elem(elem, head->prev, head);
+}
+
+void toyfs_list_add_before(struct toyfs_list_head *elem,
+			   struct toyfs_list_head *head)
+{
+	_link_elem(elem, head->prev, head);
+}
+
+
+/*. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .*/
 
 void toyfs_panicf(const char *file, int line, const char *fmt, ...)
 {

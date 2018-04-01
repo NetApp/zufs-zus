@@ -26,7 +26,6 @@
 #include <uuid/uuid.h>
 
 #include "_pr.h"
-#include "list.h"
 #include "zus.h"
 #include "toyfs.h"
 
