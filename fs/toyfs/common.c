@@ -84,13 +84,14 @@ void toyfs_panicf(const char *file, int line, const char *fmt, ...)
 
 void toyfs_mutex_init(pthread_mutex_t *mutex)
 {
-	int err;
+	int err, kind;
 	pthread_mutexattr_t attr;
 
 	err = pthread_mutexattr_init(&attr);
 	toyfs_panic_if_err(err, "pthread_mutexattr_init");
 
-	err = pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK);
+	kind = PTHREAD_MUTEX_RECURSIVE; /* TODO: PTHREAD_MUTEX_ERRORCHECK */
+	err = pthread_mutexattr_settype(&attr, kind);
 	toyfs_panic_if_err(err, "pthread_mutexattr_settype");
 
 	err = pthread_mutex_init(mutex, &attr);

@@ -175,6 +175,7 @@ _copy_out(void *tgt, const struct toyfs_page *page, loff_t off, size_t len)
 static void
 _copy_in(struct toyfs_page *page, const void *src, loff_t off, size_t len)
 {
+	toyfs_assert(page != NULL);
 	toyfs_assert(len <= sizeof(page->dat));
 	toyfs_assert((size_t)off + len <= sizeof(page->dat));
 	memcpy(&page->dat[off], src, len);
@@ -797,11 +798,13 @@ static int _clone_sub_file_range(struct toyfs_inode_info *src_tii,
 				 struct toyfs_inode_info *dst_tii,
 				 loff_t src_pos, loff_t dst_pos, size_t nbytes)
 {
-	int err;
+	int err = 0;
 	size_t src_len, dst_len, len;
 	loff_t src_off, src_end, src_nxt;
 	loff_t dst_off, dst_end, dst_nxt;
+	struct toyfs_sb_info *sbi = src_tii->sbi;
 
+	toyfs_sbi_lock(sbi);
 	src_off = src_pos;
 	src_end = src_off + (loff_t)nbytes;
 	dst_off = dst_pos;
@@ -816,12 +819,13 @@ static int _clone_sub_file_range(struct toyfs_inode_info *src_tii,
 		len = src_len < dst_len ? src_len : dst_len;
 		err = _clone_range(src_tii, dst_tii, src_off, dst_off, len);
 		if (err)
-			return err;
+			break;
 
 		src_off += len;
 		dst_off += len;
 	}
-	return 0;
+	toyfs_sbi_unlock(sbi);
+	return err;
 }
 
 static int _clone(struct toyfs_inode_info *src_tii,

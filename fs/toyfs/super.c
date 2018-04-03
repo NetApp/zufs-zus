@@ -92,9 +92,6 @@ struct toyfs_page *toyfs_bn2page(struct toyfs_sb_info *sbi, size_t bn)
 	return (struct toyfs_page *)toyfs_bn2addr(sbi, bn);
 }
 
-
-
-
 void toyfs_sbi_lock(struct toyfs_sb_info *sbi)
 {
 	toyfs_mutex_lock(&sbi->s_mutex);
