@@ -16,10 +16,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 
-/* FIXME: This will break if zus.h is included after  linux/stat.h somewhere */
 #include <linux/stat.h>
-
-
 /* This is a nasty hack for getting O_TMPFILE into centos 7.4
  * it already exists on centos7.4 but with a diffrent name
  * the value is the same
@@ -42,17 +39,35 @@
 extern bool g_verify;
 #define MAX_LFS_FILESIZE 	((loff_t)0x7fffffffffffffffLL)
 
-/* File backed Allocator - Gives user an allocated pointer
- * which is derived from a /tmp/O_TMPFILE mmap. The size
- * is round up to 4K alignment.
- */
+/* Time-stamps in zufs at inode and device-table are of this format */
+#ifndef NSEC_PER_SEC
+	#define NSEC_PER_SEC 1000000000UL
+#endif
+
+static inline __s64 div_s64_rem(__s64 X, __s32 y, __u32 *rem)
+{
+	*rem = X % y;
+	return X / y;
+}
+
+static inline void timespec_to_mt(__le64 *mt, struct timespec *t)
+{
+	*mt = cpu_to_le64(t->tv_sec * NSEC_PER_SEC + t->tv_nsec);
+}
+
+static inline void mt_to_timespec(struct timespec *t, __le64 *mt)
+{
+	__u32 nsec;
+
+	t->tv_sec = div_s64_rem(le64_to_cpu(*mt), NSEC_PER_SEC, &nsec);
+	t->tv_nsec = nsec;
+}
+
+/* ~~~~ pmem ~~~~ */
+
 struct fba {
 	int fd; void *ptr;
 };
-int  fba_alloc(struct fba *fba, size_t size);
-void fba_free(struct fba *fba);
-
-/* ~~~~ pmem ~~~~ */
 
 /* Each FS-type can decide what size to have for the page */
 struct zus_pmem_page {
@@ -291,5 +306,13 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr);
 
 /* foofs.c */
 int foofs_register_fs(int fd);
+
+/* Currently at zus-vfs.c */
+/* File backed Allocator - Gives user an allocated pointer
+ * which is derived from a /tmp/O_TMPFILE mmap. The size
+ * is round up to 4K alignment.
+ */
+int  fba_alloc(struct fba *fba, size_t size);
+void fba_free(struct fba *fba);
 
 #endif /* define __ZUS_H__ */
