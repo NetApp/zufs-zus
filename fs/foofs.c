@@ -368,9 +368,18 @@ static void foofs_evict(struct zus_inode_info *zii)
 
 static int foofs_read(void *ptr, struct zufs_ioc_IO *op)
 {
+	struct zus_inode_info *zii = op->zus_ii;
 	ulong *app_ptr = ptr;
 	ulong *app_end = app_ptr + op->hdr.len / sizeof(ulong);
-	ulong start = op->filepos;
+	ulong start = op->filepos / sizeof(ulong);
+
+// 	INFO("READ start=0x%lx len=0x%lx offset=0x%x\n",
+// 	     start, op->hdr.len / sizeof(ulong), op->hdr.offset);
+
+	if (zii->zi->i_on_disk.a[0]) {
+		*app_ptr = 0xB00DBAAD;
+		return 0;
+	}
 
 	while(app_ptr < app_end)
 		*app_ptr++ = start++;
@@ -380,16 +389,22 @@ static int foofs_read(void *ptr, struct zufs_ioc_IO *op)
 
 static int foofs_write(void *ptr, struct zufs_ioc_IO *op)
 {
+	struct zus_inode_info *zii = op->zus_ii;
 	ulong *app_ptr = ptr;
 	ulong *app_end = app_ptr + op->hdr.len / sizeof(ulong);
 	ulong start = op->filepos / sizeof(ulong);
 
-	while(app_ptr < app_end) {
-		if (*app_ptr++ != start++) {
-			if (g_verify)
+	zii->zi->i_on_disk.a[0] = 0;
+// 	INFO("WRITE start=0x%lx len=0x%lx offset=0x%x\n",
+// 	     start, op->hdr.len / sizeof(ulong), op->hdr.offset);
+
+	for(;app_ptr < app_end; ++app_ptr, ++start) {
+		if (*app_ptr != start) {
+// 			if (g_verify)
 				ERROR("*app_ptr(0x%lx) != start(0x%lx) offset=0x%x len=0x%x\n",
 					*app_ptr, start, op->hdr.offset, op->hdr.len);
 // 			break;
+			zii->zi->i_on_disk.a[0] = 1; /*tell read to fail*/
 		}
 	}
 	return 0;
