@@ -30,6 +30,15 @@ static ino_t _next_ino(struct toyfs_sb_info *sbi)
 	return __atomic_fetch_add(&sbi->s_top_ino, 1, __ATOMIC_CONSUME);
 }
 
+static bool issupported(const struct zus_inode *zi)
+{
+	const mode_t mode = zi->i_mode;
+
+	return zi_isdir(zi) || zi_isreg(zi) || zi_islnk(zi) ||
+	       S_ISCHR(mode) || S_ISBLK(mode) ||
+	       S_ISFIFO(mode) || S_ISSOCK(mode);
+}
+
 int toyfs_new_inode(struct zus_sb_info *zsbi, struct zus_inode_info *zii,
 		    void *app_ptr, struct zufs_ioc_new_inode *ioc_new)
 {
@@ -48,7 +57,7 @@ int toyfs_new_inode(struct zus_sb_info *zsbi, struct zus_inode_info *zii,
 	mode = zi->i_mode;
 	DBG("new_inode:sbi=%p tii=%p mode=%o\n", sbi, tii, mode);
 
-	if (!(zi_isdir(zi) || zi_isreg(zi) || zi_islnk(zi) || S_ISFIFO(mode)))
+	if (!issupported(zi))
 		return -ENOTSUP;
 	if (zi->i_size >= PAGE_SIZE)
 		return -EINVAL;
@@ -96,8 +105,8 @@ int toyfs_new_inode(struct zus_sb_info *zsbi, struct zus_inode_info *zii,
 			memcpy(page->dat, symname, symlen);
 			ti->ti.symlnk.sl_long = page;
 		}
-	} else if (S_ISFIFO(mode)) {
-		DBG("new_inode(fifo): ino=%lu\n", ino);
+	} else {
+		DBG("new_inode: ino=%lu mode=%o\n", ino, mode);
 		ti->ti.reg.r_first_parent = dir_tii->zii.zi->i_ino;
 	}
 

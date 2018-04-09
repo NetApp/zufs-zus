@@ -352,7 +352,7 @@ int toyfs_get_block(struct zus_inode_info *zii,
 			    tii->ino, (long)off, (long)get_block->pmem_bn);
 		} else {
 			ERROR("get_block(new): ino=%ld off=%ld FAILED\n",
-					tii->ino, (long)off);
+			      tii->ino, (long)off);
 			err = -ENOSPC;
 		}
 	} else {

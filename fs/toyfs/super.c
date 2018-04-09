@@ -674,7 +674,7 @@ struct toyfs_page *toyfs_acquire_page(struct toyfs_sb_info *sbi)
 	sbi->s_statvfs.f_bfree--;
 	sbi->s_statvfs.f_bavail--;
 	DBG_("alloc_page: blocks=%lu bfree=%lu pmem_bn=%lu\n",
-		sbi->s_statvfs.f_blocks, sbi->s_statvfs.f_bfree,
+	     sbi->s_statvfs.f_blocks, sbi->s_statvfs.f_bfree,
 	     toyfs_addr2bn(sbi, page));
 out:
 	toyfs_sbi_unlock(sbi);
