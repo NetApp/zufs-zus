@@ -92,6 +92,13 @@ struct toyfs_page *toyfs_bn2page(struct toyfs_sb_info *sbi, size_t bn)
 	return (struct toyfs_page *)toyfs_bn2addr(sbi, bn);
 }
 
+zu_dpp_t toyfs_page2dpp(struct toyfs_sb_info *sbi, struct toyfs_page *page)
+{
+	struct zus_pmem *pmem = &sbi->s_zus_sbi.pmem;
+
+	return pmem_dpp_t(pmem_addr_2_offset(pmem, page));
+}
+
 void toyfs_sbi_lock(struct toyfs_sb_info *sbi)
 {
 	toyfs_mutex_lock(&sbi->s_mutex);

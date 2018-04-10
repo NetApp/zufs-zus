@@ -104,15 +104,13 @@ int toyfs_new_inode(struct zus_sb_info *zsbi, struct zus_inode_info *zii,
 			}
 			memcpy(page->dat, symname, symlen);
 			ti->ti.symlnk.sl_long = page;
+			tii->zii.zi->i_sym_dpp = toyfs_page2dpp(sbi, page);
 		}
 	} else {
 		DBG("new_inode: ino=%lu mode=%o\n", ino, mode);
 		ti->ti.reg.r_first_parent = dir_tii->zii.zi->i_ino;
 	}
-
-
 	toyfs_track_inode(tii);
-	ioc_new->zi.i_ino = ino;
 	return 0;
 }
 

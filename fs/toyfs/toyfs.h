@@ -194,6 +194,7 @@ void toyfs_sbi_free(struct zus_sb_info *zsbi);
 size_t toyfs_addr2bn(struct toyfs_sb_info *sbi, void *ptr);
 void *toyfs_bn2addr(struct toyfs_sb_info *sbi, size_t bn);
 struct toyfs_page *toyfs_bn2page(struct toyfs_sb_info *sbi, size_t bn);
+zu_dpp_t toyfs_page2dpp(struct toyfs_sb_info *sbi, struct toyfs_page *page);
 struct toyfs_inode *toyfs_acquire_inode(struct toyfs_sb_info *sbi);
 void toyfs_release_inode(struct toyfs_sb_info *sbi, struct toyfs_inode *inode);
 void toyfs_track_inode(struct toyfs_inode_info *tii);
