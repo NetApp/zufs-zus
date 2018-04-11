@@ -724,10 +724,12 @@ _unique_page(struct toyfs_sb_info *sbi, struct toyfs_iblkref *iblkref)
 
 	page = toyfs_bn2page(sbi, dblkref->bn);
 	if (dblkref->refcnt > 1) {
-		dblkref = toyfs_acquire_dblkref(sbi);
+		dblkref = _new_dblkref(sbi);
 		if (!dblkref)
 			return NULL;
 		new_page = toyfs_bn2page(sbi, dblkref->bn);
+		toyfs_assert(new_page != NULL);
+
 		_copy_page(new_page, page);
 
 		iblkref->dblkref->refcnt--;
