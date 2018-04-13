@@ -16,6 +16,9 @@ fs/libfoofs.a: fs/foofs.o
 
 fs_libs+=fs/libfoofs.a
 
+# toyfs
+-include fs/toyfs/Makefile
+
 # Add any Makefile from config file
 ifneq ($(realpath $(CONFIG_MAKEFILE)),)
 -include $(CONFIG_MAKEFILE)
