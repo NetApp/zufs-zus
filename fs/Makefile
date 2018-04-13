@@ -15,3 +15,8 @@ fs/libfoofs.a: fs/foofs.o
 	ar rcs $(LDFLAGS) -o $@ $^
 
 fs_libs+=fs/libfoofs.a
+
+# Add any Makefile from config file
+ifneq ($(realpath $(CONFIG_MAKEFILE)),)
+-include $(CONFIG_MAKEFILE)
+endif
