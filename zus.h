@@ -44,7 +44,7 @@ extern bool g_verify;
 	#define NSEC_PER_SEC 1000000000UL
 #endif
 
-static inline __s64 div_s64_rem(__s64 X, __s32 y, __u32 *rem)
+static inline __s64 _z_div_s64_rem(__s64 X, __s32 y, __u32 *rem)
 {
 	*rem = X % y;
 	return X / y;
@@ -59,7 +59,7 @@ static inline void mt_to_timespec(struct timespec *t, __le64 *mt)
 {
 	__u32 nsec;
 
-	t->tv_sec = div_s64_rem(le64_to_cpu(*mt), NSEC_PER_SEC, &nsec);
+	t->tv_sec = _z_div_s64_rem(le64_to_cpu(*mt), NSEC_PER_SEC, &nsec);
 	t->tv_nsec = nsec;
 }
 
@@ -208,11 +208,11 @@ enum E_zus_sbi_flags {
 	ZUS_SBIF_LAST,
 };
 
-static inline void __set_bit(uint flag, ulong *val) { *val |= (1 << flag); }
+static inline void _z_set_bit(uint flag, ulong *val) { *val |= (1 << flag); }
 static inline
 void zus_sbi_flag_set(struct zus_sb_info *sbi, int flag)
 {
-	__set_bit(flag, &sbi->flags);
+	_z_set_bit(flag, &sbi->flags);
 }
 
 struct zus_zfi_operations {
