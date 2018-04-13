@@ -34,7 +34,7 @@ CWARN += -Wwrite-strings -Wmissing-prototypes  -Wundef -Wcast-qual
 CWARN += -Wmissing-declarations -Wnested-externs -Wstrict-prototypes
 CWARN += -Wbad-function-cast -Wcast-align -Wold-style-definition -Wextra
 CWARN += -Wunused -Wshadow -Wfloat-equal -Wcomment -Wsign-compare -Waddress
-CWARN += -Wredundant-decls -Wmissing-include-dirs -Wunknown-pragmas -Wvla
+CWARN += -Wredundant-decls -Wmissing-include-dirs -Wunknown-pragmas
 CWARN += -Wparentheses -Wsequence-point -Wunused-macros -Wendif-labels
 CWARN += -Woverlength-strings -Wunreachable-code -Wmissing-field-initializers
 CWARN += -Waggregate-return -Wdeclaration-after-statement -Winit-self
@@ -72,7 +72,7 @@ zus_OBJ = $(NULL)
 all: $(DEPEND) $(ALL) $(zus_OBJ)
 
 clean:
-	rm -vf $(LINKED_HEADERS) $(DEPEND) $(ALL)   $(zus_OBJ) fs/*.o
+	rm -vf $(LINKED_HEADERS) $(DEPEND) $(ALL) $(zus_OBJ) fs/*.o
 
 # =========== Headers from the running Kernel ==================================
 ZUS_API_H=zus_api.h
@@ -86,7 +86,7 @@ $(LINUX_STAT_H):
 	mkdir -p linux/ ;					\
 	ln -sTf $(abspath 					\
 		$(ZUS_API_INC)/../../../include/uapi/$(LINUX_STAT_H)) 	\
-		$(LINUX_STAT_H) ; 
+		$(LINUX_STAT_H) ;
 
 # ============== sub-projects===================================================
 -include fs/Makefile
@@ -95,20 +95,20 @@ $(LINUX_STAT_H):
 # ============== zus ===========================================================
 zus_OBJ += zus-core.o zus-vfs.o main.o module.o
 
-zus: $(zus_OBJ)
+zus: $(zus_OBJ) $(fs_libs)
 	$(CC) $(LDFLAGS) $(CFLAGS) $(C_LIBS) -o $@ $^
 
 $(DEPEND): $(zus_OBJ:.o=.c)
 
 # =============== common rules =================================================
 # every thing should compile if Makefile or .config changed
-MorC = Makefile
+MorC = Makefile fs/Makefile
 ifneq ($(realpath .config),)
 MorC += .config
 endif
 
 %.o: %.c $(MorC)
-	$(CC) $(CFLAGS) -c -o $@ $(@:.o=.c)
+	$(CC) $(FS_CFLAGS) $(CFLAGS) -c -o $@ $(@:.o=.c)
 
 #.============== dependencies genaration =======================================
 $(DEPEND): $(LINKED_HEADERS)

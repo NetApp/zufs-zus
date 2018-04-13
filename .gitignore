@@ -9,6 +9,10 @@ linux/stat.h
 # targets
 zus
 b_io
+fs/libfoofs.a
+
+# TODO how to ignore external FS(s)
+fs/m1fs/
 
 # common ignores
 *.o
