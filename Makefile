@@ -28,6 +28,10 @@ C_INCLUDE = -I./ $(CONFIG_C_INCLUDE)
 # List of -D defines
 C_DEFINE = $(CONFIG_C_DEFINE)
 
+ifdef CONFIG_ZUF_DEF_PATH
+C_DEFINE += -DCONFIG_ZUF_DEF_PATH=\"$(CONFIG_ZUF_DEF_PATH)\"
+endif
+
 # What to warn about
 CWARN =  -W -Werror -Wall
 CWARN += -Wwrite-strings -Wmissing-prototypes  -Wundef -Wcast-qual

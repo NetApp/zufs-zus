@@ -20,6 +20,13 @@
 #include "zus.h"
 #include "zusd.h"
 
+#ifdef CONFIG_ZUF_DEF_PATH
+
+#define ZUF_DEF_PATH CONFIG_ZUF_DEF_PATH
+#else
+#define ZUF_DEF_PATH "/sys/fs/zuf"
+#endif
+
 bool g_DBG = false;
 bool g_verify = false;
 bool g_daemon = false;
@@ -27,7 +34,7 @@ bool g_daemon = false;
 static void usage(void)
 {
 	static char msg[] = {
-	"usage: zus [options] FILE_PATH\n"
+	"usage: zus [options] [FILE_PATH]\n"
 	"--policyRR=[PRIORITY]\n"
 	"	Set threads policy to SCHED_RR.\n"
 	"	Optional PRIORITY is between 1-99. Default is 20\n"
@@ -74,6 +81,7 @@ int main(int argc, char *argv[])
 	};
 	char op;
 	struct thread_param tp = {
+		.path = ZUF_DEF_PATH,
 		.policy = SCHED_FIFO,
 		.rr_priority = 20,
 	};
@@ -113,9 +121,11 @@ int main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	if ((argc <= 0)) {
+	if ((argc < 0) || (argc > 1)) {
 		usage();
 		return 1;
+	} else if (argc == 1) {
+		tp.path = argv[0];
 	}
 
 	if (signal(SIGINT, sig_handler) == SIG_ERR)
@@ -124,7 +134,6 @@ int main(int argc, char *argv[])
 	if (g_daemon && daemon(0, 1))
 		ERROR("daemon failed\n");
 
-	tp.path = argv[0];
 	err = zus_mount_thread_start(&tp);
 	if (unlikely(err))
 		goto stop;
