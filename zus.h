@@ -50,12 +50,12 @@ static inline __s64 _z_div_s64_rem(__s64 X, __s32 y, __u32 *rem)
 	return X / y;
 }
 
-static inline void timespec_to_mt(__le64 *mt, struct timespec *t)
+static inline void timespec_to_zt(__le64 *mt, struct timespec *t)
 {
 	*mt = cpu_to_le64(t->tv_sec * NSEC_PER_SEC + t->tv_nsec);
 }
 
-static inline void mt_to_timespec(struct timespec *t, __le64 *mt)
+static inline void zt_to_timespec(struct timespec *t, __le64 *mt)
 {
 	__u32 nsec;
 
