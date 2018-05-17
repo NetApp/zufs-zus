@@ -204,7 +204,8 @@ static int _evict(struct zufs_ioc_hdr *hdr)
 	}
 
 	if (hdr->operation == ZUS_OP_FREE_INODE) {
-		zii->sbi->op->free_inode(zii);
+		if (likely(zii->sbi->op->free_inode))
+			zii->sbi->op->free_inode(zii);
 	} else { /* ZUS_OP_EVICT_INODE */
 		/* NOTE: On lookup Kernel ask's zus to allocate a new zii &&
 		 * retrieve the zi, before it inserts it to inode cache, it is
@@ -394,7 +395,7 @@ static int _statfs(struct zufs_ioc_hdr *hdr)
 
 static const char *_op_name(int op)
 {
-#define CASE_ENUM_NAME(e) case e: return "##e"
+#define CASE_ENUM_NAME(e) case e: return #e
 	switch  (op) {
 		CASE_ENUM_NAME(ZUS_OP_NEW_INODE		);
 		CASE_ENUM_NAME(ZUS_OP_FREE_INODE	);
