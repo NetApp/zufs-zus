@@ -7,7 +7,6 @@
 # Edit for the Kernel you are working with.
 # Default: /usr/src/kernel/$(uname -r)/
 ZUF_KERN_DIR=../zuf/
-ZUS_API_INC=$(ZUF_KERN_DIR)/fs/zuf/zus_api.h
 
 # Enable debugging info Master switch
 DEBUG=1

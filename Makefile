@@ -69,23 +69,23 @@ C_LIBS = -lrt -lcurses -lc -luuid $(CONFIG_C_LIBS)
 # Targets
 ALL = zus
 zus_OBJ = $(NULL)
-all: $(DEPEND) $(ALL) $(zus_OBJ)
+all: $(DEPEND) $(ALL)
 
 clean:
 	rm -vf $(LINKED_HEADERS) $(DEPEND) $(ALL) $(zus_OBJ) fs/*.o
 
 # =========== Headers from the running Kernel ==================================
-ZUS_API_H=zus_api.h
+ZUS_API_H=zus_api.h md_def.h
 LINUX_STAT_H=linux/stat.h
 LINKED_HEADERS=$(ZUS_API_H) $(LINUX_STAT_H)
 
 $(ZUS_API_H):
-	ln -sTf $(abspath $(ZUS_API_INC)) $(ZUS_API_H)
+	ln -sTf $(abspath $(ZUF_KERN_DIR)/fs/zuf/$@) $@
 
 $(LINUX_STAT_H):
 	mkdir -p linux/ ;					\
 	ln -sTf $(abspath 					\
-		$(ZUS_API_INC)/../../../include/uapi/$(LINUX_STAT_H)) 	\
+		$(ZUF_KERN_DIR)/include/uapi/$(LINUX_STAT_H)) 	\
 		$(LINUX_STAT_H) ;
 
 # ============== sub-projects===================================================
