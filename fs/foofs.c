@@ -34,7 +34,7 @@
  */
 enum {
 	M1FS_MAJOR_VERSION	= 15,
-	M1FS_MINOR_VERSION	= 0,
+	M1FS_MINOR_VERSION	= 1,
 	M1FS_SUPER_MAGIC	= 0x5346314d /* M1FS in BE */
 };
 
@@ -121,18 +121,25 @@ static void _init_root(struct zus_sb_info *sbi)
 {
 	struct zus_inode *root = find_zi(sbi, FOOFS_ROOT_NO);
 	struct timespec now;
+	void *root_dir;
 
 	memset(root, 0, sizeof(*root));
 
+	root->i_ino = FOOFS_ROOT_NO;
 	root->i_nlink = 2;
 	root->i_mode = S_IFDIR | 0644;
 	root->i_uid = 0;
 	root->i_gid = 0;
 
 	clock_gettime(CLOCK_REALTIME, &now);
-	timespec_to_mt(&root->i_atime, &now);
-	timespec_to_mt(&root->i_mtime, &now);
-	timespec_to_mt(&root->i_ctime, &now);
+	timespec_to_zt(&root->i_atime, &now);
+	timespec_to_zt(&root->i_mtime, &now);
+	timespec_to_zt(&root->i_ctime, &now);
+
+	root->i_size = PAGE_SIZE;
+	root->i_blocks = 1;
+	root_dir = pmem_baddr(&sbi->pmem, FOOFS_ROOT_NO + 1);
+	memset(root_dir, 0, PAGE_SIZE);
 }
 
 /* ~~~~~~~~~~~~~~~~ Vectors ~~~~~~~~~~~~~~~~~~~~~*/
@@ -253,6 +260,15 @@ static int foofs_new_inode(struct zus_sb_info *sbi, struct zus_inode_info *zii,
 	return 0;
 }
 
+static int foofs_free_inode(struct zus_inode_info *zii)
+{
+	DBG("\n");
+	zii->zi->i_mode = 0;
+	zii->zi->i_ino = 0;
+	/* Do we need to clean anything */
+	return 0;
+}
+
 static int foofs_iget(struct zus_sb_info *sbi, struct zus_inode_info *zii,
 		      ulong ino)
 {
@@ -269,7 +285,16 @@ static ulong foofs_lookup(struct zus_inode_info *dir_ii, struct zufs_str *str)
 {
 	struct __foo_dir_ent *de;
 
+	if (!str->len || !str->name[0]) {
+		ERROR("lookup NULL string\n");
+		return  0;
+	}
+
 	DBG("[%.*s]\n", str->len, str->name);
+
+if (str->len == 1)
+	DBG("[%d]\n", str->name[0]);
+
 	if (0 == strncmp(".", str->name, str->len))
 		return dir_ii->zi->i_ino;
 	else if (0 == strncmp("..", str->name, str->len))
@@ -278,6 +303,16 @@ static ulong foofs_lookup(struct zus_inode_info *dir_ii, struct zufs_str *str)
 	de = _find_de(dir_ii, str);
 	if (unlikely(!de))
 		return 0; /* NOT FOUND */
+{
+ulong max_ino = pmem_blocks(&dir_ii->sbi->pmem) / FOOFS_INODES_RATIO *
+						FOOFS_INO_PER_BLOCK;
+
+	if (unlikely(de->ino > max_ino)) {
+		ERROR("HWATTTTT\n");
+		return 0;
+	}
+
+}
 
 	return de->ino;
 }
@@ -354,8 +389,11 @@ static int foofs_readdir(void *app_ptr, struct zufs_ioc_readdir *zir)
 
 		ok = zufs_zde_emit(&rdi, de->ino, 1, zir->pos,
 				   de->name, strlen(de->name));
-		if (unlikely(!ok))
+		if (unlikely(!ok)) {
+			DBG("long dir\n");
 			break;
+		}
+		DBG("	[%ld] <%s>\n", de->ino, de->name);
 	}
 
 	return 0;
@@ -393,20 +431,21 @@ static int foofs_write(void *ptr, struct zufs_ioc_IO *op)
 	ulong *app_ptr = ptr;
 	ulong *app_end = app_ptr + op->hdr.len / sizeof(ulong);
 	ulong start = op->filepos / sizeof(ulong);
+	ulong end_pos = op->filepos + op->hdr.len;
 
 	zii->zi->i_on_disk.a[0] = 0;
-// 	INFO("WRITE start=0x%lx len=0x%lx offset=0x%x\n",
-// 	     start, op->hdr.len / sizeof(ulong), op->hdr.offset);
 
 	for(;app_ptr < app_end; ++app_ptr, ++start) {
 		if (*app_ptr != start) {
-// 			if (g_verify)
+			if (g_verify)
 				ERROR("*app_ptr(0x%lx) != start(0x%lx) offset=0x%x len=0x%x\n",
 					*app_ptr, start, op->hdr.offset, op->hdr.len);
-// 			break;
-			zii->zi->i_on_disk.a[0] = 1; /*tell read to fail*/
 		}
 	}
+
+	if (zii->zi->i_size < end_pos)
+		zii->zi->i_size = end_pos;
+
 	return 0;
 }
 
@@ -430,13 +469,16 @@ static const struct zus_sbi_operations foofs_sbi_operations = {
 	.zii_alloc	= foofs_zii_alloc,
 	.zii_free	= foofs_zii_free,
 	.new_inode	= foofs_new_inode,
-	.iget		= foofs_iget,
+	.free_inode	= foofs_free_inode,
 
 	.lookup		= foofs_lookup,
 	.add_dentry     = foofs_add_dentry,
 	.remove_dentry  = foofs_remove_dentry,
-	.readdir 	= foofs_readdir,
+	.iget		= foofs_iget,
 
+// 	rename		=,
+	.readdir 	= foofs_readdir,
+// 	clone		=,
 	.statfs		= foofs_statfs,
 };
 
