@@ -88,13 +88,13 @@ static uint16_t crc(const void *data, size_t data_len)
 }
 
 
-static uint16_t toyfs_calc_csum(struct zufs_dev_table *dev_table)
+static uint16_t toyfs_calc_csum(struct md_dev_table *dev_table)
 {
 #ifndef u64
 #define u64 uint64_t
 #endif
 
-	uint32_t n = ZUFS_SB_STATIC_SIZE(dev_table) - sizeof(dev_table->s_sum);
+	uint32_t n = MDT_STATIC_SIZE(dev_table) - sizeof(dev_table->s_sum);
 
 	return crc(&dev_table->s_version, n);
 }
@@ -141,7 +141,7 @@ static void toyfs_close_blkdev(const char *path, int fd)
 	close(fd);
 }
 
-static void toyfs_fill_dev_table(struct zufs_dev_table *dev_table,
+static void toyfs_fill_dev_table(struct md_dev_table *dev_table,
 				 loff_t dev_size, const char *uu)
 {
 	int err;
@@ -171,7 +171,7 @@ static void toyfs_fill_dev_table(struct zufs_dev_table *dev_table,
 	printf("device: uuid=%s blocks=%lu\n", uu, (size_t)dev_id->blocks);
 
 	clock_gettime(CLOCK_REALTIME, &now);
-	timespec_to_mt(&dev_table->s_wtime, &now);
+	timespec_to_zt(&dev_table->s_wtime, &now);
 	dev_table->s_sum = toyfs_calc_csum(dev_table);
 }
 

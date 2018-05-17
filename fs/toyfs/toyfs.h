@@ -100,8 +100,8 @@ struct toyfs_itable {
 };
 
 union toyfs_super_block_part {
-	struct zufs_dev_table dev_table;
-	uint8_t reserved[ZUFS_SB_SIZE];
+	struct md_dev_table dev_table;
+	uint8_t reserved[MDT_SIZE];
 };
 
 
