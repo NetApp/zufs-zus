@@ -503,11 +503,16 @@ int zus_register_all(int fd)
 		ERROR("failed to register foofs: %d\n", err);
 		return err;
 	}
+
 	err = toyfs_register_fs(fd);
 	if (err) {
 		ERROR("failed to register toyfs: %d\n", err);
 		return err;
 	}
+
+#ifdef __M1US_ON
+	m1fs_register_fs(fd);
+#endif
 	return 0;
 }
 
