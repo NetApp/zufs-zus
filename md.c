@@ -25,6 +25,10 @@ static void _init_dev_info(struct md_dev_info *mdi, struct md_dev_id *id,
 	if (pmem_addr) { /* We are t1*/
 		mdi->t1i.virt_addr = pmem_addr + offset;
 	}
+
+	DBG("[%d] mdi(offset=0x%lx, size=0x%lx, nid=%d) @%p\n",
+	    mdi->index, mdi->offset, mdi->size, mdi->nid,
+            pmem_addr ? pmem_addr + offset : 0);
 }
 
 int md_init_from_pmem_info(struct multi_devices *md)
