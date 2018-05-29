@@ -119,12 +119,13 @@ static struct __foo_dir_ent *_find_empty_de(struct zus_inode_info *dir_ii)
 
 static void _init_root(struct zus_sb_info *sbi)
 {
-	struct zus_inode *root = find_zi(sbi, FOOFS_ROOT_NO);
+	struct zus_inode *root;
 	struct timespec now;
 	void *root_dir;
 
-	memset(root, 0, sizeof(*root));
+	root = find_zi(sbi, FOOFS_ROOT_NO);
 
+	memset(root, 0, sizeof(*root));
 	root->i_ino = FOOFS_ROOT_NO;
 	root->i_nlink = 2;
 	root->i_mode = S_IFDIR | 0644;
@@ -173,6 +174,7 @@ int foofs_sbi_init(struct zus_sb_info *sbi, struct zufs_ioc_mount *zim)
 	if (unlikely(!sbi->z_root))
 		return -ENOMEM;
 
+	zim->s_blocksize_bits = PAGE_SHIFT;
 	return 0;
 }
 
@@ -202,7 +204,9 @@ void foofs_zii_free(struct zus_inode_info *zii)
 
 static int foofs_statfs(struct zus_sb_info *sbi, struct zufs_ioc_statfs *ioc)
 {
-	uint num_files = _get_fill(sbi);
+	uint num_files;
+
+	num_files = _get_fill(sbi);
 
 	ioc->statfs_out.f_type		= M1FS_SUPER_MAGIC;
 	ioc->statfs_out.f_bsize		= PAGE_SIZE;
