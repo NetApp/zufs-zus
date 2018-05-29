@@ -29,12 +29,13 @@
 
 #include "zus_api.h"
 #include "_pr.h"
-
 /* FIXME: Move to K_in_U include structure */
 #ifndef likely
 #define likely(x_)	__builtin_expect(!!(x_), 1)
 #define unlikely(x_)	__builtin_expect(!!(x_), 0)
 #endif
+
+#include "md.h"
 
 extern bool g_verify;
 #define MAX_LFS_FILESIZE 	((loff_t)0x7fffffffffffffffLL)
@@ -62,82 +63,6 @@ static inline void zt_to_timespec(struct timespec *t, __le64 *mt)
 	t->tv_sec = _z_div_s64_rem(le64_to_cpu(*mt), NSEC_PER_SEC, &nsec);
 	t->tv_nsec = nsec;
 }
-
-/* ~~~~ pmem ~~~~ */
-
-struct fba {
-	int fd; void *ptr;
-};
-
-/* Each FS-type can decide what size to have for the page */
-struct zus_pmem_page {
-	ulong flags; /* numa_id, bits*/
-	ulong user_info[0];
-};
-
-/* pmem access. One for each zus_super_block */
-/* use one of nv.h for movnt or cl_flush(ing) access */
-struct zus_pmem {
-	struct zufs_ioc_pmem pmem_info; /* As received from Kernel */
-
-	void *p_pmem_addr;
-	int fd;
-	uint user_page_size;
-	struct fba pages;
-};
-
-static inline ulong pmem_blocks(struct zus_pmem *pmem)
-{
-	return pmem->pmem_info.pmem_total_blocks;
-}
-
-static inline ulong pmem_p2o(ulong bn)
-{
-	return (ulong)bn << PAGE_SHIFT;
-}
-
-static inline ulong pmem_o2p(ulong offset)
-{
-	return offset >> PAGE_SHIFT;
-}
-
-static inline ulong pmem_o2p_up(ulong offset)
-{
-	return pmem_o2p(offset + PAGE_SIZE - 1);
-}
-
-static inline
-void *pmem_addr(struct zus_pmem *pmem, ulong o)
-{
-	if (unlikely(!o))
-		return NULL;
-
-	return pmem->p_pmem_addr + o;
-}
-
-static inline void *pmem_baddr(struct zus_pmem *pmem, ulong bn)
-{
-	return pmem_addr(pmem, pmem_p2o(bn));
-}
-
-static inline ulong pmem_addr_2_offset(struct zus_pmem *pmem, void *ptr)
-{
-	ulong off = ptr - pmem->p_pmem_addr;
-	/*
-	if (unlikely((off < 0) || (pmem_p2o(pmem_blocks(pmem)))))
-		return ~0;
-	*/
-
-	return off;
-}
-
-static inline uint pmem_numa_id(struct zus_pmem *pmem, ulong bn)
-{
-	return 0;
-}
-
-/* Not all users need this */
-void pmem_set_numa_id_in_pages(struct zus_pmem *pmem);
 
 static inline
 zu_dpp_t pmem_dpp_t(ulong offset) { return (zu_dpp_t)offset; }
@@ -194,7 +119,7 @@ struct zus_sbi_operations {
 };
 
 struct zus_sb_info {
-	struct zus_pmem		pmem;
+	struct multi_devices	md;
 	struct zus_fs_info	*zfi;
 	const struct zus_sbi_operations *op;
 
@@ -231,17 +156,6 @@ struct zus_fs_info {
 	uint			user_page_size;
 	uint			next_sb_id;
 };
-
-static inline
-struct m1fs_super_block *zus_mdt(struct zus_sb_info *sbi)
-{
-	ulong dt_offset = sbi->zfi->rfi.dt_offset;
-
-	if (unlikely(~0UL == dt_offset))
-		return NULL;
-
-	return (sbi->pmem.p_pmem_addr + dt_offset);
-}
 
 /* POSIX protocol helpers every one must use */
 

@@ -4,6 +4,7 @@
 
 # Headers lineked (ln -s) from Kernel
 md_def.h
+md.h
 zus_api.h
 linux/stat.h
 

@@ -22,14 +22,14 @@
 
 /* ~~~ mount stuff ~~~ */
 
-static int _pmem_mmap(struct zus_pmem *pmem)
+static int _pmem_mmap(struct multi_devices *md)
 {
 	int prot = PROT_WRITE | PROT_READ;
 	int flags = MAP_SHARED;
 
-	pmem->p_pmem_addr = mmap(NULL, pmem_p2o(pmem_blocks(pmem)), prot, flags,
-				 pmem->fd, 0);
-	if (!pmem->p_pmem_addr) {
+	md->p_pmem_addr = mmap(NULL, md_p2o(md->pmem_info.dev_list.t1_count),
+			       prot, flags, md->fd, 0);
+	if (!md->p_pmem_addr) {
 		ERROR("mmap failed=> %d: %s\n", errno, strerror(errno));
 		return errno ?: ENOMEM;
 	}
@@ -39,44 +39,43 @@ static int _pmem_mmap(struct zus_pmem *pmem)
 
 static int _pmem_grab(struct zus_sb_info *sbi, uint pmem_kern_id)
 {
-	struct zus_pmem *pmem = &sbi->pmem;
+	struct multi_devices *md = &sbi->md;
 	int err;
 
-	err = zuf_root_open_tmp(&pmem->fd);
+	err = zuf_root_open_tmp(&md->fd);
 	if (unlikely(err))
 		return err;
 
-	err = zuf_grab_pmem(pmem->fd, pmem_kern_id, &pmem->pmem_info);
+	err = zuf_grab_pmem(md->fd, pmem_kern_id, &md->pmem_info);
 	if (unlikely(err))
 		return err;
 
-	if (!pmem_blocks(pmem))
-		INFO("pmem with zero blocks pmem_kern_id=%u\n", pmem_kern_id);
-
-	err = ftruncate(pmem->fd, pmem_p2o(pmem_blocks(pmem)));
+	err = _pmem_mmap(md);
 	if (unlikely(err))
 		return err;
 
-	err = _pmem_mmap(pmem);
-	if (unlikely(err))
+	err = md_init_from_pmem_info(md);
+	if (unlikely(err)) {
+		ERROR("md_init_from_pmem_info pmem_kern_id=%u => %d\n",
+		    pmem_kern_id, err);
 		return err;
+	}
 
-	pmem->user_page_size = sbi->zfi->user_page_size;
-	if (!pmem->user_page_size)
+	md->user_page_size = sbi->zfi->user_page_size;
+	if (!md->user_page_size)
 		return 0; /* User does not want pages */
 
-	err = fba_alloc(&pmem->pages, pmem_blocks(pmem) * pmem->user_page_size);
-
+	err = fba_alloc(&md->pages, md_t1_blocks(md) * md->user_page_size);
 	return err;
 }
 
 static void _pmem_ungrab(struct zus_sb_info *sbi)
 {
 	/* Kernel makes free easy (close couple files) */
-	fba_free(&sbi->pmem.pages);
+	fba_free(&sbi->md.pages);
 
-	zuf_root_close(&sbi->pmem.fd);
-	sbi->pmem.p_pmem_addr = NULL;
+	zuf_root_close(&sbi->md.fd);
+	sbi->md.p_pmem_addr = NULL;
 }
 
 static void _zus_sbi_fini(struct zus_sb_info *sbi)
@@ -110,8 +109,7 @@ int zus_mount(int fd, struct zufs_ioc_mount *zim)
 		goto err;
 
 	zim->zus_sbi = sbi;
-	zim->_zi = pmem_dpp_t(pmem_addr_2_offset(
-					&sbi->pmem, sbi->z_root->zi));
+	zim->_zi = pmem_dpp_t(md_addr_2_offset(&sbi->md, sbi->z_root->zi));
 	zim->zus_ii = sbi->z_root;
 	DBG("_zi 0x%lx zus_ii=%p\n",(ulong)zim->_zi, zim->zus_ii);
 
@@ -175,7 +173,7 @@ static int _new_inode(void *app_ptr, struct zufs_ioc_hdr *hdr)
 	if (unlikely(err))
 		goto _err_zii_free;
 
-	ioc_new->_zi = pmem_addr_2_offset(&sbi->pmem, zii->zi);
+	ioc_new->_zi = md_addr_2_offset(&sbi->md, zii->zi);
 	ioc_new->zus_ii = zii;
 
 	if (ioc_new->flags & ZI_TMPFILE)
@@ -243,7 +241,7 @@ static int _lookup(struct zufs_ioc_hdr *hdr)
 	if (unlikely(!zii))
 		return -ENOENT;
 
-	lookup->_zi = pmem_addr_2_offset(&zii->sbi->pmem, zii->zi);
+	lookup->_zi = md_addr_2_offset(&zii->sbi->md, zii->zi);
 	lookup->zus_ii = zii;
 	return 0;
 }
@@ -335,7 +333,7 @@ static int _symlink(struct zufs_ioc_hdr *hdr)
 		return err;
 
 	if (sym)
-		ioc_sym->_link = pmem_addr_2_offset(&zii->sbi->pmem, sym);
+		ioc_sym->_link = md_addr_2_offset(&zii->sbi->md, sym);
 	return 0;
 }
 
@@ -503,12 +501,13 @@ int zus_register_all(int fd)
 		ERROR("failed to register foofs: %d\n", err);
 		return err;
 	}
-
+#if 0
 	err = toyfs_register_fs(fd);
 	if (err) {
 		ERROR("failed to register toyfs: %d\n", err);
 		return err;
 	}
+#endif
 
 #ifdef __M1US_ON
 	m1fs_register_fs(fd);

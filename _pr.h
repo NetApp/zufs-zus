@@ -23,4 +23,6 @@ extern bool g_DBG;
 #define DBG(fmt, a...) if (g_DBG) printf("zus %s:%d: " fmt, __func__, __LINE__, ##a)
 #define DBGCONT(fmt, a...) do { if (g_DBG) printf(fmt, ##a); } while(0)
 
+#define md_dbg_err DBG
+
 #endif /* define ___PR_H__ */

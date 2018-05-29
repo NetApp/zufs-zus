@@ -40,15 +40,15 @@ enum {
 
 static struct zus_inode *find_zi(struct zus_sb_info *sbi, ulong ino)
 {
-	struct zus_inode *zi_array = pmem_baddr(&sbi->pmem, 1);
+	struct zus_inode *zi_array = md_baddr(&sbi->md, 1);
 
 	return &zi_array[ino];
 }
 
 static struct zus_inode *find_free_ino(struct zus_sb_info *sbi)
 {
-	struct zus_inode *zi_array = pmem_baddr(&sbi->pmem, 1);
-	ulong max_ino = pmem_blocks(&sbi->pmem) / FOOFS_INODES_RATIO *
+	struct zus_inode *zi_array = md_baddr(&sbi->md, 1);
+	ulong max_ino = md_t1_blocks(&sbi->md) / FOOFS_INODES_RATIO *
 							FOOFS_INO_PER_BLOCK;
 	ulong i;
 
@@ -64,8 +64,8 @@ static struct zus_inode *find_free_ino(struct zus_sb_info *sbi)
 
 static ulong _get_fill(struct zus_sb_info *sbi)
 {
-	struct zus_inode *zi_array = pmem_baddr(&sbi->pmem, 1);
-	ulong max_ino = pmem_blocks(&sbi->pmem) / FOOFS_INODES_RATIO *
+	struct zus_inode *zi_array = md_baddr(&sbi->md, 1);
+	ulong max_ino = md_t1_blocks(&sbi->md) / FOOFS_INODES_RATIO *
 							FOOFS_INO_PER_BLOCK;
 	ulong used_files = 0;
 	ulong i;
@@ -89,7 +89,7 @@ struct foofs_dir {
 
 static struct foofs_dir *_foo_dir(struct zus_inode_info *dir_ii)
 {
-	return pmem_baddr(&dir_ii->sbi->pmem,  dir_ii->zi->i_ino + 1);
+	return md_baddr(&dir_ii->sbi->md,  dir_ii->zi->i_ino + 1);
 }
 
 static struct __foo_dir_ent *_find_de(struct zus_inode_info *dir_ii,
@@ -138,7 +138,7 @@ static void _init_root(struct zus_sb_info *sbi)
 
 	root->i_size = PAGE_SIZE;
 	root->i_blocks = 1;
-	root_dir = pmem_baddr(&sbi->pmem, FOOFS_ROOT_NO + 1);
+	root_dir = md_baddr(&sbi->md, FOOFS_ROOT_NO + 1);
 	memset(root_dir, 0, PAGE_SIZE);
 }
 
@@ -207,7 +207,7 @@ static int foofs_statfs(struct zus_sb_info *sbi, struct zufs_ioc_statfs *ioc)
 	ioc->statfs_out.f_type		= M1FS_SUPER_MAGIC;
 	ioc->statfs_out.f_bsize		= PAGE_SIZE;
 
-	ioc->statfs_out.f_blocks	= pmem_blocks(&sbi->pmem);
+	ioc->statfs_out.f_blocks	= md_t1_blocks(&sbi->md);
 	ioc->statfs_out.f_bfree		= ioc->statfs_out.f_blocks - num_files;
 	ioc->statfs_out.f_bavail	= ioc->statfs_out.f_bfree;
 
@@ -304,7 +304,7 @@ if (str->len == 1)
 	if (unlikely(!de))
 		return 0; /* NOT FOUND */
 {
-ulong max_ino = pmem_blocks(&dir_ii->sbi->pmem) / FOOFS_INODES_RATIO *
+ulong max_ino = md_t1_blocks(&dir_ii->sbi->md) / FOOFS_INODES_RATIO *
 						FOOFS_INO_PER_BLOCK;
 
 	if (unlikely(de->ino > max_ino)) {

@@ -75,7 +75,7 @@ clean:
 	rm -vf $(LINKED_HEADERS) $(DEPEND) $(ALL) $(zus_OBJ) fs/*.o
 
 # =========== Headers from the running Kernel ==================================
-ZUS_API_H=zus_api.h md_def.h
+ZUS_API_H=zus_api.h md_def.h md.h
 LINUX_STAT_H=linux/stat.h
 LINKED_HEADERS=$(ZUS_API_H) $(LINUX_STAT_H)
 
@@ -93,7 +93,7 @@ $(LINUX_STAT_H):
 
 
 # ============== zus ===========================================================
-zus_OBJ += zus-core.o zus-vfs.o main.o module.o
+zus_OBJ += zus-core.o zus-vfs.o main.o module.o md.o
 
 zus: $(zus_OBJ) $(fs_libs)
 	$(CC) $(LDFLAGS) $(CFLAGS) $(C_LIBS) -o $@ $^
