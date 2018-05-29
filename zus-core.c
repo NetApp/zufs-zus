@@ -302,6 +302,23 @@ struct _zu_mount_thread {
 	volatile bool stop;
 } g_mount;
 
+struct zufs_ioc_numa_map g_zus_numa_map;
+
+int zus_cpu_to_node(int cpu)
+{
+	if ((cpu < 0) || ((int)g_zus_numa_map.online_cpus < cpu)) {
+		ERROR("Bad cpu=%d\n", cpu);
+		return -1;
+	}
+
+	return g_zus_numa_map.cpu_to_node[cpu];
+}
+
+static int _numa_map_init(int fd)
+{
+	return zuf_numa_map(fd, &g_zus_numa_map);
+}
+
 static void *zus_mount_thread(void *callback_info)
 {
 	struct zufs_ioc_mount zim = {};
@@ -324,8 +341,14 @@ static void *zus_mount_thread(void *callback_info)
 			break;
 		}
 
-		if (!g_zts)
-			zus_start_all_threads(&g_mount.tp, zim.num_cpu);
+		if (!g_zts) {
+			g_mount.err = _numa_map_init(g_mount.fd);
+			if (unlikely(g_mount.err))
+				break;
+
+			zus_start_all_threads(&g_mount.tp,
+					      g_zus_numa_map.online_cpus);
+		}
 
 		if (zim.is_umounting) {
 			zus_umount(g_mount.fd, &zim);

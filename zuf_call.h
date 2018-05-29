@@ -50,6 +50,12 @@ int zuf_recieve_mount(int fd, struct  zufs_ioc_mount *zim)
 }
 
 static inline
+int zuf_numa_map(int fd, struct zufs_ioc_numa_map *zinm)
+{
+	return _ioctl(fd, ZU_IOC_NUMA_MAP, &zinm->hdr, "ZU_IOC_NUMA_MAP");
+}
+
+static inline
 int zuf_grab_pmem(int fd, uint pmem_kern_id, struct zufs_ioc_pmem *zip)
 {
 	zip->pmem_kern_id = pmem_kern_id;

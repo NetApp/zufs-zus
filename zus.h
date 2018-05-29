@@ -207,7 +207,11 @@ static inline void zus_std_remove_dentry(struct zus_inode *dir_zi,
 /* Open an O_TMPFILE on the zuf-root we belong to */
 int zuf_root_open_tmp(int *fd);
 void zuf_root_close(int *fd);
+
+/* CPU & NUMA topology by zus */
+extern struct zufs_ioc_numa_map g_zus_numa_map;
 int zus_getztno(void);
+int zus_cpu_to_node(int cpu);
 
 /* zus-vfs.c */
 int zus_register_all(int fd);
