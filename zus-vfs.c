@@ -27,8 +27,8 @@ static int _pmem_mmap(struct multi_devices *md)
 	int prot = PROT_WRITE | PROT_READ;
 	int flags = MAP_SHARED;
 
-	md->p_pmem_addr = mmap(NULL, md_p2o(md->pmem_info.dev_list.t1_count),
-			       prot, flags, md->fd, 0);
+	md->p_pmem_addr = mmap(NULL, md_p2o(md_t1_blocks(md)), prot, flags,
+			       md->fd, 0);
 	if (!md->p_pmem_addr) {
 		ERROR("mmap failed=> %d: %s\n", errno, strerror(errno));
 		return errno ?: ENOMEM;
@@ -111,10 +111,9 @@ int zus_mount(int fd, struct zufs_ioc_mount *zim)
 	zim->zus_sbi = sbi;
 	zim->_zi = pmem_dpp_t(md_addr_2_offset(&sbi->md, sbi->z_root->zi));
 	zim->zus_ii = sbi->z_root;
-	DBG("_zi 0x%lx zus_ii=%p\n",(ulong)zim->_zi, zim->zus_ii);
 
-	/* zim->zmp = sbi->zmp */
-	zim->s_blocksize_bits	= zim->s_blocksize_bits;
+	DBG("[%lld] _zi 0x%lx zus_ii=%p\n",
+	    sbi->z_root->zi->i_ino, (ulong)zim->_zi, zim->zus_ii);
 
 	return 0;
 err:
