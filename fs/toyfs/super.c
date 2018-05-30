@@ -651,7 +651,6 @@ struct zus_sb_info *toyfs_sbi_alloc(struct zus_fs_info *zfi)
 	_pool_init(&sbi->s_pool);
 	_itable_init(&sbi->s_itable);
 	sbi->s_zus_sbi.op = &toyfs_sbi_op;
-	sbi->s_zus_sbi.pmem.user_page_size = PAGE_SIZE;
 	return &sbi->s_zus_sbi;
 }
 
