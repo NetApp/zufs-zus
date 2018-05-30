@@ -520,9 +520,7 @@ int zus_register_all(int fd)
 	}
 #endif
 
-#ifdef __M1US_ON
 	m1fs_register_fs(fd);
-#endif
 	return 0;
 }
 
