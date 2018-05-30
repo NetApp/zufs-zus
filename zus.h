@@ -45,6 +45,11 @@ extern bool g_verify;
 	#define NSEC_PER_SEC 1000000000UL
 #endif
 
+static inline __le16 le16_add(__le16 *val, __s16 add)
+{
+	return *val = cpu_to_le16(le16_to_cpu(*val) + add);
+}
+
 static inline __s64 _z_div_s64_rem(__s64 X, __s32 y, __u32 *rem)
 {
 	*rem = X % y;
@@ -190,16 +195,16 @@ static inline void zus_std_add_dentry(struct zus_inode *dir_zi,
 	zi->i_nlink = cpu_to_le64(le64_to_cpu(zi->i_nlink) + 1);
 
 	if (zi_isdir(zi))
-		dir_zi->i_nlink = cpu_to_le64(le64_to_cpu(dir_zi->i_nlink) + 1);
+		le16_add(&dir_zi->i_nlink, 1);
 }
 
 static inline void zus_std_remove_dentry(struct zus_inode *dir_zi,
 					struct zus_inode *zi)
 {
 	if (zi_isdir(zi))
-		dir_zi->i_nlink = cpu_to_le64(le64_to_cpu(dir_zi->i_nlink) - 1);
+		le16_add(&dir_zi->i_nlink, -1);
 
-	zi->i_nlink = cpu_to_le64(le64_to_cpu(zi->i_nlink) - 1);
+	le16_add(&zi->i_nlink, -1);
 }
 
 /* zus-core */
