@@ -226,10 +226,22 @@ static int _evict(struct zufs_ioc_hdr *hdr)
 static int _lookup(struct zufs_ioc_hdr *hdr)
 {
 	struct zufs_ioc_lookup *lookup = (void *)hdr;
+	struct zufs_str *str = &lookup->str;
 	struct zus_inode_info *zii;
 	ulong ino;
 
-	ino  = lookup->dir_ii->sbi->op->lookup(lookup->dir_ii, &lookup->str);
+	if (!str->len || !str->name[0]) {
+		ERROR("lookup NULL string\n");
+		return  0;
+	}
+
+	if (0 == strncmp(".", str->name, str->len))
+		ino = lookup->dir_ii->zi->i_ino;
+	else if (0 == strncmp("..", str->name, str->len))
+		ino = lookup->dir_ii->zi->i_dir.parent;
+	else
+		ino  = lookup->dir_ii->sbi->op->lookup(lookup->dir_ii, str);
+
 	if (!ino) {
 		DBG("[%.*s] NOT FOUND\n", lookup->str.len, lookup->str.name);
 		return -ENOENT;

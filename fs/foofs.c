@@ -289,34 +289,11 @@ static ulong foofs_lookup(struct zus_inode_info *dir_ii, struct zufs_str *str)
 {
 	struct __foo_dir_ent *de;
 
-	if (!str->len || !str->name[0]) {
-		ERROR("lookup NULL string\n");
-		return  0;
-	}
-
 	DBG("[%.*s]\n", str->len, str->name);
-
-if (str->len == 1)
-	DBG("[%d]\n", str->name[0]);
-
-	if (0 == strncmp(".", str->name, str->len))
-		return dir_ii->zi->i_ino;
-	else if (0 == strncmp("..", str->name, str->len))
-		return dir_ii->zi->i_dir.parent;
 
 	de = _find_de(dir_ii, str);
 	if (unlikely(!de))
 		return 0; /* NOT FOUND */
-{
-ulong max_ino = md_t1_blocks(&dir_ii->sbi->md) / FOOFS_INODES_RATIO *
-						FOOFS_INO_PER_BLOCK;
-
-	if (unlikely(de->ino > max_ino)) {
-		ERROR("HWATTTTT\n");
-		return 0;
-	}
-
-}
 
 	return de->ino;
 }
