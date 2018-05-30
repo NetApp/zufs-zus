@@ -161,19 +161,19 @@ struct zus_fs_info {
 
 static inline bool zi_isdir(const struct zus_inode *zi)
 {
-	return S_ISDIR(zi->i_mode);
+	return S_ISDIR(le16_to_cpu(zi->i_mode));
 }
 static inline bool zi_isreg(const struct zus_inode *zi)
 {
-	return S_ISREG(zi->i_mode);
+	return S_ISREG(le16_to_cpu(zi->i_mode));
 }
 static inline bool zi_islnk(const struct zus_inode *zi)
 {
-	return S_ISLNK(zi->i_mode);
+	return S_ISLNK(le16_to_cpu(zi->i_mode));
 }
 static inline ulong zi_ino(const struct zus_inode *zi)
 {
-	return zi->i_ino;
+	return le64_to_cpu(zi->i_ino);
 }
 
 /* Caller checks if (zi_isdir(zi)) */
@@ -181,25 +181,25 @@ static inline void zus_std_new_dir(struct zus_inode *dir_zi, struct zus_inode *z
 {
 	/* Directory points to itself (POSIX for you) */
 	zi->i_dir.parent = dir_zi->i_ino;
-	zi->i_nlink = 1;
+	zi->i_nlink = cpu_to_le16(1);
 }
 
 static inline void zus_std_add_dentry(struct zus_inode *dir_zi,
 				     struct zus_inode *zi)
 {
-	++zi->i_nlink;
+	zi->i_nlink = cpu_to_le64(le64_to_cpu(zi->i_nlink) + 1);
 
 	if (zi_isdir(zi))
-		++dir_zi->i_nlink;
+		dir_zi->i_nlink = cpu_to_le64(le64_to_cpu(dir_zi->i_nlink) + 1);
 }
 
 static inline void zus_std_remove_dentry(struct zus_inode *dir_zi,
 					struct zus_inode *zi)
 {
 	if (zi_isdir(zi))
-		--dir_zi->i_nlink;
+		dir_zi->i_nlink = cpu_to_le64(le64_to_cpu(dir_zi->i_nlink) - 1);
 
-	--zi->i_nlink;
+	zi->i_nlink = cpu_to_le64(le64_to_cpu(zi->i_nlink) - 1);
 }
 
 /* zus-core */
