@@ -97,7 +97,7 @@ $(LINUX_STAT_H):
 
 
 # ============== zus ===========================================================
-zus_OBJ += zus-core.o zus-vfs.o main.o module.o md.o
+zus_OBJ += zus-core.o zus-vfs.o main.o module.o md.o nvml_movnt.o
 
 zus: $(zus_OBJ) $(fs_libs)
 	$(CC) $(LDFLAGS) $(CFLAGS) $(C_LIBS) -o $@ $^
