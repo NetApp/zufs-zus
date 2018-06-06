@@ -113,7 +113,7 @@ struct zus_sbi_operations {
 	int (*add_dentry)(struct zus_inode_info *dir_ii,
 			  struct zus_inode_info *zii, struct zufs_str *str);
 	int (*remove_dentry)(struct zus_inode_info *dir_ii,
-			     struct zufs_str *str);
+			struct zus_inode_info *zii, struct zufs_str *str);
 	int (*iget)(struct zus_sb_info *sbi, struct zus_inode_info *zii,
 			   ulong ino);
 	int (*rename)(struct zufs_ioc_rename *zir);

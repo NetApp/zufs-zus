@@ -322,7 +322,8 @@ static int foofs_add_dentry(struct zus_inode_info *dir_ii,
 }
 
 static int foofs_remove_dentry(struct zus_inode_info *dir_ii,
-			       struct zufs_str *str)
+				struct zus_inode_info *zii,
+				struct zufs_str *str)
 {
 	struct __foo_dir_ent *de;
 
@@ -332,7 +333,7 @@ static int foofs_remove_dentry(struct zus_inode_info *dir_ii,
 	if (unlikely(!de))
 		return -ENOENT;
 
-	zus_std_remove_dentry(dir_ii->zi, find_zi(dir_ii->sbi, de->ino));
+	zus_std_remove_dentry(dir_ii->zi, zii->zi);
 	de->ino = 0;
 	de->name[0] = 0;
 

@@ -261,9 +261,10 @@ static int _dentry(struct zufs_ioc_hdr *hdr)
 {
 	struct zufs_ioc_dentry *zid = (void *)hdr;
 	struct zus_inode_info *dir_ii = zid->zus_dir_ii;
+	struct zus_inode_info *zii = zid->zus_ii;
 
 	if (hdr->operation == ZUS_OP_REMOVE_DENTRY)
-		return dir_ii->sbi->op->remove_dentry(dir_ii, &zid->str);
+		return dir_ii->sbi->op->remove_dentry(dir_ii, zii, &zid->str);
 
 	return dir_ii->sbi->op->add_dentry(dir_ii, zid->zus_ii, &zid->str);
 }
