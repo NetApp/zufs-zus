@@ -10,6 +10,7 @@
  */
 
 #include <linux/types.h>
+#include <errno.h>
 
 #include "zus.h"
 #include "md.h"
@@ -66,6 +67,27 @@ static uint16_t crc16(uint16_t crc, const void *data, size_t data_len)
 	return crc & 0xffff;
 }
 
+static ulong _gcd(ulong _x, ulong _y)
+{
+	ulong tmp;
+
+	if (_x < _y) {
+		ulong c = _x;
+
+		_x = _y;
+		_y = c;
+	}
+
+	if (!_y)
+		return _x;
+
+	while ((tmp = _x % _y) != 0) {
+		_x = _y;
+		_y = tmp;
+	}
+	return _y;
+}
+
 short md_calc_csum(struct md_dev_table *msb)
 {
 	uint n = MDT_STATIC_SIZE(msb) - sizeof(msb->s_sum);
@@ -95,11 +117,34 @@ static void _init_dev_info(struct md_dev_info *mdi, struct md_dev_id *id,
             pmem_addr ? pmem_addr + offset : 0);
 }
 
+static int _map_setup(struct multi_devices *md, ulong blocks, int dev_start,
+		      struct md_dev_larray *larray)
+{
+	ulong map_size, bn_end;
+	uint i, dev_index = dev_start;
+
+	map_size = blocks / larray->bn_gcd;
+	larray->map = calloc(map_size, sizeof(*larray->map));
+	if (!larray->map) {
+		md_dbg_err("failed to allocate dev map\n");
+		return -ENOMEM;
+	}
+
+	bn_end = md_o2p(md->devs[dev_index].size);
+	for (i = 0; i < map_size; ++i) {
+		if ((i * larray->bn_gcd) >= bn_end)
+			bn_end += md_o2p(md->devs[++dev_index].size);
+		larray->map[i] = &md->devs[dev_index];
+	}
+
+	return 0;
+}
+
 int md_init_from_pmem_info(struct multi_devices *md)
 {
 	struct md_dev_list *dev_list = &md->pmem_info.dev_list;
 	ulong offset = 0;
-	int i;
+	int i, err;
 
 	md->t1_count = dev_list->t1_count;
 	md->t2_count = dev_list->t2_count;
@@ -110,6 +155,7 @@ int md_init_from_pmem_info(struct multi_devices *md)
 		_init_dev_info(mdi, &dev_list->dev_ids[i], i, offset,
 			       md->p_pmem_addr);
 		offset += mdi->size;
+		md->t1a.bn_gcd = _gcd(md->t1a.bn_gcd, md_o2p(mdi->size));
 	}
 
 	offset = 0;
@@ -119,6 +165,10 @@ int md_init_from_pmem_info(struct multi_devices *md)
 		_init_dev_info(mdi, &dev_list->dev_ids[i], i, offset, NULL);
 		offset += mdi->size;
 	}
+
+	err = _map_setup(md, md_t1_blocks(md), 0, &md->t1a);
+	if (unlikely(err))
+		return err;
 
 	return 0;
 }
