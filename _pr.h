@@ -24,5 +24,9 @@ extern bool g_DBG;
 #define DBGCONT(fmt, a...) do { if (g_DBG) printf(fmt, ##a); } while(0)
 
 #define md_dbg_err DBG
+#define md_warn_cnd(silent, s, args ...) \
+	do {if (!silent) \
+		printf("[%s:%d] " s, __func__, __LINE__, ## args); \
+	} while (0)
 
 #endif /* define ___PR_H__ */
