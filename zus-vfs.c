@@ -109,7 +109,7 @@ int zus_mount(int fd, struct zufs_ioc_mount *zim)
 		goto err;
 
 	zim->zus_sbi = sbi;
-	zim->_zi = pmem_dpp_t(md_addr_2_offset(&sbi->md, sbi->z_root->zi));
+	zim->_zi = pmem_dpp_t(md_addr_to_offset(&sbi->md, sbi->z_root->zi));
 	zim->zus_ii = sbi->z_root;
 
 	DBG("[%lld] _zi 0x%lx zus_ii=%p\n",
@@ -172,7 +172,7 @@ static int _new_inode(void *app_ptr, struct zufs_ioc_hdr *hdr)
 	if (unlikely(err))
 		goto _err_zii_free;
 
-	ioc_new->_zi = md_addr_2_offset(&sbi->md, zii->zi);
+	ioc_new->_zi = md_addr_to_offset(&sbi->md, zii->zi);
 	ioc_new->zus_ii = zii;
 
 	if (ioc_new->flags & ZI_TMPFILE)
@@ -252,7 +252,7 @@ static int _lookup(struct zufs_ioc_hdr *hdr)
 	if (unlikely(!zii))
 		return -ENOENT;
 
-	lookup->_zi = md_addr_2_offset(&zii->sbi->md, zii->zi);
+	lookup->_zi = md_addr_to_offset(&zii->sbi->md, zii->zi);
 	lookup->zus_ii = zii;
 	return 0;
 }
@@ -344,7 +344,7 @@ static int _symlink(struct zufs_ioc_hdr *hdr)
 		return err;
 
 	if (sym)
-		ioc_sym->_link = md_addr_2_offset(&zii->sbi->md, sym);
+		ioc_sym->_link = md_addr_to_offset(&zii->sbi->md, sym);
 	return 0;
 }
 
