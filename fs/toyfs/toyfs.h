@@ -229,7 +229,8 @@ int toyfs_setattr(struct zus_inode_info *zii,
 /* dir.c */
 int toyfs_add_dentry(struct zus_inode_info *dir_zii,
 		     struct zus_inode_info *zii, struct zufs_str *str);
-int toyfs_remove_dentry(struct zus_inode_info *dir_zii, struct zufs_str *str);
+int toyfs_remove_dentry(struct zus_inode_info *dir_zii,
+			struct zus_inode_info *zii, struct zufs_str *str);
 int toyfs_readdir(void *app_ptr, struct zufs_ioc_readdir *zir);
 int toyfs_iterate_dir(struct toyfs_inode_info *dir_tii,
 		      struct zufs_ioc_readdir *zir, void *buf);

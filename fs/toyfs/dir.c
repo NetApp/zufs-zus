@@ -90,7 +90,8 @@ int toyfs_add_dentry(struct zus_inode_info *dir_zii,
 	return 0;
 }
 
-int toyfs_remove_dentry(struct zus_inode_info *dir_zii, struct zufs_str *str)
+int toyfs_remove_dentry(struct zus_inode_info *dir_zii,
+			struct zus_inode_info *zii, struct zufs_str *str)
 {
 	ino_t ino;
 	mode_t mode;
@@ -118,6 +119,7 @@ int toyfs_remove_dentry(struct zus_inode_info *dir_zii, struct zufs_str *str)
 
 	ino = dirent->d_ino;
 	tii = toyfs_find_inode(dir_tii->sbi, ino);
+	toyfs_assert(tii == Z2II(zii));
 	if (!tii)
 		return -ENOENT;
 
