@@ -306,9 +306,10 @@ struct zufs_ioc_numa_map g_zus_numa_map;
 
 int zus_cpu_to_node(int cpu)
 {
+	/* TODO(sagi): put this 'if' under WARN_ON */
 	if ((cpu < 0) || ((int)g_zus_numa_map.online_cpus < cpu)) {
 		ERROR("Bad cpu=%d\n", cpu);
-		return -1;
+		return 0; /* yell, but do not crash */
 	}
 
 	return g_zus_numa_map.cpu_to_node[cpu];
