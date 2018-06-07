@@ -68,7 +68,7 @@ CFLAGS = -fPIC -pthread -std=gnu11 $(CONFIG_CFLAGS)	\
 CFLAGS += "-DKERNEL=0"
 
 # List of -L -l libs
-C_LIBS = -lrt -lcurses -lc -luuid $(CONFIG_C_LIBS)
+C_LIBS = -lrt -lcurses -lc -luuid -lunwind $(CONFIG_C_LIBS)
 
 # Targets
 ALL = zus
@@ -97,7 +97,7 @@ $(LINUX_STAT_H):
 
 
 # ============== zus ===========================================================
-zus_OBJ += zus-core.o zus-vfs.o main.o module.o md.o nvml_movnt.o
+zus_OBJ += zus-core.o zus-vfs.o main.o module.o md.o nvml_movnt.o utils.o
 
 zus: $(zus_OBJ) $(fs_libs)
 	$(CC) $(LDFLAGS) $(CFLAGS) $(C_LIBS) -o $@ $^

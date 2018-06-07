@@ -240,4 +240,15 @@ int m1fs_register_fs(int fd);
 int  fba_alloc(struct fba *fba, size_t size);
 void fba_free(struct fba *fba);
 
+
+/* utils.c */
+void zus_warn(const char *cond, const char *file, int line);
+void zus_bug(const char *cond, const char *file, int line);
+
+#define ZUS_WARN_ON(x_) \
+	do { if (unlikely(x_)) zus_warn(#x_, __FILE__, __LINE__); } while (0)
+
+#define ZUS_BUG_ON(x_) \
+	do { if (unlikely(x_)) zus_bug(#x_, __FILE__, __LINE__); } while (0)
+
 #endif /* define __ZUS_H__ */
