@@ -29,7 +29,7 @@ static int _pmem_mmap(struct multi_devices *md)
 
 	md->p_pmem_addr = mmap(NULL, md_p2o(md_t1_blocks(md)), prot, flags,
 			       md->fd, 0);
-	if (!md->p_pmem_addr) {
+	if (md->p_pmem_addr == MAP_FAILED) {
 		ERROR("mmap failed=> %d: %s\n", errno, strerror(errno));
 		return errno ?: ENOMEM;
 	}
@@ -535,7 +535,7 @@ int  fba_alloc(struct fba *fba, size_t size)
 
 	fba->ptr = mmap(NULL, size, PROT_WRITE | PROT_READ, MAP_SHARED,
 			fba->fd, 0);
-	if (!fba->ptr) {
+	if (fba->ptr == MAP_FAILED) {
 		ERROR("mmap failed=> %d: %s\n", errno, strerror(errno));
 		fba_free(fba);
 		return errno ?: ENOMEM;
