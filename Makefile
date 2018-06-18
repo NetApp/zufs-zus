@@ -84,13 +84,13 @@ LINUX_STAT_H=linux/stat.h
 LINKED_HEADERS=$(ZUS_API_H) $(LINUX_STAT_H)
 
 $(ZUS_API_H):
-	ln -sTf $(abspath $(ZUF_KERN_DIR)/fs/zuf/$@) $@
+	ln -sTf $(shell realpath --relative-to=$(ROOT) \
+		  $(ZUF_KERN_DIR))/fs/zuf/$@ $@
 
 $(LINUX_STAT_H):
 	mkdir -p linux/ ;					\
-	ln -sTf $(abspath 					\
-		$(ZUF_KERN_DIR)/include/uapi/$(LINUX_STAT_H)) 	\
-		$(LINUX_STAT_H) ;
+	ln -sTf $(shell realpath --relative-to=$(ROOT)/linux \
+		  $(ZUF_KERN_DIR))/include/uapi/$(LINUX_STAT_H) $(LINUX_STAT_H)
 
 # ============== sub-projects===================================================
 -include fs/Makefile
