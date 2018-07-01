@@ -121,3 +121,14 @@ $(DEPEND): $(LINKED_HEADERS)
 ifneq (clean, $(MAKECMDGOALS))
 -include $(DEPEND)
 endif
+
+#.============== install =======================================================
+SERVICE = zus.service
+SYSTEMD_SERVICE_DIR = /lib/systemd/system
+
+install:
+	cp -f $(SERVICE) $(SYSTEMD_SERVICE_DIR)
+	systemctl daemon-reload
+	systemctl stop zus
+	systemctl enable zus
+	systemctl start zus

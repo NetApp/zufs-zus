@@ -1,0 +1,27 @@
+#
+# Service unit file for the zus user-mode application
+#
+# Copyright (C) 2018 NetApp, Inc.  All rights reserved.
+#
+# ZUFS-License: BSD-3-Clause. See module.c for LICENSE details.
+#
+# Authors:
+#	Boaz Harrosh <boaz@plexistor.com>
+#	Shachar Sharon <sshachar@netapp.com>
+#
+
+[Unit]
+Description=ZUS Daemon
+ConditionPathExists=/lib/modules/%v/kernel/fs/zuf/zuf.ko
+After=local-fs.target
+
+[Service]
+Type=simple
+ExecStartPre=/sbin/modprobe zuf
+ExecStartPre=/bin/mount -t zuf nodev /sys/fs/zuf
+ExecStart=/opt/zus/zus
+ExecStopPost=/bin/umount -t zuf /sys/fs/zuf
+ExecStopPost=/sbin/rmmod zuf
+
+[Install]
+WantedBy=multi-user.target
