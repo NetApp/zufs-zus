@@ -147,24 +147,29 @@ int toyfs_free_inode(struct zus_inode_info *zii)
 	return 0;
 }
 
-int toyfs_iget(struct zus_sb_info *zsbi, struct zus_inode_info *zii, ulong ino)
+int toyfs_iget(struct zus_sb_info *zsbi, ulong ino, struct zus_inode_info **zii)
 {
-	int err = 0;
-	struct toyfs_inode_info *tii;
 	struct toyfs_sb_info *sbi = Z2SBI(zsbi);
+	struct toyfs_inode_info *tii;
 
 	DBG("iget: ino=%lu\n", ino);
 
-	toyfs_assert(zii->op);
 	tii = toyfs_find_inode(sbi, ino);
-	if (tii) {
-		zii->zi = tii->zii.zi;
-		DBG("iget: ino=%lu zi=%p\n", ino, zii->zi);
-	} else {
-		err = -ENOENT;
-		DBG("iget: ino=%lu err=%d\n", ino, err);
+	if (!tii) {
+		*zii = NULL;
+		DBG("iget: ino=%lu => -ENOENT\n", ino);
+		return -ENOENT;
 	}
-	return err;
+	
+	tii = toyfs_alloc_ii(sbi);
+	if (unlikely(!tii)) {
+		DBG("iget: ino=%lu => ENOMEM\n", ino);
+		return -ENOMEM;
+	}
+
+	*zii = &tii->zii;
+	DBG("iget: ino=%lu zi=%p\n", ino, tii->zii.zi);
+	return 0;
 }
 
 void toyfs_evict(struct zus_inode_info *zii)

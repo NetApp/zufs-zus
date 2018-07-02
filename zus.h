@@ -114,8 +114,8 @@ struct zus_sbi_operations {
 			  struct zus_inode_info *zii, struct zufs_str *str);
 	int (*remove_dentry)(struct zus_inode_info *dir_ii,
 			struct zus_inode_info *zii, struct zufs_str *str);
-	int (*iget)(struct zus_sb_info *sbi, struct zus_inode_info *zii,
-			   ulong ino);
+	int (*iget)(struct zus_sb_info *sbi, ulong ino,
+		    struct zus_inode_info **zii);
 	int (*rename)(struct zufs_ioc_rename *zir);
 	int (*readdir)(void *app_ptr, struct zufs_ioc_readdir *zir);
 	int (*clone)(struct zufs_ioc_clone *ioc_clone);

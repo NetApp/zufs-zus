@@ -273,15 +273,20 @@ static int foofs_free_inode(struct zus_inode_info *zii)
 	return 0;
 }
 
-static int foofs_iget(struct zus_sb_info *sbi, struct zus_inode_info *zii,
-		      ulong ino)
+static int foofs_iget(struct zus_sb_info *sbi, ulong ino,
+		      struct zus_inode_info **zii)
 {
-	zii->op = &foofs_zii_operations;
-	zii->zi = find_zi(sbi, ino);
 
-	if (!zii->zi)
+	struct zus_inode *zi = find_zi(sbi, ino);
+
+	if (!zi)
 		return -ENOENT;
 
+	*zii = foofs_zii_alloc(sbi);
+	if (unlikely(!*zii))
+		return -ENOMEM;
+
+	(*zii)->zi = zi;
 	return 0;
 }
 

@@ -136,17 +136,11 @@ struct zus_inode_info *zus_iget(struct zus_sb_info *sbi, ulong ino)
 	struct zus_inode_info *zii;
 	int err;
 
-	zii = sbi->op->zii_alloc(sbi);
-	if (!zii)
+	err =  sbi->op->iget(sbi, ino, &zii);
+	if (err)
 		return NULL;
 
 	zii->sbi = sbi;
-	err =  sbi->op->iget(sbi, zii, ino);
-	if (err) {
-		zii->sbi->op->zii_free(zii);
-		return NULL;
-	}
-
 	return zii;
 }
 
