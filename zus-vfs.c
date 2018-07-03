@@ -522,8 +522,19 @@ int zus_register_all(int fd)
 /* ~~~ STUFF MOVE TO NEW FILE ~~~ */
 
 /* ~~~~ fba ~~~~ */
+
+/*
+ * Force fba allocations to be 2M aligned. We don't care for out-of-range pages
+ * as they are never touched and therefore remains unallocated.
+ */
+#define FBA_ALIGNSIZE 	(ZUFS_ALLOC_MASK + 1)
+
 int  fba_alloc(struct fba *fba, size_t size)
 {
+	ulong addr;
+
+	size += FBA_ALIGNSIZE;
+
 	/* Our buffers are allocated from a tmpfile so all is aligned and easy
 	 */
 	fba->fd = open("/tmp/", O_RDWR | O_TMPFILE | O_EXCL, 0666);
@@ -540,6 +551,11 @@ int  fba_alloc(struct fba *fba, size_t size)
 		fba_free(fba);
 		return errno ?: ENOMEM;
 	}
+
+	addr = ALIGN((ulong)fba->ptr, FBA_ALIGNSIZE);
+	INFO("fba: fd=%d mmap-addr=0x%lx align-addr=0x%lx msize=%lu\n",
+		fba->fd, (ulong)fba->ptr, addr, size);
+	fba->ptr = (void *)addr;
 
 	return 0;
 }
