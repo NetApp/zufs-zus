@@ -245,10 +245,18 @@ void fba_free(struct fba *fba);
 void zus_warn(const char *cond, const char *file, int line);
 void zus_bug(const char *cond, const char *file, int line);
 
-#define ZUS_WARN_ON(x_) \
-	do { if (unlikely(x_)) zus_warn(#x_, __FILE__, __LINE__); } while (0)
+#define ZUS_WARN_ON(x_) ({ \
+	int __ret_warn_on = !!(x_); \
+	if (unlikely(__ret_warn_on)) \
+		zus_warn(#x_, __FILE__, __LINE__); \
+	unlikely(__ret_warn_on); \
+})
 
-#define ZUS_BUG_ON(x_) \
-	do { if (unlikely(x_)) zus_bug(#x_, __FILE__, __LINE__); } while (0)
+#define ZUS_BUG_ON(x_) ({ \
+	int __ret_bug_on = !!(x_); \
+	if (unlikely(__ret_bug_on)) \
+		zus_bug(#x_, __FILE__, __LINE__); \
+	unlikely(__ret_bug_on); \
+})
 
 #endif /* define __ZUS_H__ */
