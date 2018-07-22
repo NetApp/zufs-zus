@@ -47,9 +47,9 @@ extern bool g_verify;
 	#define NSEC_PER_SEC 1000000000UL
 #endif
 
-static inline __le16 le16_add(__le16 *val, __s16 add)
+static inline __le32 le32_add(__le32 *val, __s16 add)
 {
-	return *val = cpu_to_le16(le16_to_cpu(*val) + add);
+	return *val = cpu_to_le32(le32_to_cpu(*val) + add);
 }
 
 static inline __s64 _z_div_s64_rem(__s64 X, __s32 y, __u32 *rem)
@@ -188,25 +188,25 @@ static inline void zus_std_new_dir(struct zus_inode *dir_zi, struct zus_inode *z
 {
 	/* Directory points to itself (POSIX for you) */
 	zi->i_dir.parent = dir_zi->i_ino;
-	zi->i_nlink = cpu_to_le16(1);
+	zi->i_nlink = cpu_to_le32(1);
 }
 
 static inline void zus_std_add_dentry(struct zus_inode *dir_zi,
 				     struct zus_inode *zi)
 {
-	zi->i_nlink = cpu_to_le64(le64_to_cpu(zi->i_nlink) + 1);
+	zi->i_nlink = le32_add(&zi->i_nlink, 1);
 
 	if (zi_isdir(zi))
-		le16_add(&dir_zi->i_nlink, 1);
+		le32_add(&dir_zi->i_nlink, 1);
 }
 
 static inline void zus_std_remove_dentry(struct zus_inode *dir_zi,
 					struct zus_inode *zi)
 {
 	if (zi_isdir(zi))
-		le16_add(&dir_zi->i_nlink, -1);
+		le32_add(&dir_zi->i_nlink, -1);
 
-	le16_add(&zi->i_nlink, -1);
+	le32_add(&zi->i_nlink, -1);
 }
 
 /* zus-core */
