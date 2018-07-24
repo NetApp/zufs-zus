@@ -315,6 +315,28 @@ int zus_cpu_to_node(int cpu)
 	return g_zus_numa_map.cpu_to_node[cpu];
 }
 
+int zus_set_numa_affinity(cpu_set_t *affinity, int nid)
+{
+	uint i;
+
+	CPU_ZERO(affinity);
+
+	for (i = 0; i < g_zus_numa_map.online_cpus; ++i) {
+		if (zus_cpu_to_node(i) == nid)
+			break;
+	}
+
+	if (i == g_zus_numa_map.online_cpus)
+		return -EINVAL;
+
+	for (; i < g_zus_numa_map.online_cpus; ++i) {
+		if (zus_cpu_to_node(i) != nid)
+			break;
+		CPU_SET(i, affinity);
+	}
+	return 0;
+}
+
 static int _numa_map_init(int fd)
 {
 	return zuf_numa_map(fd, &g_zus_numa_map);

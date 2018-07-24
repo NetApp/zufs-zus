@@ -15,6 +15,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <sched.h>
 
 #include <linux/stat.h>
 /* This is a nasty hack for getting O_TMPFILE into centos 7.4
@@ -217,6 +218,7 @@ void zuf_root_close(int *fd);
 extern struct zufs_ioc_numa_map g_zus_numa_map;
 int zus_getztno(void);
 int zus_cpu_to_node(int cpu);
+int zus_set_numa_affinity(cpu_set_t *affinity, int nid);
 
 /* zus-vfs.c */
 int zus_register_all(int fd);
