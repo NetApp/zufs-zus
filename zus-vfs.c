@@ -390,6 +390,17 @@ static int _seek(struct zufs_ioc_hdr *hdr)
 	return zii->op->seek(zii, ioc_seek);
 }
 
+static int _ioc_ioctl(struct zufs_ioc_hdr *hdr)
+{
+	struct zufs_ioc_ioctl *ioc_ioctl = (void *)hdr;
+	struct zus_inode_info *zii = ioc_ioctl->zus_ii;
+
+	if (!zii->op->ioctl)
+		return -ENOTTY;
+
+	return zii->op->ioctl(zii, ioc_ioctl);
+}
+
 static int _statfs(struct zufs_ioc_hdr *hdr)
 {
 	struct zufs_ioc_statfs *ioc_statfs = (void *)hdr;
@@ -424,6 +435,7 @@ static const char *_op_name(int op)
 		CASE_ENUM_NAME(ZUS_OP_SYNC		);
 		CASE_ENUM_NAME(ZUS_OP_FALLOCATE		);
 		CASE_ENUM_NAME(ZUS_OP_LLSEEK		);
+		CASE_ENUM_NAME(ZUS_OP_IOCTL		);
 		CASE_ENUM_NAME(ZUS_OP_STATFS		);
 		CASE_ENUM_NAME(ZUS_OP_BREAK		);
 	default:
@@ -473,6 +485,8 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 		return _fallocate(hdr);
 	case ZUS_OP_LLSEEK:
 		return _seek(hdr);
+	case ZUS_OP_IOCTL:
+		return _ioc_ioctl(hdr);
 	case ZUS_OP_STATFS:
 		return _statfs(hdr);
 
