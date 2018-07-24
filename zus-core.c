@@ -20,6 +20,7 @@
 #include "zusd.h"
 #include "zuf_call.h"
 #include "wtz.h"
+#include "iom_enc.h"
 
 const char* g_zus_root_path;
 
@@ -432,4 +433,19 @@ void zus_join(void)
 	void *tret;
 
 	pthread_join(g_mount.thread, &tret);
+}
+
+/* ~~~ callbacks from FS code into kernel ~~~ */
+
+int __zus_iom_exec(struct zus_sb_info *sbi, struct zufs_ioc_iomap_exec *ziome,
+		   bool sync)
+{
+	if (ZUS_WARN_ON(!ziome))
+		return -EFAULT;
+
+	ziome->sb_id = sbi->kern_sb_id;
+	ziome->zus_sbi = sbi;
+	ziome->wait_for_done = sync;
+
+	return zuf_iomap_exec(g_mount.fd, ziome);
 }

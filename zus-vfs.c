@@ -42,6 +42,7 @@ static int _pmem_grab(struct zus_sb_info *sbi, uint pmem_kern_id)
 	struct multi_devices *md = &sbi->md;
 	int err;
 
+	md->sbi = sbi;
 	err = zuf_root_open_tmp(&md->fd);
 	if (unlikely(err))
 		return err;
