@@ -99,6 +99,7 @@ int zus_mount(int fd, struct zufs_ioc_mount *zim)
 		goto err;
 	}
 	sbi->zfi = zim->zus_zfi;
+	sbi->kern_sb_id = zim->sb_id;
 
 	err = _pmem_grab(sbi, zim->pmem_kern_id);
 	if (unlikely(err))

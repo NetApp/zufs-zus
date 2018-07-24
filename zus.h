@@ -132,6 +132,7 @@ struct zus_sb_info {
 
 	struct zus_inode_info	*z_root;
 	ulong			flags;
+	__u64			kern_sb_id;
 };
 
 enum E_zus_sbi_flags {
