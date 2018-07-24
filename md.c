@@ -167,10 +167,17 @@ int md_init_from_pmem_info(struct multi_devices *md)
 		offset += mdi->size;
 	}
 
-	err = _map_setup(md, md_t1_blocks(md), 0, &md->t1a);
-	if (unlikely(err))
-		return err;
+	if (md->t1_count) {
+		err = _map_setup(md, md_t1_blocks(md), 0, &md->t1a);
+		if (unlikely(err))
+			return err;
+	}
 
+	if (md->t2_count) {
+		err = _map_setup(md, md_t2_blocks(md),  md->t1_count, &md->t2a);
+		if (unlikely(err))
+			return err;
+	}
 	return 0;
 }
 
