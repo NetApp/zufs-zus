@@ -7,7 +7,7 @@
  * ZUFS-License: BSD-3-Clause. See module.c for LICENSE details.
  *
  * Authors:
- *	Shachar Sharon <sshachar@netapp.com>
+ *      Shachar Sharon <sshachar@netapp.com>
  */
 #ifndef TOYFS_H_
 #define TOYFS_H_
@@ -26,13 +26,13 @@
 #include "zus.h"
 
 #ifndef ARRAY_SIZE
-#define ARRAY_SIZE(x_)	(sizeof(x_) / sizeof(x_[0]))
+#define ARRAY_SIZE(x_)  (sizeof(x_) / sizeof(x_[0]))
 #endif
 #ifndef MAKESTR
-#define MAKESTR(x_)	#x_
+#define MAKESTR(x_)     #x_
 #endif
 #ifndef STR
-#define STR(x_)		MAKESTR(x_)
+#define STR(x_)         MAKESTR(x_)
 #endif
 #ifndef container_of
 #define container_of(ptr, type, member) \
@@ -47,11 +47,11 @@
 	do { if (!(cond)) toyfs_panic("assert failed: %s", #cond); } while (0)
 
 
-#define TOYFS_NULL_INO		(0)
-#define TOYFS_ROOT_INO		(1)
-#define TOYFS_MAJOR_VERSION	(14)
-#define TOYFS_MINOR_VERSION	(1)
-#define TOYFS_SUPER_MAGIC	(0x5346314d)
+#define TOYFS_NULL_INO          (0)
+#define TOYFS_ROOT_INO          (1)
+#define TOYFS_MAJOR_VERSION     (14)
+#define TOYFS_MINOR_VERSION     (1)
+#define TOYFS_SUPER_MAGIC       (0x5346314d)
 
 #define Z2SBI(zsbi) toyfs_zsbi_to_sbi(zsbi)
 #define Z2II(zii) toyfs_zii_to_tii(zii)
@@ -89,9 +89,9 @@ struct toyfs_pool {
 	struct toyfs_list_head free_iblkrefs;
 	struct toyfs_list_head free_dirents;
 	struct toyfs_list_head free_inodes;
-	void	*mem;
-	size_t	msz;
-	bool	pmem;
+	void    *mem;
+	size_t  msz;
+	bool    pmem;
 };
 
 struct toyfs_itable {
@@ -160,6 +160,8 @@ struct toyfs_inode_info {
 	struct toyfs_inode_info *next;
 	ino_t ino;
 	unsigned long imagic;
+	bool mapped;
+	bool valid;
 };
 
 struct toyfs_dirent {
@@ -167,7 +169,7 @@ struct toyfs_dirent {
 	loff_t  d_off;
 	ino_t   d_ino;
 	size_t  d_nlen;
-	mode_t	d_type;
+	mode_t  d_type;
 	char    d_name[ZUFS_NAME_LEN + 1]; /* TODO: Use variable size */
 };
 
@@ -223,7 +225,7 @@ void toyfs_evict(struct zus_inode_info *zii);
 int toyfs_new_inode(struct zus_sb_info *zsbi, struct zus_inode_info *zii,
 		    void *app_ptr, struct zufs_ioc_new_inode *ioc_new);
 int toyfs_free_inode(struct zus_inode_info *zii);
-int toyfs_iget(struct zus_sb_info *zsbi, struct zus_inode_info *zii, ulong ino);
+int toyfs_iget(struct zus_sb_info *zsbi, ulong ino, struct zus_inode_info **zii);
 int toyfs_setattr(struct zus_inode_info *zii,
 		  uint enable_bits, ulong truncate_size);
 
@@ -235,6 +237,14 @@ int toyfs_remove_dentry(struct zus_inode_info *dir_zii,
 int toyfs_readdir(void *app_ptr, struct zufs_ioc_readdir *zir);
 int toyfs_iterate_dir(struct toyfs_inode_info *dir_tii,
 		      struct zufs_ioc_readdir *zir, void *buf);
+
+struct toyfs_dirent *
+toyfs_lookup_dirent(struct toyfs_inode_info *dir_ii, struct zufs_str *str);
+void toyfs_add_dirent(struct toyfs_inode_info *dir_tii,
+		      struct toyfs_inode_info *tii, struct zufs_str *str,
+		      struct toyfs_dirent *dirent);
+void toyfs_remove_dirent(struct toyfs_inode_info *dir_tii,
+			 struct toyfs_inode_info *tii, struct toyfs_dirent *);
 
 /* file.c */
 int toyfs_read(void *buf, struct zufs_ioc_IO *ioc_io);

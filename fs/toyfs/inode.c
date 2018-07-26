@@ -92,7 +92,7 @@ int toyfs_new_inode(struct zus_sb_info *zsbi, struct zus_inode_info *zii,
 			ti->zi.i_nlink = 1;
 	} else if (zi_islnk(zi)) {
 		symlen = ti->zi.i_size;
-		symlong = symlen > sizeof(ti->zi.i_symlink);
+		symlong = symlen >= sizeof(ti->zi.i_symlink);
 		symname = symlong ? (const char *)symname :
 			  (const char *)zi->i_symlink;
 		DBG("new_inode(symlnk): ino=%lu lnk=%.*s\n",
@@ -161,7 +161,7 @@ int toyfs_iget(struct zus_sb_info *zsbi, ulong ino, struct zus_inode_info **zii)
 		DBG("iget: ino=%lu => -ENOENT\n", ino);
 		return -ENOENT;
 	}
-	
+
 	tii = toyfs_alloc_ii(sbi);
 	if (unlikely(!tii)) {
 		DBG("iget: ino=%lu => ENOMEM\n", ino);

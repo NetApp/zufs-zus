@@ -9,10 +9,16 @@
 #	Shachar Sharon <sshachar@netapp.com>
 #
 
-zus_OBJ += $(addprefix fs/toyfs/, \
+toyfs_OBJ = $(addprefix fs/toyfs/, \
              common.o super.o inode.o dir.o namei.o symlink.o file.o)
 
-toyfs_mkfs_OBJ = fs/toyfs/mkfs.o
+fs/toyfs/libtoyfs.a: $(toyfs_OBJ)
+	ar rcs $(LDFLAGS) -o $@ $^
+
+fs_libs+=fs/toyfs/libtoyfs.a
+
+
+toyfs_mkfs_OBJ = fs/toyfs/mkfs.o md.o
 toyfs_mkfs_PROG = fs/toyfs/mkfs.toyfs
 
 ALL += $(toyfs_mkfs_PROG)

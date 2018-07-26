@@ -75,17 +75,17 @@ union toyfs_dirents_page {
 size_t toyfs_addr2bn(struct toyfs_sb_info *sbi, void *ptr)
 {
 	size_t offset;
-	struct zus_pmem *pmem = &sbi->s_zus_sbi.pmem;
+	struct multi_devices *md = &sbi->s_zus_sbi.md;
 
-	offset = pmem_addr_2_offset(pmem, ptr);
-	return pmem_o2p(offset);
+	offset = md_addr_to_offset(md, ptr);
+	return md_o2p(offset);
 }
 
 void *toyfs_bn2addr(struct toyfs_sb_info *sbi, size_t bn)
 {
-	struct zus_pmem *pmem = &sbi->s_zus_sbi.pmem;
+	struct multi_devices *md = &sbi->s_zus_sbi.md;
 
-	return pmem_baddr(pmem, bn);
+	return md_baddr(md, bn);
 }
 
 struct toyfs_page *toyfs_bn2page(struct toyfs_sb_info *sbi, size_t bn)
@@ -95,9 +95,9 @@ struct toyfs_page *toyfs_bn2page(struct toyfs_sb_info *sbi, size_t bn)
 
 zu_dpp_t toyfs_page2dpp(struct toyfs_sb_info *sbi, struct toyfs_page *page)
 {
-	struct zus_pmem *pmem = &sbi->s_zus_sbi.pmem;
+	struct multi_devices *md = &sbi->s_zus_sbi.md;
 
-	return pmem_dpp_t(pmem_addr_2_offset(pmem, page));
+	return pmem_dpp_t(md_addr_to_offset(md, page));
 }
 
 void toyfs_sbi_lock(struct toyfs_sb_info *sbi)
@@ -125,6 +125,7 @@ struct toyfs_inode_info *toyfs_alloc_ii(struct toyfs_sb_info *sbi)
 
 	memset(tii, 0, sizeof(*tii));
 	tii->imagic = TOYFS_IMAGIC;
+	tii->valid = true;
 	tii->next = NULL;
 	tii->sbi = sbi;
 	tii->zii.op = &toyfs_zii_op;
@@ -155,9 +156,15 @@ void toyfs_zii_free(struct zus_inode_info *zii)
 	struct toyfs_sb_info *sbi = tii->sbi;
 
 	toyfs_sbi_lock(sbi);
+	toyfs_assert(tii->sbi != NULL);
+	if (tii->mapped)
+		toyfs_untrack_inode(tii);
 	memset(tii, 0xAB, sizeof(*tii));
 	tii->zii.op = NULL;
+	tii->next = NULL;
+	tii->ti = NULL;
 	tii->sbi = NULL;
+	tii->valid = false;
 	free(tii);
 	sbi->s_statvfs.f_ffree++;
 	sbi->s_statvfs.f_favail++;
@@ -571,6 +578,8 @@ _itable_find(struct toyfs_itable *itable, ino_t ino)
 			break;
 		tii = tii->next;
 	}
+	if (tii)
+		toyfs_assert(tii->mapped);
 	_itable_unlock(itable);
 	return tii;
 }
@@ -581,14 +590,15 @@ static void _itable_insert(struct toyfs_itable *itable,
 	size_t slot;
 	struct toyfs_inode_info **ient;
 
+	_itable_lock(itable);
 	toyfs_assert(tii->ti);
 	toyfs_assert(tii->sbi);
 	toyfs_assert(!tii->next);
-
-	_itable_lock(itable);
+	toyfs_assert(!tii->mapped);
 	slot = _itable_slot_of(itable, tii->ino);
 	ient = &itable->imap[slot];
 	tii->next = *ient;
+	tii->mapped = true;
 	*ient = tii;
 	itable->icount++;
 	_itable_unlock(itable);
@@ -602,6 +612,7 @@ static void _itable_remove(struct toyfs_itable *itable,
 
 	_itable_lock(itable);
 	toyfs_assert(itable->icount > 0);
+	toyfs_assert(tii->mapped);
 	slot = _itable_slot_of(itable, tii->ino);
 	ient = &itable->imap[slot];
 	toyfs_assert(*ient != NULL);
@@ -613,9 +624,9 @@ static void _itable_remove(struct toyfs_itable *itable,
 	toyfs_assert(*ient != NULL);
 	*ient = tii->next;
 	itable->icount--;
-	_itable_unlock(itable);
-
 	tii->next = NULL;
+	tii->mapped = false;
+	_itable_unlock(itable);
 }
 
 void toyfs_track_inode(struct toyfs_inode_info *tii)
@@ -811,9 +822,9 @@ static int _new_root_inode(struct toyfs_sb_info *sbi,
 }
 
 
-static int _read_pmem_sb_first_time(struct zus_pmem *pmem)
+static int _read_pmem_sb_first_time(struct multi_devices *md)
 {
-	void *pmem_addr = pmem->p_pmem_addr;
+	void *pmem_addr = md->p_pmem_addr;
 	const struct toyfs_super_block *sb;
 
 	sb = (const struct toyfs_super_block *)pmem_addr;
@@ -830,16 +841,16 @@ static int _read_pmem_sb_first_time(struct zus_pmem *pmem)
 	return 0;
 }
 
-static void _read_pmem_first_time(struct zus_pmem *pmem)
+static void _read_pmem_first_time(struct multi_devices *md)
 {
 	size_t i, pmem_total_blocks, pmem_total_size;
-	void *pmem_addr = pmem->p_pmem_addr;
+	void *pmem_addr = md->p_pmem_addr;
 	char *ptr;
 	char buf[1024];
 	const size_t buf_size = sizeof(buf);
 
-	pmem_total_blocks = pmem_blocks(pmem);
-	pmem_total_size = pmem_p2o(pmem_total_blocks);
+	pmem_total_blocks = md_t1_blocks(md);
+	pmem_total_size = md_p2o(pmem_total_blocks);
 	ptr = (char *)pmem_addr;
 	for (i = 0; i < pmem_total_size; i += buf_size) {
 		memcpy(buf, ptr, buf_size);
@@ -847,16 +858,16 @@ static void _read_pmem_first_time(struct zus_pmem *pmem)
 	}
 }
 
-static void _write_pmem_first_time(struct zus_pmem *pmem)
+static void _write_pmem_first_time(struct multi_devices *md)
 {
 	size_t i, head_size, pmem_total_blocks, pmem_total_size;
-	void *pmem_addr = pmem->p_pmem_addr;
+	void *pmem_addr = md->p_pmem_addr;
 	char *ptr;
 	char buf[1024];
 	const size_t buf_size = sizeof(buf);
 
-	pmem_total_blocks = pmem_blocks(pmem);
-	pmem_total_size = pmem_p2o(pmem_total_blocks);
+	pmem_total_blocks = md_t1_blocks(md);
+	pmem_total_size = md_p2o(pmem_total_blocks);
 
 	head_size = (2 * PAGE_SIZE);
 	ptr = (char *)pmem_addr + head_size;
@@ -867,21 +878,21 @@ static void _write_pmem_first_time(struct zus_pmem *pmem)
 	}
 }
 
-static int _prepare_pmem_first_time(struct zus_pmem *pmem)
+static int _prepare_pmem_first_time(struct multi_devices *md)
 {
 	int err;
 
-	err = _read_pmem_sb_first_time(pmem);
+	err = _read_pmem_sb_first_time(md);
 	if (err)
 		return err;
 
-	_read_pmem_first_time(pmem);
-	err = _read_pmem_sb_first_time(pmem);
+	_read_pmem_first_time(md);
+	err = _read_pmem_sb_first_time(md);
 	if (err)
 		return err;
 
-	_write_pmem_first_time(pmem);
-	err = _read_pmem_sb_first_time(pmem);
+	_write_pmem_first_time(md);
+	err = _read_pmem_sb_first_time(md);
 	if (err)
 		return err;
 
@@ -899,15 +910,15 @@ int toyfs_sbi_init(struct zus_sb_info *zsbi, struct zufs_ioc_mount *zim)
 
 	INFO("sbi_init: sbi=%p\n", sbi);
 
-	pmem_kernel_id = sbi->s_zus_sbi.pmem.pmem_info.pmem_kern_id;
-	pmem_total_blocks = pmem_blocks(&sbi->s_zus_sbi.pmem);
+	pmem_kernel_id = sbi->s_zus_sbi.md.pmem_info.pmem_kern_id;
+	pmem_total_blocks = md_t1_blocks(&sbi->s_zus_sbi.md);
 	if ((pmem_kernel_id > 0) && (pmem_total_blocks > 2)) {
-		err = _prepare_pmem_first_time(&sbi->s_zus_sbi.pmem);
+		err = _prepare_pmem_first_time(&sbi->s_zus_sbi.md);
 		if (err)
 			return err;
 
-		msz = pmem_p2o(pmem_total_blocks - 2);
-		mem = pmem_baddr(&sbi->s_zus_sbi.pmem, 2);
+		msz = md_p2o(pmem_total_blocks - 2);
+		mem = md_baddr(&sbi->s_zus_sbi.md, 2);
 		using_pmem = true;
 	} else {
 		msz = (1ULL << 30) /* 1G */;
@@ -929,6 +940,7 @@ int toyfs_sbi_init(struct zus_sb_info *zsbi, struct zufs_ioc_mount *zim)
 	zim->zus_sbi = &sbi->s_zus_sbi;
 	zim->zus_ii = sbi->s_zus_sbi.z_root;
 	zim->s_blocksize_bits  = PAGE_SHIFT;
+	zim->acl_on = 1;
 
 	return 0;
 }

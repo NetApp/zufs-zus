@@ -133,7 +133,13 @@ struct toyfs_sb_info *toyfs_zsbi_to_sbi(struct zus_sb_info *zsbi)
 
 struct toyfs_inode_info *toyfs_zii_to_tii(struct zus_inode_info *zii)
 {
-	return zii ? container_of(zii, struct toyfs_inode_info, zii) : NULL;
+	struct toyfs_inode_info *tii = NULL;
+
+	if (zii) {
+		tii = container_of(zii, struct toyfs_inode_info, zii);
+		toyfs_assert(tii->valid);
+	}
+	return tii;
 }
 
 /*. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .*/
@@ -182,7 +188,6 @@ static struct zus_fs_info toyfs_zfi = {
 	.rfi.s_time_gran = 1,
 	.rfi.def_mode = 0755,
 	.rfi.s_maxbytes = MAX_LFS_FILESIZE,
-	.rfi.acl_on = 1,
 	.op = &toyfs_zfi_op,
 	.sbi_op = &toyfs_sbi_op,
 	.user_page_size = 0,

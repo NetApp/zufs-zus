@@ -30,6 +30,8 @@
 #include "zus.h"
 #include "toyfs.h"
 
+bool g_DBG = false;
+
 static int toyfs_open_blkdev(const char *path, loff_t *sz)
 {
 	int fd, err;
@@ -92,7 +94,7 @@ static void toyfs_fill_dev_table(struct md_dev_table *dev_table,
 			       TOYFS_MINOR_VERSION;
 	dev_table->s_magic = TOYFS_SUPER_MAGIC;
 	dev_table->s_flags = 0;
-	dev_table->s_t1_blocks = pmem_o2p(dev_size & ~align_mask);
+	dev_table->s_t1_blocks = md_o2p(dev_size & ~align_mask);
 	dev_table->s_dev_list.id_index = 0;
 	dev_table->s_dev_list.t1_count = 1;
 

@@ -17,6 +17,7 @@
 #include <unistd.h>
 #include <limits.h>
 #include <errno.h>
+#include <libpmem.h>
 #include <linux/falloc.h>
 
 #include "_pr.h"
@@ -36,12 +37,15 @@
 #define FALLOC_FL_UNSHARE_RANGE	0x40
 #endif
 
-
+/* Local functions forward declarations */
 static void _drop_iblkref(struct toyfs_inode_info *tii,
 			  struct toyfs_iblkref *iblkref);
 
 static struct toyfs_iblkref *
 _require_iblkref(struct toyfs_inode_info *tii, loff_t off);
+
+static struct toyfs_page *
+_unique_page(struct toyfs_sb_info *sbi, struct toyfs_iblkref *iblkref);
 
 
 static struct toyfs_dblkref *_new_dblkref(struct toyfs_sb_info *sbi)
@@ -155,9 +159,7 @@ static loff_t _next_page(loff_t off)
 
 static bool _ispagealigned(loff_t off, size_t len)
 {
-	const loff_t noff = off + (loff_t)len;
-
-	return (noff == _off_to_boff(noff));
+	return !(off % PAGE_SIZE) && !(len % PAGE_SIZE);
 }
 
 static size_t _nbytes_in_range(loff_t off, loff_t next, loff_t end)
@@ -179,7 +181,7 @@ _copy_in(struct toyfs_page *page, const void *src, loff_t off, size_t len)
 	toyfs_assert(page != NULL);
 	toyfs_assert(len <= sizeof(page->dat));
 	toyfs_assert((size_t)off + len <= sizeof(page->dat));
-	memcpy(&page->dat[off], src, len);
+	pmem_memcpy_persist(&page->dat[off], src, len);
 }
 
 static void _copy_page(struct toyfs_page *page, const struct toyfs_page *other)
@@ -224,17 +226,20 @@ static int _check_rw(loff_t off, size_t len)
 	return _check_io(off, len);
 }
 
-static int _check_falloc_flags(int flags)
+static int _check_falloc(int flags, loff_t off, size_t len)
 {
 	if (flags & FALLOC_FL_NO_HIDE_STALE)
-		return -ENOTSUP;
-	if (flags & FALLOC_FL_COLLAPSE_RANGE)
 		return -ENOTSUP;
 	if (flags & FALLOC_FL_INSERT_RANGE)
 		return -ENOTSUP;
 	if (flags & FALLOC_FL_UNSHARE_RANGE)
 		return -ENOTSUP;
 	if ((flags & FALLOC_FL_PUNCH_HOLE) && !(flags & FALLOC_FL_KEEP_SIZE))
+		return -ENOTSUP;
+	if ((flags & FALLOC_FL_COLLAPSE_RANGE) &&
+	    (flags != FALLOC_FL_COLLAPSE_RANGE))
+		return -ENOTSUP;
+	if (((flags & FALLOC_FL_COLLAPSE_RANGE)) && !_ispagealigned(off, len))
 		return -ENOTSUP;
 	return 0;
 }
@@ -253,6 +258,11 @@ static loff_t _tin_offset(loff_t off, size_t len, size_t isize)
 	return (end < (loff_t)isize) ? end : (loff_t)isize;
 }
 
+static struct toyfs_iblkref *iblkref_of(struct toyfs_list_head *itr)
+{
+	return container_of(itr, struct toyfs_iblkref, head);
+}
+
 static struct toyfs_iblkref *
 _fetch_iblkref(struct toyfs_inode_info *tii, loff_t off)
 {
@@ -265,13 +275,34 @@ _fetch_iblkref(struct toyfs_inode_info *tii, loff_t off)
 	iblkrefs = &reg_ti->r_iblkrefs;
 	itr = iblkrefs->next;
 	while (itr != iblkrefs) {
-		iblkref = container_of(itr, struct toyfs_iblkref, head);
+		iblkref = iblkref_of(itr);
 		if (iblkref->off == boff)
 			return iblkref;
 		itr = itr->next;
 	}
 	return NULL;
 }
+
+static struct toyfs_iblkref *
+_fetch_iblkref_from(struct toyfs_inode_info *tii, loff_t off)
+{
+	struct toyfs_list_head *itr;
+	struct toyfs_list_head *iblkrefs;
+	struct toyfs_iblkref *iblkref;
+	struct toyfs_inode_reg *reg_ti = &tii->ti->ti.reg;
+	const loff_t boff = _off_to_boff(off);
+
+	iblkrefs = &reg_ti->r_iblkrefs;
+	itr = iblkrefs->next;
+	while (itr != iblkrefs) {
+		iblkref = iblkref_of(itr);
+		if (iblkref->off >= boff)
+			return iblkref;
+		itr = itr->next;
+	}
+	return NULL;
+}
+
 
 static struct toyfs_page *_fetch_page(struct toyfs_inode_info *tii, loff_t off)
 {
@@ -393,7 +424,7 @@ _require_iblkref(struct toyfs_inode_info *tii, loff_t off)
 	iblkrefs = &reg_ti->r_iblkrefs;
 	itr = iblkrefs->next;
 	while (itr != iblkrefs) {
-		iblkref = container_of(itr, struct toyfs_iblkref, head);
+		iblkref = iblkref_of(itr);
 		if (iblkref->off == boff)
 			break;
 		if (iblkref->off > boff) {
@@ -464,31 +495,33 @@ static void _zero_range_at(struct toyfs_inode_info *tii,
 			   struct toyfs_iblkref *iblkref,
 			   loff_t off, size_t len)
 {
+	size_t plen;
+	loff_t poff, pnxt;
 	struct toyfs_page *page;
 
-	if (iblkref) {
-		DBG("zero range: ino=%lu off=%ld len=%lu bn=%lu\n",
-		    tii->ino, off, len, iblkref->dblkref->bn);
-		page = toyfs_bn2page(tii->sbi, iblkref->dblkref->bn);
-		_assign_zeros(page, _off_in_page(off), len);
-	}
+	DBG("zero range: ino=%lu off=%ld len=%lu bn=%lu\n",
+	    tii->ino, off, len, iblkref->dblkref->bn);
+	page = toyfs_bn2page(tii->sbi, iblkref->dblkref->bn);
+
+	poff = _off_in_page(off);
+	pnxt = _next_page(poff);
+	plen = _nbytes_in_range(poff, pnxt, poff + (loff_t)len);
+	_assign_zeros(page, poff, plen);
 }
 
 static void _punch_hole_at(struct toyfs_inode_info *tii,
 			   struct toyfs_iblkref *iblkref,
 			   loff_t off, size_t len)
 {
-	if (iblkref) {
-		if (len < PAGE_SIZE)
-			_zero_range_at(tii, iblkref, off, len);
-		else
-			_drop_iblkref(tii, iblkref);
-	}
+	if (len < PAGE_SIZE)
+		_zero_range_at(tii, iblkref, off, len);
+	else
+		_drop_iblkref(tii, iblkref);
 }
 
 static int _punch_hole(struct toyfs_inode_info *tii, loff_t from, size_t nbytes)
 {
-	size_t len, cnt = 0;
+	size_t len;
 	loff_t off, end, nxt;
 	struct toyfs_iblkref *iblkref;
 
@@ -498,9 +531,8 @@ static int _punch_hole(struct toyfs_inode_info *tii, loff_t from, size_t nbytes)
 		iblkref = _fetch_iblkref(tii, off);
 		nxt = _next_page(off);
 		len = _nbytes_in_range(off, nxt, end);
-		_punch_hole_at(tii, iblkref, off, len);
-
-		cnt += len;
+		if (iblkref)
+			_punch_hole_at(tii, iblkref, off, len);
 		off = nxt;
 	}
 	return 0;
@@ -508,20 +540,52 @@ static int _punch_hole(struct toyfs_inode_info *tii, loff_t from, size_t nbytes)
 
 static int _zero_range(struct toyfs_inode_info *tii, loff_t from, size_t nbytes)
 {
-	size_t len, cnt = 0;
+	size_t len;
 	loff_t off, end, nxt;
+	struct toyfs_list_head *itr;
 	struct toyfs_iblkref *iblkref;
+	struct toyfs_list_head *iblkrefs = &tii->ti->ti.reg.r_iblkrefs;
 
 	off = from;
 	end = off + (loff_t)nbytes;
-	while (off < end) {
-		iblkref = _fetch_iblkref(tii, off);
-		nxt = _next_page(off);
+	iblkref = _fetch_iblkref_from(tii, off);
+	if (!iblkref)
+		return 0;
+
+	itr = &iblkref->head;
+	while ((itr != iblkrefs) && (iblkref->off < end)) {
+		nxt = _next_page(iblkref->off);
 		len = _nbytes_in_range(off, nxt, end);
 		_zero_range_at(tii, iblkref, off, len);
 
-		cnt += len;
-		off = nxt;
+		itr = itr->next;
+		iblkref = iblkref_of(itr);
+		off = iblkref->off;
+	}
+	return 0;
+}
+
+static int _collapse_range(struct toyfs_inode_info *tii,
+			   loff_t from, size_t nbytes)
+{
+	int err;
+	struct toyfs_list_head *itr;
+	struct toyfs_iblkref *iblkref;
+	struct toyfs_list_head *iblkrefs = &tii->ti->ti.reg.r_iblkrefs;
+
+	err = _punch_hole(tii, from, nbytes);
+	if (err)
+		return err;
+	if (nbytes <= tii->zii.zi->i_size)
+		tii->zii.zi->i_size -= nbytes;
+	iblkref = _fetch_iblkref_from(tii, from);
+	if (iblkref) {
+		itr = &iblkref->head;
+		while (itr != iblkrefs) {
+			iblkref = iblkref_of(itr);
+			iblkref->off -= (loff_t)nbytes;
+			itr = itr->next;
+		}
 	}
 	return 0;
 }
@@ -563,7 +627,7 @@ _fallocate(struct toyfs_inode_info *tii, int mode, loff_t off, size_t len)
 	err = _check_io(off, len);
 	if (err)
 		goto out;
-	err = _check_falloc_flags(mode);
+	err = _check_falloc(mode, off, len);
 	if (err)
 		goto out;
 
@@ -571,6 +635,8 @@ _fallocate(struct toyfs_inode_info *tii, int mode, loff_t off, size_t len)
 		err = _punch_hole(tii, off, len);
 	else if (mode & FALLOC_FL_ZERO_RANGE)
 		err = _zero_range(tii, off, len);
+	else if (mode & FALLOC_FL_COLLAPSE_RANGE)
+		err = _collapse_range(tii, off, len);
 	else
 		err = _falloc_range(tii, off, len);
 out:
@@ -658,7 +724,7 @@ static void _drop_range(struct toyfs_inode_info *tii, loff_t pos)
 
 	itr = iblkrefs->next;
 	while (itr != iblkrefs) {
-		iblkref = container_of(itr, struct toyfs_iblkref, head);
+		iblkref = iblkref_of(itr);
 		itr = itr->next;
 
 		if (iblkref->off >= pos)
@@ -666,8 +732,31 @@ static void _drop_range(struct toyfs_inode_info *tii, loff_t pos)
 	}
 }
 
+static int _zero_after(struct toyfs_inode_info *tii, loff_t pos)
+{
+	loff_t poff;
+	struct toyfs_iblkref *iblkref;
+	struct toyfs_page *page;
+
+	if (!(pos % PAGE_SIZE))
+		return 0;
+
+	iblkref = _fetch_iblkref(tii, pos);
+	if (!iblkref)
+		return 0;
+
+	page = _unique_page(tii->sbi, iblkref);
+	if (!page)
+		return -ENOSPC;
+
+	poff = _off_in_page(pos);
+	_assign_zeros(page, poff, PAGE_SIZE - poff);
+	return 0;
+}
+
 int toyfs_truncate(struct toyfs_inode_info *tii, size_t size)
 {
+	int err = 0;
 	struct zus_inode *zi = tii->zii.zi;
 
 	if (S_ISDIR(zi->i_mode))
@@ -676,11 +765,13 @@ int toyfs_truncate(struct toyfs_inode_info *tii, size_t size)
 	if (!S_ISREG(zi->i_mode))
 		return -EINVAL;
 
-	if (size < zi->i_size)
+	if (size < zi->i_size) {
 		_drop_range(tii, (loff_t)size);
+		err = _zero_after(tii, (loff_t)size);
+	}
 
 	zi->i_size = size;
-	return 0;
+	return err;
 }
 
 static int _clone_entire_file_range(struct toyfs_inode_info *src_tii,
@@ -698,7 +789,7 @@ static int _clone_entire_file_range(struct toyfs_inode_info *src_tii,
 	toyfs_sbi_lock(dst_tii->sbi);
 	itr = src_iblkrefs->next;
 	while (itr != src_iblkrefs) {
-		src_iblkref = container_of(itr, struct toyfs_iblkref, head);
+		src_iblkref = iblkref_of(itr);
 		itr = itr->next;
 
 		dst_iblkref = toyfs_acquire_iblkref(dst_tii->sbi);

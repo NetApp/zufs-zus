@@ -32,7 +32,7 @@ static int _get_symlink(struct toyfs_inode_info *tii, void **symlink)
 	if (!zi_islnk(&ti->zi))
 		return -EINVAL;
 
-	if (ti->zi.i_size > sizeof(ti->zi.i_symlink))
+	if (ti->zi.i_size >= sizeof(ti->zi.i_symlink))
 		*symlink = ti->ti.symlnk.sl_long->dat;
 	else
 		*symlink = ti->zi.i_symlink;
@@ -52,7 +52,7 @@ const char *toyfs_symlink_value(const struct toyfs_inode_info *tii)
 	const char *symlnk = NULL;
 
 	if (zi_islnk(zi)) {
-		if (zi->i_size > sizeof(zi->i_symlink))
+		if (zi->i_size >= sizeof(zi->i_symlink))
 			symlnk = (const char *)ti->ti.symlnk.sl_long->dat;
 		else
 			symlnk = (const char *)ti->zi.i_symlink;

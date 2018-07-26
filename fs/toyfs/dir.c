@@ -7,7 +7,7 @@
  * ZUFS-License: BSD-3-Clause. See module.c for LICENSE details.
  *
  * Authors:
- *	Shachar Sharon <sshachar@netapp.com>
+ *      Shachar Sharon <sshachar@netapp.com>
  */
 
 #define _GNU_SOURCE
@@ -49,19 +49,25 @@ static void _set_dirent(struct toyfs_dirent *dirent,
 	strncpy(dirent->d_name, name, nlen);
 }
 
-static bool _hasname(const struct toyfs_dirent *dirent,
-		     const struct zufs_str *str)
+void toyfs_add_dirent(struct toyfs_inode_info *dir_tii,
+		      struct toyfs_inode_info *tii, struct zufs_str *str,
+		      struct toyfs_dirent *dirent)
 {
-	return (dirent->d_nlen == str->len) &&
-	       !strncmp(dirent->d_name, str->name, dirent->d_nlen);
+	loff_t doff;
+	struct toyfs_list_head *childs = &dir_tii->ti->ti.dir.d_childs;
+
+	doff = _next_doff(dir_tii);
+	_set_dirent(dirent, str->name, str->len, tii, doff);
+	toyfs_list_add_tail(&dirent->d_head, childs);
+	dir_tii->ti->ti.dir.d_ndentry++;
+	dir_tii->ti->zi.i_size = (size_t)(doff + PAGE_SIZE + 2);
+	zus_std_add_dentry(dir_tii->zii.zi, tii->zii.zi);
 }
 
 int toyfs_add_dentry(struct zus_inode_info *dir_zii,
 		     struct zus_inode_info *zii, struct zufs_str *str)
 {
-	loff_t doff;
 	struct toyfs_dirent *dirent;
-	struct toyfs_list_head *childs;
 	struct toyfs_inode_info *dir_tii = Z2II(dir_zii);
 	struct toyfs_inode_info *tii = Z2II(zii);
 	const ino_t dirino = dir_tii->ino;
@@ -70,17 +76,11 @@ int toyfs_add_dentry(struct zus_inode_info *dir_zii,
 	DBG("add_dentry: dirino=%lu %.*s ino=%lu mode=%o\n",
 	    dirino, str->len, str->name, ino, _mode_of(tii));
 
-	childs = &dir_tii->ti->ti.dir.d_childs;
 	dirent = toyfs_acquire_dirent(dir_tii->sbi);
 	if (!dirent)
 		return -ENOSPC;
 
-	doff = _next_doff(dir_tii);
-	_set_dirent(dirent, str->name, str->len, tii, doff);
-	toyfs_list_add_tail(&dirent->d_head, childs);
-	dir_tii->ti->ti.dir.d_ndentry++;
-	dir_tii->ti->zi.i_size = (size_t)(doff + PAGE_SIZE + 2);
-	zus_std_add_dentry(dir_tii->zii.zi, tii->zii.zi);
+	toyfs_add_dirent(dir_tii, tii, str, dirent);
 
 	DBG("add_dentry: dirino=%lu dirnlink=%u dirsize=%ld "
 	    "%.*s ino=%lu nlink=%d\n", dirino, dir_tii->zii.zi->i_nlink,
@@ -91,13 +91,21 @@ int toyfs_add_dentry(struct zus_inode_info *dir_zii,
 	return 0;
 }
 
+void toyfs_remove_dirent(struct toyfs_inode_info *dir_tii,
+			 struct toyfs_inode_info *tii,
+			 struct toyfs_dirent *dirent)
+{
+	toyfs_list_del(&dirent->d_head);
+	dir_tii->ti->ti.dir.d_ndentry--;
+	zus_std_remove_dentry(dir_tii->zii.zi, tii->zii.zi);
+}
+
 int toyfs_remove_dentry(struct zus_inode_info *dir_zii,
 			struct zus_inode_info *zii, struct zufs_str *str)
 {
 	ino_t ino;
 	mode_t mode;
-	struct toyfs_dirent *dirent = NULL;
-	struct toyfs_list_head *childs, *itr;
+	struct toyfs_dirent *dirent;
 	struct toyfs_inode_info *tii;
 	struct zus_inode *zi;
 	const char *symval;
@@ -106,15 +114,7 @@ int toyfs_remove_dentry(struct zus_inode_info *dir_zii,
 	DBG("remove_dentry: dirino=%lu %.*s\n",
 	    dir_tii->ino, str->len, str->name);
 
-	childs = &dir_tii->ti->ti.dir.d_childs;
-	itr = childs->next;
-	while (itr != childs) {
-		dirent = container_of(itr, struct toyfs_dirent, d_head);
-		if (_hasname(dirent, str))
-			break;
-		dirent = NULL;
-		itr = itr->next;
-	}
+	dirent = toyfs_lookup_dirent(dir_tii, str);
 	if (!dirent)
 		return -ENOENT;
 
@@ -136,9 +136,7 @@ int toyfs_remove_dentry(struct zus_inode_info *dir_zii,
 		DBG("remove_dentry: ino=%lu mode=%o\n", ino, mode);
 	}
 
-	toyfs_list_del(&dirent->d_head);
-	dir_tii->ti->ti.dir.d_ndentry--;
-	zus_std_remove_dentry(dir_tii->zii.zi, zi);
+	toyfs_remove_dirent(dir_tii, tii, dirent);
 	toyfs_release_dirent(dir_tii->sbi, dirent);
 
 	/*
