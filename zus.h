@@ -96,6 +96,12 @@ struct zus_zii_operations {
 	int (*seek)(struct zus_inode_info *zii, struct zufs_ioc_seek *ioc_seek);
 	int (*ioctl)(struct zus_inode_info *zii,
 		     struct zufs_ioc_ioctl *ioc_ioctl);
+	int (*getxattr)(struct zus_inode_info *zii,
+			struct zufs_ioc_xattr *ioc_xattr);
+	int (*setxattr)(struct zus_inode_info *zii,
+			struct zufs_ioc_xattr *ioc_xattr);
+	int (*listxattr)(struct zus_inode_info *zii,
+			 struct zufs_ioc_xattr *ioc_xattr);
 };
 
 struct zus_inode_info {
