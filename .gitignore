@@ -1,6 +1,8 @@
 .dependencies
 *.kdev4
 .config
+.nfs*
+.*.swp
 
 # Headers lineked (ln -s) from Kernel
 md_def.h
@@ -19,3 +21,4 @@ fs/patches
 
 # common ignores
 *.o
+*.so
