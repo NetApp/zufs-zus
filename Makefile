@@ -112,7 +112,7 @@ MorC += .config
 endif
 
 %.o: %.c $(MorC)
-	$(CC) $(FS_CFLAGS) $(CFLAGS) -c -o $@ $(@:.o=.c)
+	$(CC) $(FS_CFLAGS) $(CFLAGS) -c -o $@ $<
 
 #.============== dependencies genaration =======================================
 $(DEPEND): $(LINKED_HEADERS)
