@@ -30,8 +30,6 @@
 #include "zus.h"
 #include "toyfs.h"
 
-bool g_DBG = false;
-
 static int toyfs_open_blkdev(const char *path, loff_t *sz)
 {
 	int fd, err;

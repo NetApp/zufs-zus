@@ -9,23 +9,21 @@
 #	Shachar Sharon <sshachar@netapp.com>
 #
 
-toyfs_OBJ = $(addprefix fs/toyfs/, \
-             common.o super.o inode.o dir.o namei.o symlink.o file.o)
+toyfs_OBJ = common.o super.o inode.o dir.o namei.o symlink.o file.o
 
-fs/toyfs/libtoyfs.a: $(toyfs_OBJ)
-	ar rcs $(LDFLAGS) -o $@ $^
+toyfs_mkfs = mkfs.toyfs
+toyfs_lib = libtoyfs.so
 
-fs_libs+=fs/toyfs/libtoyfs.a
+all: $(toyfs_mkfs) $(toyfs_lib)
 
+clean:
+	@rm -vf *.o $(toyfs_lib) $(toyfs_mkfs)
 
-toyfs_mkfs_OBJ = fs/toyfs/mkfs.o md.o
-toyfs_mkfs_PROG = fs/toyfs/mkfs.toyfs
+CFLAGS += -I../..
+LDFLAGS += -L../.. -luuid -lzus -lpmem
 
-ALL += $(toyfs_mkfs_PROG)
-
-all: $(toyfs_mkfs_PROG)
-
-$(toyfs_mkfs_PROG):  $(toyfs_mkfs_OBJ)
+$(toyfs_mkfs): mkfs.o
 	$(CC) $(LDFLAGS) $(CFLAGS) $(C_LIBS) -o $@ $^
 
-
+$(toyfs_lib): $(toyfs_OBJ)
+	$(CC) -shared $(LDFLAGS) $(CFLAGS) $(C_LIBS) -o $@ $^
