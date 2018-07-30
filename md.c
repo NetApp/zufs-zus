@@ -89,15 +89,15 @@ static ulong _gcd(ulong _x, ulong _y)
 	return _y;
 }
 
-short md_calc_csum(struct md_dev_table *msb)
+short md_calc_csum(struct md_dev_table *mdt)
 {
-	uint n = MDT_STATIC_SIZE(msb) - sizeof(msb->s_sum);
+	uint n = MDT_STATIC_SIZE(mdt) - sizeof(mdt->s_sum);
 	/* FIXME: We should skip s_version so we can change it after
 	*        mount, once we start using the new structures
-	*   So below should be &msb->s_version => &msb->s_magic
+	*   So below should be &mdt->s_version => &mdt->s_magic
 	*   PXS-240.
 	*/
-	return crc16(~0, (__u8 *)&msb->s_version, n);
+	return crc16(~0, (__u8 *)&mdt->s_version, n);
 	return 0;
 }
 
@@ -181,15 +181,15 @@ int md_init_from_pmem_info(struct multi_devices *md)
 	return 0;
 }
 
-static bool _csum_mismatch(struct md_dev_table *msb, int silent)
+static bool _csum_mismatch(struct md_dev_table *mdt, int silent)
 {
-	ushort crc = md_calc_csum(msb);
+	ushort crc = md_calc_csum(mdt);
 
-	if (msb->s_sum == cpu_to_le16(crc))
+	if (mdt->s_sum == cpu_to_le16(crc))
 		return false;
 
 	md_warn_cnd(silent, "expected(0x%x) != s_sum(0x%x)\n",
-		      cpu_to_le16(crc), msb->s_sum);
+		      cpu_to_le16(crc), mdt->s_sum);
 	return true;
 }
 
@@ -198,31 +198,31 @@ static bool _uuid_le_equal(uuid_le *uuid1, uuid_le *uuid2)
 	return (memcmp(uuid1, uuid2, sizeof(uuid_le)) == 0);
 }
 
-static bool _mdt_compare_uuids(struct md_dev_table *msb,
-			       struct md_dev_table *main_msb, int silent)
+static bool _mdt_compare_uuids(struct md_dev_table *mdt,
+			       struct md_dev_table *main_mdt, int silent)
 {
 	int i, dev_count;
 
-	if (!_uuid_le_equal(&msb->s_uuid, &main_msb->s_uuid)) {
-		md_warn_cnd(silent, "msb uuid (%pUb != %pUb) mismatch\n",
-			      &msb->s_uuid, &main_msb->s_uuid);
+	if (!_uuid_le_equal(&mdt->s_uuid, &main_mdt->s_uuid)) {
+		md_warn_cnd(silent, "mdt uuid (%pUb != %pUb) mismatch\n",
+			      &mdt->s_uuid, &main_mdt->s_uuid);
 		return false;
 	}
 
-	dev_count = msb->s_dev_list.t1_count + msb->s_dev_list.t2_count +
-		    msb->s_dev_list.rmem_count;
+	dev_count = mdt->s_dev_list.t1_count + mdt->s_dev_list.t2_count +
+		    mdt->s_dev_list.rmem_count;
 	for (i = 0; i < dev_count; ++i) {
-		struct md_dev_id *dev_id1 = &msb->s_dev_list.dev_ids[i];
-		struct md_dev_id *dev_id2 = &main_msb->s_dev_list.dev_ids[i];
+		struct md_dev_id *dev_id1 = &mdt->s_dev_list.dev_ids[i];
+		struct md_dev_id *dev_id2 = &main_mdt->s_dev_list.dev_ids[i];
 
 		if (!_uuid_le_equal(&dev_id1->uuid, &dev_id2->uuid)) {
-			md_warn_cnd(silent, "msb dev %d uuid (%pUb != %pUb) mismatch\n",
+			md_warn_cnd(silent, "mdt dev %d uuid (%pUb != %pUb) mismatch\n",
 				      i, &dev_id1->uuid, &dev_id2->uuid);
 			return false;
 		}
 
 		if (dev_id1->blocks != dev_id2->blocks) {
-			md_warn_cnd(silent, "msb dev %d blocks (0x%llx != 0x%llx) mismatch\n",
+			md_warn_cnd(silent, "mdt dev %d blocks (0x%llx != 0x%llx) mismatch\n",
 				      i, le64_to_cpu(dev_id1->blocks),
 				      le64_to_cpu(dev_id2->blocks));
 			return false;
@@ -232,19 +232,19 @@ static bool _mdt_compare_uuids(struct md_dev_table *msb,
 	return true;
 }
 
-bool md_mdt_check(struct md_dev_table *msb,
-		  struct md_dev_table *main_msb, struct block_device *bdev,
+bool md_mdt_check(struct md_dev_table *mdt,
+		  struct md_dev_table *main_mdt, struct block_device *bdev,
 		  struct mdt_check *mc)
 {
-	struct md_dev_table *msb2 = (void *)msb + MDT_SIZE;
+	struct md_dev_table *mdt2 = (void *)mdt + MDT_SIZE;
 	struct md_dev_id *dev_id;
 	ulong super_size;
 
-// 	BUILD_BUG_ON(MDT_STATIC_SIZE(msb) & (SMP_CACHE_BYTES - 1));
+// 	BUILD_BUG_ON(MDT_STATIC_SIZE(mdt) & (SMP_CACHE_BYTES - 1));
 
 	/* Do sanity checks on the superblock */
-	if (le32_to_cpu(msb->s_magic) != mc->magic) {
-		if (le32_to_cpu(msb2->s_magic) != mc->magic) {
+	if (le32_to_cpu(mdt->s_magic) != mc->magic) {
+		if (le32_to_cpu(mdt2->s_magic) != mc->magic) {
 			md_warn_cnd(mc->silent,
 				     "Can't find a valid partition\n");
 			return false;
@@ -253,52 +253,52 @@ bool md_mdt_check(struct md_dev_table *msb,
 		md_warn_cnd(mc->silent,
 			     "Magic error in super block: using copy\n");
 		/* Try to auto-recover the super block */
-		memcpy_to_pmem(msb, msb2, sizeof(*msb));
+		memcpy_to_pmem(mdt, mdt2, sizeof(*mdt));
 	}
 
-	if ((mc->major_ver != (uint)mdt_major_version(msb)) ||
-	    (mc->minor_ver < (uint)mdt_minor_version(msb))) {
+	if ((mc->major_ver != (uint)mdt_major_version(mdt)) ||
+	    (mc->minor_ver < (uint)mdt_minor_version(mdt))) {
 		md_warn_cnd(mc->silent,
 			     "mkfs-mount versions mismatch! %d.%d != %d.%d\n",
-			     mdt_major_version(msb), mdt_minor_version(msb),
+			     mdt_major_version(mdt), mdt_minor_version(mdt),
 			     mc->major_ver, mc->minor_ver);
 		return false;
 	}
 
-	if (_csum_mismatch(msb, mc->silent)) {
-		if (_csum_mismatch(msb2, mc->silent)) {
+	if (_csum_mismatch(mdt, mc->silent)) {
+		if (_csum_mismatch(mdt2, mc->silent)) {
 			md_warn_cnd(mc->silent, "checksum error in super block\n");
 			return false;
 		} else {
 			md_warn_cnd(mc->silent, "crc16 error in super block: using copy\n");
 			/* Try to auto-recover the super block */
-			memcpy_to_pmem(msb, msb2, MDT_SIZE);
-			/* TODO(sagi): copy fixed msb to shadow */
+			memcpy_to_pmem(mdt, mdt2, MDT_SIZE);
+			/* TODO(sagi): copy fixed mdt to shadow */
 		}
 	}
 
-	if (main_msb) {
-		if (msb->s_dev_list.t1_count != main_msb->s_dev_list.t1_count) {
-			md_warn_cnd(mc->silent, "msb t1 count mismatch\n");
+	if (main_mdt) {
+		if (mdt->s_dev_list.t1_count != main_mdt->s_dev_list.t1_count) {
+			md_warn_cnd(mc->silent, "mdt t1 count mismatch\n");
 			return false;
 		}
 
-		if (msb->s_dev_list.t2_count != main_msb->s_dev_list.t2_count) {
-			md_warn_cnd(mc->silent, "msb t2 count mismatch\n");
+		if (mdt->s_dev_list.t2_count != main_mdt->s_dev_list.t2_count) {
+			md_warn_cnd(mc->silent, "mdt t2 count mismatch\n");
 			return false;
 		}
 
-		if (msb->s_dev_list.rmem_count != main_msb->s_dev_list.rmem_count) {
-			md_warn_cnd(mc->silent, "msb rmem dev count mismatch\n");
+		if (mdt->s_dev_list.rmem_count != main_mdt->s_dev_list.rmem_count) {
+			md_warn_cnd(mc->silent, "mdt rmem dev count mismatch\n");
 			return false;
 		}
 
-		if (!_mdt_compare_uuids(msb, main_msb, mc->silent))
+		if (!_mdt_compare_uuids(mdt, main_mdt, mc->silent))
 			return false;
 	}
 
 	/* check alignment */
-	dev_id = &msb->s_dev_list.dev_ids[msb->s_dev_list.id_index];
+	dev_id = &mdt->s_dev_list.dev_ids[mdt->s_dev_list.id_index];
 	super_size = md_p2o(__dev_id_blocks(dev_id));
 	if (unlikely(!super_size || super_size & mc->alloc_mask)) {
 		md_warn_cnd(mc->silent, "super_size(0x%lx) ! 2_M aligned\n",
