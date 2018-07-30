@@ -15,6 +15,7 @@
 #include "zus.h"
 #include "atomic.h"
 #include "md.h"
+#include "iom_enc.h"
 
 /*
  * python pycrc.py --model crc-16 --algorithm table-driven --generate c
@@ -307,4 +308,53 @@ bool md_mdt_check(struct md_dev_table *mdt,
 	}
 
 	return true;
+}
+
+int md_t2_mdt_read(struct multi_devices *md, int dev_index,
+		   struct md_dev_table *mdt)
+{
+	struct zus_iomap_build iomb = {};
+	struct {
+		struct zufs_ioc_iomap_exec ziome;
+		struct zufs_iom_t2_zusmem_io space;
+		__u64 null_term;
+	} a;
+
+	iomb.ziome = &a.ziome;
+	_zus_ioc_ziome_init(iomb.ziome, sizeof(a));
+	_zus_ioc_iom_start(&iomb, md->sbi, NULL, NULL, &a.ziome);
+
+	_zus_iom_enc_t2_zusmem_read(&iomb, 0, mdt, PAGE_SIZE);
+
+	_zus_iom_submit(&iomb, true);
+
+	return iomb.ziome->hdr.err;
+}
+
+int md_t2_mdt_write(struct multi_devices *md, struct md_dev_table *mdt)
+{
+	struct zus_iomap_build iomb = {};
+	struct {
+		struct zufs_ioc_iomap_exec ziome;
+		struct zufs_iom_t2_zusmem_io space[md->t2_count];
+		__u64 null_term;
+	} a;
+	int i;
+
+	iomb.ziome = &a.ziome;
+	_zus_ioc_ziome_init(iomb.ziome, sizeof(a));
+	_zus_ioc_iom_start(&iomb, md->sbi, NULL, NULL, &a.ziome);
+
+	for (i = 0; i < md->t2_count; ++i) {
+		ulong bn = md_o2p(md_t2_dev(md, i)->offset);
+
+		mdt->s_dev_list.id_index = mdt->s_dev_list.t1_count + i;
+		mdt->s_sum = cpu_to_le16(md_calc_csum(mdt));
+
+		_zus_iom_enc_t2_zusmem_write(&iomb, bn, mdt, PAGE_SIZE);
+	}
+
+	_zus_iom_submit(&iomb, true);
+
+	return iomb.ziome->hdr.err;
 }
