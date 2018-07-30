@@ -64,6 +64,8 @@ CFLAGS = -fPIC -pthread -std=gnu11 $(CONFIG_CFLAGS)	\
 	$(CWARN) $(CNO_WARN)				\
 	$(CONFIG_PEDANTIC_FLAGS)
 
+export CFLAGS
+
 # On Linux
 CFLAGS += "-DKERNEL=0"
 

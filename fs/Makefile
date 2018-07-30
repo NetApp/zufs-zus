@@ -10,13 +10,11 @@
 #	Shachar Sharon <sshachar@netapp.com>
 #
 
-# foofs linked into zus
-fs/libfoofs.a: fs/foofs.o
-	ar rcs $(LDFLAGS) -o $@ $^
+LIBFS_SUBDIRS = $(addprefix fs/,$(CONFIG_LIBFS_MODULES))
 
-fs_libs+=fs/libfoofs.a
+all clean: $(LIBFS_SUBDIRS)
 
-# Add any Makefile from config file
-ifneq ($(realpath $(CONFIG_MAKEFILE)),)
--include $(CONFIG_MAKEFILE)
-endif
+$(LIBFS_SUBDIRS):
+	$(MAKE) -C $@ $(MAKECMDGOALS)
+
+.PHONY: $(LIBFS_SUBDIRS)
