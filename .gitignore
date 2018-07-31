@@ -25,3 +25,4 @@ fs/*
 # common ignores
 *.o
 *.so
+*.rpm

@@ -1,5 +1,5 @@
 #
-# Service unit file for the zus user-mode application
+# Service unit file for the ZUFS
 #
 # Copyright (C) 2018 NetApp, Inc.  All rights reserved.
 #
@@ -11,15 +11,17 @@
 #
 
 [Unit]
-Description=ZUS Daemon
-ConditionPathExists=/lib/modules/%v/kernel/fs/zuf/zuf.ko
+Description=Zero-copy User-mode FileSystem
+ConditionPathExists=|/lib/modules/%v/kernel/fs/zuf/zuf.ko
+ConditionPathExists=|/usr/lib/zufs/extra/zuf.ko
 After=local-fs.target
 
 [Service]
 Type=simple
+EnvironmentFile=-/etc/zufs.conf
 ExecStartPre=/sbin/modprobe zuf
 ExecStartPre=/bin/mount -t zuf nodev /sys/fs/zuf
-ExecStart=/opt/zus/zus
+ExecStart=/sbin/zusd
 ExecStopPost=/bin/umount -t zuf /sys/fs/zuf
 ExecStopPost=/sbin/rmmod zuf
 

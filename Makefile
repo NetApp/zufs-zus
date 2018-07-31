@@ -139,13 +139,35 @@ ifneq (clean, $(MAKECMDGOALS))
 -include $(DEPEND)
 endif
 
-#.============== install =======================================================
-SERVICE = zus.service
+#.============== install & package =============================================
+SERVICE = zusd.service
 SYSTEMD_SERVICE_DIR = /lib/systemd/system
+SYSTEMD_DEPS_DIR = /etc/systemd/system/multi-user.target.wants
+ZUFS_LIB_DIR = /usr/lib/zufs
 
 install:
-	cp -f $(SERVICE) $(SYSTEMD_SERVICE_DIR)
-	systemctl daemon-reload
-	systemctl stop zus
-	systemctl enable zus
-	systemctl start zus
+	mkdir -p $(DESTDIR){/sbin,/usr/lib64,$(ZUFS_LIB_DIR)}
+	mkdir -p $(DESTDIR){$(SYSTEMD_SERVICE_DIR),$(SYSTEMD_DEPS_DIR)}
+	cp -f zusd $(DESTDIR)/sbin
+	cp -f $(LIBZUS) $(DESTDIR)/usr/lib64
+	cp -f fs/foofs/libfoofs.so $(DESTDIR)$(ZUFS_LIB_DIR)
+	cp -f $(SERVICE) $(DESTDIR)$(SYSTEMD_SERVICE_DIR)
+	ln -sf $(SYSTEMD_SERVICE_DIR)/$(SERVICE) $(DESTDIR)$(SYSTEMD_DEPS_DIR)
+	[[ -z "$(DESTDIR)" ]] && pkg/post_install.sh || :
+
+rpm:
+	$(eval TMPDIR := $(shell mktemp -d))
+	$(MAKE) -C . DESTDIR=$(TMPDIR) install
+	$(eval GIT_HASH := $(shell git rev-parse HEAD))
+	fpm -s dir -t $@ -n zufs-zus -v $(VER) -C $(TMPDIR) \
+		--iteration $(BUILD_ID) --epoch 1 \
+		--url "netapp.com" --license "GPL/BSD" --vendor "NetApp Inc." \
+		--description "`printf "ZUS - Zero-copy User-mode Server\nID: $(GIT_HASH)"`" \
+		-d libunwind -d libuuid -d libpmem -d zufs-zuf \
+		--rpm-rpmbuild-define "_build_id_links none" \
+		--before-remove pkg/pre_uninstall.sh \
+		--after-remove pkg/post_uninstall.sh \
+		--after-install pkg/post_install.sh .
+	rm -rf $(TMPDIR)
+
+.PHONY: all clean install rpm
