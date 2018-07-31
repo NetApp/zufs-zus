@@ -37,3 +37,6 @@ CONFIG_CDEBUG_FLAGS =
 
 # Control path zus-zuf
 CONFIG_ZUF_DEF_PATH = /sys/fs/zuf
+
+# clflushopt enable
+# CONFIG_C_DEFINE += -DCONFIG_CL_FLUSH_OPT
