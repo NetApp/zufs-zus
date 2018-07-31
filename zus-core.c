@@ -109,13 +109,13 @@ static void *zu_thread(void *callback_info)
 {
 	struct _zu_thread *zt = callback_info;
 	struct zufs_ioc_wait_operation *op =
-				g_wait_structs.ptr + zt->no * sizeof(*op);
+				g_wait_structs.ptr + zt->no * ZUS_MAX_OP_SIZE;
 
 	zt->err = zuf_root_open_tmp(&zt->fd);
 	if (zt->err)
 		return NULL;
 
-	zt->err = zuf_zt_init(zt->fd, zt->no);
+	zt->err = zuf_zt_init(zt->fd, zt->no, ZUS_MAX_OP_SIZE);
 	if (zt->err)
 		return NULL; /* leak the file it is fine */
 
@@ -241,8 +241,7 @@ static int zus_start_all_threads(struct thread_param *tp, uint num_cpus)
 	g_num_gts = num_cpus;
 	pthread_key_create(&g_zts_id_key, NULL);
 
-	err = fba_alloc(&g_wait_structs,
-			num_cpus * sizeof(struct zufs_ioc_wait_operation));
+	err = fba_alloc(&g_wait_structs, num_cpus * ZUS_MAX_OP_SIZE);
 	if (unlikely(err)) {
 		ERROR("fba_alloc => %d\n", err);
 		return err;
