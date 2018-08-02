@@ -14,11 +14,16 @@
 #ifndef __ZUS_IOM_H__
 #define __ZUS_IOM_H__
 
+#include <errno.h>
+
 #include "zus.h"
 
 typedef void (*iomb_done_fn)(struct zus_iomap_build *iomb);
+typedef void (*iomb_submit_fn)(struct zus_iomap_build *iomb, bool last,
+			       bool sync);
 struct zus_iomap_build {
 	iomb_done_fn		done;
+	iomb_submit_fn		submit;
 	void			*priv;
 	int			err;
 
@@ -28,7 +33,7 @@ struct zus_iomap_build {
 
 	/* Optional */
 	struct zus_sb_info	*sbi;
-	struct zufs_ioc_iomap_exec *ziome;
+	struct zufs_iomap	*ziom;
 };
 
 static inline ulong _zus_iom_len(struct zus_iomap_build *iomb)
@@ -44,10 +49,10 @@ static inline void _zus_iom_enc_type_val(__u64 *ptr, enum ZUFS_IOM_TYPE type,
 	*ptr = (__u64)val | ((__u64)type << ZUFS_IOM_VAL_BITS);
 }
 
-static inline void _zus_ioc_ziome_init(struct zufs_ioc_iomap_exec *ziome,
-				       uint bytes)
+static inline void _zus_ioc_ziom_init(struct zufs_iomap *ziom, uint bytes)
 {
-	ziome->iom_n = (bytes - sizeof(*ziome)) / sizeof(__u64);
+	memset(ziom, 0, sizeof(*ziom));
+	ziom->iom_max = (bytes - sizeof(*ziom)) / sizeof(__u64);
 }
 
 static inline void _zus_iom_start(struct zus_iomap_build *iomb, __u64 *iom_e,
@@ -56,23 +61,24 @@ static inline void _zus_iom_start(struct zus_iomap_build *iomb, __u64 *iom_e,
 	iomb->cur_iom_e = iomb->start_iom_e = iom_e;
 	iomb->end_iom_e = iom_e + max;
 	iom_e[0] = 0;
-	iomb->ziome = NULL;
+	iomb->ziom = NULL;
 }
 
-/* ziome must come zero(ed) and @ziome->max_list denoting
- * how much space is available in @ziome->iom_e[].
+/* ziom must come zero(ed) and @ziom->max_list denoting
+ * how much space is available in @ziom->iom_e[].
  */
 static inline void _zus_ioc_iom_start(struct zus_iomap_build *iomb,
 				      struct zus_sb_info *sbi,
-				      iomb_done_fn done, void* priv,
-				      struct zufs_ioc_iomap_exec *ziome)
+				      iomb_done_fn done, iomb_submit_fn submit,
+				      void* priv, struct zufs_iomap *ziom)
 {
-	_zus_iom_start(iomb, ziome->iom_e, ziome->iom_n);
-	iomb->ziome = ziome;
+	_zus_iom_start(iomb, ziom->iom_e, ziom->iom_max);
+	iomb->ziom = ziom;
 	iomb->sbi = sbi;
 	iomb->done = done;
+	iomb->submit = submit;
 	iomb->priv = priv;
-	ziome->iomb = iomb;
+	ziom->iomb = iomb;
 }
 static inline void _zus_iom_end(struct zus_iomap_build *iomb)
 {
@@ -80,17 +86,8 @@ static inline void _zus_iom_end(struct zus_iomap_build *iomb)
 	if (iomb->cur_iom_e < iomb->end_iom_e)
 		_zus_iom_enc_type_val(iomb->cur_iom_e, 0, 0);
 
-	if (iomb->ziome)
-		iomb->ziome->iom_n = _zus_iom_len(iomb);
-}
-
-static inline void _zus_iom_submit(struct zus_iomap_build *iomb, bool sync)
-{
-	_zus_iom_end(iomb);
-
-	iomb->err = __zus_iom_exec(iomb->sbi, iomb->ziome, sync);
-	if (sync && iomb->done)
-		iomb->done(iomb);
+	if (iomb->ziom)
+		iomb->ziom->iom_n = _zus_iom_len(iomb);
 }
 
 static inline int _zus_iom_enc_unmap(struct zus_iomap_build *iomb, ulong index,
@@ -170,5 +167,9 @@ static inline int _zus_iom_enc_t2_zusmem_read(struct zus_iomap_build *iomb,
 	return _zus_iom_enc_t2_zusmem_io(iomb, t2_bn, ptr, len,
 					 IOM_T2_ZUSMEM_READ);
 }
+
+/* Two services for submit */
+void _zus_ioc_iom_exec_submit(struct zus_iomap_build *iomb, bool done, bool sync);
+void _zus_iom_read_submit(struct zus_iomap_build *iomb, bool done, bool sync);
 
 #endif /* define __ZUS_IOM_H__ */
