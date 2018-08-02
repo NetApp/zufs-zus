@@ -212,8 +212,10 @@ static inline void zus_std_add_dentry(struct zus_inode *dir_zi,
 static inline void zus_std_remove_dentry(struct zus_inode *dir_zi,
 					struct zus_inode *zi)
 {
-	if (zi_isdir(zi))
+	if (zi_isdir(zi)) {
+		le32_add(&zi->i_nlink, -1);
 		le32_add(&dir_zi->i_nlink, -1);
+	}
 
 	le32_add(&zi->i_nlink, -1);
 }
