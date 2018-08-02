@@ -166,6 +166,7 @@ int md_init_from_pmem_info(struct multi_devices *md)
 
 		_init_dev_info(mdi, &dev_list->dev_ids[i], i, offset, NULL);
 		offset += mdi->size;
+		md->t2a.bn_gcd = _gcd(md->t2a.bn_gcd, md_o2p(mdi->size));
 	}
 
 	if (md->t1_count) {
@@ -328,7 +329,7 @@ int md_t2_mdt_read(struct multi_devices *md, int dev_index,
 
 	_zus_iom_submit(&iomb, true);
 
-	return iomb.ziome->hdr.err;
+	return iomb.err;
 }
 
 int md_t2_mdt_write(struct multi_devices *md, struct md_dev_table *mdt)
@@ -356,5 +357,5 @@ int md_t2_mdt_write(struct multi_devices *md, struct md_dev_table *mdt)
 
 	_zus_iom_submit(&iomb, true);
 
-	return iomb.ziome->hdr.err;
+	return iomb.err;
 }
