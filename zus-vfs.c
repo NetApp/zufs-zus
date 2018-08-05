@@ -17,8 +17,6 @@
 
 #include "zus.h"
 #include "zuf_call.h"
-#include "fs/toyfs/toyfs.h"
-
 
 /* ~~~ mount stuff ~~~ */
 
@@ -549,13 +547,6 @@ int zus_register_all(int fd)
 		ERROR("failed to register foofs: %d\n", err);
 		return err;
 	}
-#if 0
-	err = toyfs_register_fs(fd);
-	if (err) {
-		ERROR("failed to register toyfs: %d\n", err);
-		return err;
-	}
-#endif
 
 	m1fs_register_fs(fd);
 	return 0;
