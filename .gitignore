@@ -16,9 +16,12 @@ fs/libfoofs.a
 zusd
 libzus.so
 
-# TODO how to ignore external FS(s)
-fs/m1fs/
-fs/patches
+# ignore external FS(s) linked under fs/ (except local ones)
+!fs/
+fs/*
+!fs/Makefile
+!fs/foofs.c
+!fs/toyfs
 
 # common ignores
 *.o
