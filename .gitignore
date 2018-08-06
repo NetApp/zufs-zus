@@ -11,9 +11,10 @@ zus_api.h
 linux/stat.h
 
 # targets
-zus
 b_io
 fs/libfoofs.a
+zusd
+libzus.so
 
 # TODO how to ignore external FS(s)
 fs/m1fs/

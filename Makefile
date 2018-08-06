@@ -73,12 +73,11 @@ CFLAGS += "-DKERNEL=0"
 C_LIBS = -lrt -lcurses -lc -luuid -lunwind $(CONFIG_C_LIBS)
 
 # Targets
-ALL = zus
-zus_OBJ = $(NULL)
+ALL = zusd libzus.so
 all: $(DEPEND) $(ALL)
 
 clean:
-	rm -vf $(LINKED_HEADERS) $(DEPEND) $(ALL) $(zus_OBJ) fs/*.o
+	rm -vf $(LINKED_HEADERS) $(DEPEND) $(ALL) $(zusd_OBJ) $(libzus_OBJ)
 
 # =========== Headers from the running Kernel ==================================
 ZUS_API_H=zus_api.h md_def.h md.h
@@ -98,13 +97,21 @@ $(LINUX_STAT_H):
 -include fs/Makefile
 
 
-# ============== zus ===========================================================
-zus_OBJ += zus-core.o zus-vfs.o main.o module.o md_zus.o nvml_movnt.o utils.o
+# ============== libzus & zusd =================================================
+LIBZUS = libzus.so
 
-zus: $(zus_OBJ) $(fs_libs)
+libzus_OBJ += zus-core.o zus-vfs.o module.o md_zus.o nvml_movnt.o \
+	      utils.o fs/foofs.o
+
+$(LIBZUS): $(libzus_OBJ:.o=.c)
+	$(CC) -shared $(LDFLAGS) $(CFLAGS) $(C_LIBS) -o $@ $^
+
+zusd_OBJ = main.o
+
+zusd: $(zusd_OBJ) $(LIBZUS)
 	$(CC) $(LDFLAGS) $(CFLAGS) $(C_LIBS) -o $@ $^
 
-$(DEPEND): $(zus_OBJ:.o=.c)
+$(DEPEND): $(zusd_OBJ:.o=.c) $(libzus_OBJ:.o:.c)
 
 # =============== common rules =================================================
 # every thing should compile if Makefile or .config changed
