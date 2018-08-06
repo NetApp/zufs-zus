@@ -264,6 +264,7 @@ int zus_thread_create(pthread_t *new_tread, struct zus_thread_params *params,
 
 /* zus-vfs.c */
 int zus_register_all(int fd);
+void zus_unregister_all(void);
 int zus_register_one(int fd, struct zus_fs_info *p_zfi);
 
 int zus_mount(int fd, struct zufs_ioc_mount *zim);
@@ -275,9 +276,7 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr);
 int __zus_iom_exec(struct zus_sb_info *sbi, struct zufs_ioc_iomap_exec *ziome,
 		   bool sync);
 
-/* FIXME: FS registration must be dynamic */
 int foofs_register_fs(int fd);
-int m1fs_register_fs(int fd);
 
 /* Currently at zus-vfs.c */
 /* File backed Allocator - Gives user an allocated pointer
@@ -315,5 +314,10 @@ void zus_bug(const char *cond, const char *file, int line);
 		zus_bug(#x_, __FILE__, __LINE__); \
 	unlikely(__ret_bug_on); \
 })
+
+#define ZUS_LIBFS_MAX_NR	16			/* see also MAX_LOCKDEP_FSs in zuf */
+#define ZUS_LIBFS_MAX_PATH	256
+#define ZUS_LIBFS_DIR		"/usr/lib/zufs"
+#define ZUS_LIBFS_LIST_ENV	"ZUFS_LIBFS_LIST"
 
 #endif /* define __ZUS_H__ */

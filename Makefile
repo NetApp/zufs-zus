@@ -101,7 +101,7 @@ $(LINUX_STAT_H):
 LIBZUS = libzus.so
 
 libzus_OBJ += zus-core.o zus-vfs.o module.o md_zus.o nvml_movnt.o \
-	      utils.o fs/foofs.o
+	      utils.o fs-loader.o fs/foofs.o
 
 $(LIBZUS): $(libzus_OBJ:.o=.c)
 	$(CC) -shared $(LDFLAGS) $(CFLAGS) $(C_LIBS) -o $@ $^

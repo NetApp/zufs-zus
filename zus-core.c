@@ -549,6 +549,8 @@ void zus_mount_thread_stop(void)
 	g_mount.stop = true;
 	pthread_join(g_mount.zbt.thread, &tret);
 	g_mount.zbt.thread = 0;
+
+	zus_unregister_all();
 }
 
 void zus_join(void)

@@ -523,35 +523,6 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 	return 0;
 }
 
-/* ~~~~ zuf_fs_info stuff ~~~~~ */
-int zus_register_one(int fd, struct zus_fs_info *zfi)
-{
-	int err;
-
-	/* add zfi on a global list ?? */
-
-	err = zuf_register_fs(fd, zfi);
-	if (err)
-		return err;
-
-	return 0;
-}
-
-/* TODO: We need some registry of all fss to load */
-int zus_register_all(int fd)
-{
-	int err;
-
-	err = foofs_register_fs(fd);
-	if (err) {
-		ERROR("failed to register foofs: %d\n", err);
-		return err;
-	}
-
-	m1fs_register_fs(fd);
-	return 0;
-}
-
 /* ~~~ STUFF MOVE TO NEW FILE ~~~ */
 
 /* ~~~~ fba ~~~~ */
