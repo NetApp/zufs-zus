@@ -33,8 +33,8 @@
  * to a single t1 in that case. (Silently destroy anything there)
  */
 enum {
-	M1FS_MAJOR_VERSION	= 15,
-	M1FS_MINOR_VERSION	= 1,
+	M1FS_MAJOR_VERSION	= 17,
+	M1FS_MINOR_VERSION	= 0,
 	M1FS_SUPER_MAGIC	= 0x5346314d /* M1FS in BE */
 };
 
@@ -496,7 +496,13 @@ static struct zus_fs_info foo_zfi = {
 	.next_sb_id	= 0,
 };
 
+static
 int foofs_register_fs(int fd)
 {
 	return zus_register_one(fd, &foo_zfi);
+}
+
+int REGISTER_FS_FN(int fd)
+{
+	return foofs_register_fs(fd);
 }

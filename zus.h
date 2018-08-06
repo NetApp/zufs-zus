@@ -276,8 +276,6 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr);
 int __zus_iom_exec(struct zus_sb_info *sbi, struct zufs_ioc_iomap_exec *ziome,
 		   bool sync);
 
-int foofs_register_fs(int fd);
-
 /* Currently at zus-vfs.c */
 /* File backed Allocator - Gives user an allocated pointer
  * which is derived from a /tmp/O_TMPFILE mmap. The size

@@ -12,7 +12,6 @@ linux/stat.h
 
 # targets
 b_io
-fs/libfoofs.a
 zusd
 libzus.so
 
@@ -20,7 +19,7 @@ libzus.so
 !fs/
 fs/*
 !fs/Makefile
-!fs/foofs.c
+!fs/foofs
 !fs/toyfs
 
 # common ignores

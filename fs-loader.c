@@ -149,12 +149,6 @@ int zus_register_all(int fd)
 {
 	int err;
 
-	err = foofs_register_fs(fd);
-	if (err) {
-		ERROR("failed to register foofs: %d\n", err);
-		return err;
-	}
-
 	err = _load_libfs(fd);
 	if (err) {
 		ERROR("failed to load dynamic libfs modules => %d\n", err);
