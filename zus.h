@@ -267,6 +267,16 @@ void zus_bug(const char *cond, const char *file, int line);
 	unlikely(__ret_warn_on); \
 })
 
+#define ZUS_WARN_ON_ONCE(x_) ({				\
+	int __ret_warn_on = !!(x_);			\
+	static bool __once = false;			\
+	if (unlikely(__ret_warn_on && !__once))	{	\
+		zus_warn(#x_, __FILE__, __LINE__); 	\
+		__once = true;				\
+	}						\
+	unlikely(__ret_warn_on);			\
+})
+
 #define ZUS_BUG_ON(x_) ({ \
 	int __ret_bug_on = !!(x_); \
 	if (unlikely(__ret_bug_on)) \

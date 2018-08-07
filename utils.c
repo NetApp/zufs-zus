@@ -54,7 +54,7 @@ static int _dump_backtrace(FILE *fp)
 		if (err)
 			return err;
 
-		fprintf(fp, "[<%p>] 0x%lx %s+0x%lx\n",
+		fprintf(fp, "<4>zus_warn:        [<%p>] 0x%lx %s+0x%lx\n",
 			(void *)ip, (long)sp, sym, (long)off);
 	}
 	return 0;
@@ -64,19 +64,32 @@ static void _dump_addr2line(FILE *fp)
 {
 	int i, len;
 	void *arr[BACKTRACE_MAX];
+	char ptrS[2048];
+	char *m = ptrS;
+	int s = sizeof(ptrS);
 
 	len = unw_backtrace(arr, BACKTRACE_MAX);
-	fprintf(fp, "addr2line -a -C -e %s -f -p -s ", program_invocation_name);
-	for (i = 1; i < len - 2; ++i)
-		fprintf(fp, "%p ", arr[i]);
-	fputs("\n", fp);
+
+	for (i = 0; i < len - 3; ++i) {
+		int l;
+
+		if (!(i % 5)) {
+			l = snprintf(m, s, "\\\n				");
+			s -= l; m += l;
+		}
+		l = snprintf(m, s, "%p ", arr[i + 1]);
+		s -= l; m += l;
+	}
+	
+	fprintf(fp, "<4>zus_warn: addr2line -a -C -e %s -f -p -s %s\n",
+		program_invocation_name, ptrS);
 }
 
 void zus_warn(const char *cond, const char *file, int line)
 {
 	FILE *fp = stderr;
 
-	fprintf(fp, "%s: %s (%s:%d)\n", __func__, cond, file, line);
+	fprintf(fp, "<4>%s: %s (%s:%d)\n", __func__, cond, file, line);
 	_dump_backtrace(fp);
 	_dump_addr2line(fp);
 }
@@ -85,7 +98,7 @@ void zus_bug(const char *cond, const char *file, int line)
 {
 	FILE *fp = stderr;
 
-	fprintf(fp, "%s: %s (%s:%d)\n", __func__, cond, file, line);
+	fprintf(fp, "<3>%s: %s (%s:%d)\n", __func__, cond, file, line);
 	_dump_backtrace(fp);
 	_dump_addr2line(fp);
 	abort();

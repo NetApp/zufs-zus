@@ -15,18 +15,19 @@
 #include <stdio.h>
 
 /* FIXME*/
-#define ERROR(fmt, a...) printf("!!! %s:%d: " fmt, __func__, __LINE__, ##a)
-#define INFO(fmt, a...) printf("zus %s:%d: " fmt, __func__, __LINE__, ##a)
+#define ERROR(fmt, a...) fprintf(stderr, "<3>zus: [%s:%d]: " fmt, __func__, __LINE__, ##a)
+#define INFO(fmt, a...) fprintf(stderr, "<5>zus: " fmt, ##a)
 
-extern bool g_DBG;
+extern ulong g_DBGMASK;
+#define ZUS_DBGPRNT  (g_DBGMASK & 1)
 
-#define DBG(fmt, a...) if (g_DBG) printf("zus %s:%d: " fmt, __func__, __LINE__, ##a)
-#define DBGCONT(fmt, a...) do { if (g_DBG) printf(fmt, ##a); } while(0)
+#define DBG(fmt, a...) if (ZUS_DBGPRNT) fprintf(stderr, "<5>zus: [%s:%d]: " fmt, __func__, __LINE__, ##a)
+#define DBGCONT(fmt, a...) do { if (ZUS_DBGPRNT) fprintf(stderr, fmt, ##a); } while(0)
 
 #define md_dbg_err DBG
 #define md_warn_cnd(silent, s, args ...) \
 	do {if (!silent) \
-		printf("[%s:%d] " s, __func__, __LINE__, ## args); \
+		fprintf(stderr, "<4>md-zus: [%s:%d] " s, __func__, __LINE__, ## args); \
 	} while (0)
 
 #endif /* define ___PR_H__ */

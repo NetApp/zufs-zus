@@ -595,7 +595,7 @@ int  fba_alloc(struct fba *fba, size_t size)
 	}
 
 	addr = ALIGN((ulong)fba->ptr, FBA_ALIGNSIZE);
-	INFO("fba: fd=%d mmap-addr=0x%lx align-addr=0x%lx msize=%lu\n",
+	DBG("fba: fd=%d mmap-addr=0x%lx align-addr=0x%lx msize=%lu\n",
 		fba->fd, (ulong)fba->ptr, addr, size);
 	fba->ptr = (void *)addr;
 
