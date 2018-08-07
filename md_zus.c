@@ -311,6 +311,15 @@ bool md_mdt_check(struct md_dev_table *mdt,
 	return true;
 }
 
+static void _done(struct zus_iomap_build *iomb)
+{
+}
+
+static void _submit(struct zus_iomap_build *iomb, bool last, bool sync)
+{
+	ERROR("\n");
+}
+
 int md_t2_mdt_read(struct multi_devices *md, int dev_index,
 		   struct md_dev_table *mdt)
 {
@@ -321,13 +330,13 @@ int md_t2_mdt_read(struct multi_devices *md, int dev_index,
 		__u64 null_term;
 	} a;
 
-	iomb.ziome = &a.ziome;
-	_zus_ioc_ziome_init(iomb.ziome, sizeof(a));
-	_zus_ioc_iom_start(&iomb, md->sbi, NULL, NULL, &a.ziome);
+	iomb.ziom = &a.ziome.ziom;
+	_zus_ioc_ziom_init(iomb.ziom, sizeof(a));
+	_zus_ioc_iom_start(&iomb, md->sbi, _done, _submit, md, &a.ziome.ziom);
 
 	_zus_iom_enc_t2_zusmem_read(&iomb, 0, mdt, PAGE_SIZE);
 
-	_zus_iom_submit(&iomb, true);
+	_zus_ioc_iom_exec_submit(&iomb, true, true);
 
 	return iomb.err;
 }
@@ -342,10 +351,11 @@ int md_t2_mdt_write(struct multi_devices *md, struct md_dev_table *mdt)
 	} a;
 	int i;
 
-	iomb.ziome = &a.ziome;
-	_zus_ioc_ziome_init(iomb.ziome, sizeof(a));
-	_zus_ioc_iom_start(&iomb, md->sbi, NULL, NULL, &a.ziome);
+	iomb.ziom = &a.ziome.ziom;
+	_zus_ioc_ziom_init(iomb.ziom, sizeof(a));
+	_zus_ioc_iom_start(&iomb, md->sbi, NULL, NULL, NULL, &a.ziome.ziom);
 
+	/* FIXME: must make copies and execute at end. one by one for now */
 	for (i = 0; i < md->t2_count; ++i) {
 		ulong bn = md_o2p(md_t2_dev(md, i)->offset);
 
@@ -353,9 +363,40 @@ int md_t2_mdt_write(struct multi_devices *md, struct md_dev_table *mdt)
 		mdt->s_sum = cpu_to_le16(md_calc_csum(mdt));
 
 		_zus_iom_enc_t2_zusmem_write(&iomb, bn, mdt, PAGE_SIZE);
+		_zus_ioc_iom_exec_submit(&iomb, true, true);
+		if (iomb.err)
+			break;
 	}
 
-	_zus_iom_submit(&iomb, true);
-
 	return iomb.err;
+}
+
+/* ~~~  _zus_iom facility (imp of iom_enc.h) ~~~ */
+
+#ifndef container_of
+#define container_of(ptr, type, member) \
+	(type *)((void *)((char *)ptr - offsetof(type, member)))
+#endif
+
+void _zus_ioc_iom_exec_submit(struct zus_iomap_build *iomb, bool done,
+			      bool sync)
+{
+	struct zufs_ioc_iomap_exec *ziome =
+			container_of(iomb->ziom, typeof(*ziome), ziom);
+
+	_zus_iom_end(iomb);
+
+	if (ZUS_WARN_ON(!iomb->ziom))
+		return;
+
+	iomb->err = __zus_iom_exec(iomb->sbi, ziome, sync);
+	if (sync && iomb->done)
+		iomb->done(iomb);
+}
+
+void _zus_iom_read_submit(struct zus_iomap_build *iomb, bool done, bool sync)
+{
+	/* FIXME: perhaps chain the bios */
+	if (!done)
+		ERROR("should not happen bio should be big enough\n");
 }

@@ -447,5 +447,9 @@ int __zus_iom_exec(struct zus_sb_info *sbi, struct zufs_ioc_iomap_exec *ziome,
 	ziome->zus_sbi = sbi;
 	ziome->wait_for_done = sync;
 
+	DBG("ziome->sb_id=%lld, iom_n=0x%x [0x%llx, 0x%llx, 0x%llx, 0x%llx]\n",
+	    ziome->sb_id, ziome->ziom.iom_n, ziome->ziom.iom_e[0],
+	    ziome->ziom.iom_e[1], ziome->ziom.iom_e[2], ziome->ziom.iom_e[3]);
+
 	return zuf_iomap_exec(g_mount.fd, ziome);
 }
