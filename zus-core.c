@@ -458,22 +458,29 @@ struct _zu_mount_thread {
 
 static void *zus_mount_thread(void *callback_info)
 {
-	struct zufs_ioc_mount zim = {};
+	struct fba fba = {};
+	struct zufs_ioc_mount *zim;
+
+	g_mount.zbt.err = fba_alloc(&fba, ZUS_MAX_OP_SIZE);
+	if (unlikely(g_mount.zbt.err))
+		return (void *)((long)g_mount.zbt.err);
+
+	zim = fba.ptr;
 
 	g_mount.zbt.err = zuf_root_open_tmp(&g_mount.fd);
 	if (g_mount.zbt.err)
-		return NULL;
+		goto out;
 
 	INFO("Mount thread Running fd=%d\n", g_mount.fd);
 
-	zim.hdr.err = zus_register_all(g_mount.fd);
-	if (zim.hdr.err) {
-		ERROR("zus_register_all => %d\n", zim.hdr.err);
-		return NULL;
+	g_mount.zbt.err = zus_register_all(g_mount.fd);
+	if (g_mount.zbt.err) {
+		ERROR("zus_register_all => %d\n", g_mount.zbt.err);
+		goto out;
 	}
 
 	while(!g_mount.stop) {
-		g_mount.zbt.err = zuf_recieve_mount(g_mount.fd, &zim);
+		g_mount.zbt.err = zuf_recieve_mount(g_mount.fd, zim);
 		if (g_mount.zbt.err || g_mount.stop) {
 			break;
 		}
@@ -487,17 +494,19 @@ static void *zus_mount_thread(void *callback_info)
 					      g_zus_numa_map.online_cpus);
 		}
 
-		if (zim.is_umounting) {
-			zus_umount(g_mount.fd, &zim);
+		if (zim->is_umounting) {
+			zus_umount(g_mount.fd, zim);
 		} else {
-			zus_mount(g_mount.fd, &zim);
+			zus_mount(g_mount.fd, zim);
 		}
 	}
 
 	zuf_root_close(&g_mount.fd);
 
+out:
+	fba_free(&fba);
 	INFO("Mount thread Exit\n");
-	return &g_mount;
+	return (void *)((long)g_mount.zbt.err);
 }
 
 int zus_mount_thread_start(struct zus_thread_params *tp, const char* zuf_path)
