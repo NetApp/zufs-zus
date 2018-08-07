@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <sys/mman.h>
 #include <asm-generic/mman.h>
+#include <linux/limits.h>
 
 #include "zus.h"
 #include "zusd.h"
@@ -22,7 +23,12 @@
 #include "wtz.h"
 #include "iom_enc.h"
 
-const char* g_zus_root_path;
+/* TODO: Where to put */
+typedef unsigned int uint;
+
+/* ~~~ zuf-root files ~~~ */
+char g_zus_root_path_stor[PATH_MAX];
+const char const *g_zus_root_path = g_zus_root_path_stor;
 
 int zuf_root_open_tmp(int *fd)
 {
@@ -47,33 +53,264 @@ void zuf_root_close(int *fd)
 	}
 }
 
-struct _zu_thread {
+/* ~~~ CPU & NUMA topology by zus ~~~ */
+
+#define __ZT_PLEASE_FREE 1
+struct zus_base_thread {
+	__start_routine threadfn;
+	void *user_arg;
+
+	uint one_cpu;
+	uint nid;
 	pthread_t thread;
-	int no;
+	ulong flags;
 	int err;
+};
+
+static pthread_key_t g_zts_id_key;
+struct zufs_ioc_numa_map g_zus_numa_map;
+
+static int _numa_map_init(int fd)
+{
+	return zuf_numa_map(fd, &g_zus_numa_map);
+}
+
+static inline bool ___BAD_CPU(uint cpu)
+{
+	/* TODO: WARN_ON_ONCE */
+	if (ZUS_WARN_ON(g_zus_numa_map.online_cpus < cpu)) {
+		ERROR("Bad cpu=%d\n", cpu);
+		return true; /* yell, but do not crash */
+	}
+
+	return false;
+}
+#define BAD_CPU(cpu) (unlikely(___BAD_CPU(cpu)))
+
+int zus_cpu_to_node(int cpu)
+{
+	if (BAD_CPU(cpu))
+		return 0; /* Yell but don't crash */
+
+	return g_zus_numa_map.cpu_to_node[cpu];
+}
+
+int zus_current_onecpu(void)
+{
+	struct zus_base_thread *zbt = pthread_getspecific(g_zts_id_key);
+
+	if (!zbt)
+		return ZUS_CPU_ALL;
+	return  zbt->one_cpu;
+}
+
+static int __zus_current_cpu(bool warn)
+{
+	struct zus_base_thread *zbt = pthread_getspecific(g_zts_id_key);
+
+	if (ZUS_WARN_ON(!zbt)) /* not created by us */
+		return sched_getcpu();
+
+	ZUS_WARN_ON_ONCE(warn && (zbt->one_cpu == ZUS_CPU_ALL));
+	if (zbt->one_cpu == ZUS_CPU_ALL)
+		return sched_getcpu();
+
+	return zbt->one_cpu;
+}
+
+int zus_current_cpu(void)
+{
+	return __zus_current_cpu(true);
+}
+
+int zus_current_nid(void)
+{
+	struct zus_base_thread *zbt = pthread_getspecific(g_zts_id_key);
+
+	if (ZUS_WARN_ON(!zbt)) /* not created by us */
+		return zus_cpu_to_node(sched_getcpu());
+
+	if (ZUS_WARN_ON_ONCE(zbt->nid == ZUS_NUMA_NO_NID))
+		return zus_cpu_to_node(sched_getcpu());
+
+	return zbt->nid;
+}
+
+
+static int zus_set_numa_affinity(cpu_set_t *affinity, int nid)
+{
+	uint i;
+
+	CPU_ZERO(affinity);
+
+	for (i = 0; i < g_zus_numa_map.online_cpus; ++i) {
+		if (zus_cpu_to_node(i) == nid)
+			break;
+	}
+
+	if (i == g_zus_numa_map.online_cpus) {
+		ERROR("Smoking %d\n", nid);
+		return -EINVAL;
+	}
+
+	for (; i < g_zus_numa_map.online_cpus; ++i) {
+		if (zus_cpu_to_node(i) != nid)
+			break;
+		CPU_SET(i, affinity);
+	}
+	return 0;
+}
+
+static void zus_set_onecpu_affinity(cpu_set_t *affinity, uint cpu)
+{
+	CPU_ZERO(affinity);
+	CPU_SET(cpu, affinity);
+}
+
+static void *zus_glue_thread(void *__zt)
+{
+	struct zus_base_thread *zbt = __zt;
+	void *ret;
+
+	pthread_setspecific(g_zts_id_key, zbt);
+
+	ret = zbt->threadfn(zbt->user_arg);
+
+	pthread_setspecific(g_zts_id_key, NULL);
+	if (zbt->flags & __ZT_PLEASE_FREE)
+		free(zbt);
+
+	return ret;
+}
+
+/* @zbt comes ZERO(ed), Safe zbt->flags maybe set and are untouched */
+static
+int __zus_thread_create(struct zus_base_thread *zbt, struct zus_thread_params *tp,
+		        __start_routine fn, void *user_arg)
+{
+	pthread_attr_t attr;
+	int err;
+
+	zbt->threadfn = fn;
+	zbt->user_arg = user_arg;
+	zbt->one_cpu = ZUS_CPU_ALL;
+	zbt->nid = ZUS_NUMA_NO_NID;
+
+	err = pthread_attr_init(&attr);
+	if (unlikely(err)) {
+		ERROR("pthread_attr_init => %d: %s\n", err, strerror(err));
+		return zbt->err = err;
+	}
+
+	err = pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
+	if (unlikely(err)) {
+		ERROR("pthread_attr_setinheritsched => %d: %s\n",
+		      err, strerror(err));
+		goto error;
+	}
+
+	if (tp->policy != SCHED_OTHER) {
+		struct sched_param sp = {
+			.__sched_priority = tp->rr_priority,
+		};
+
+		err = pthread_attr_setschedpolicy(&attr, tp->policy);
+		if (unlikely(err)) {
+			ERROR("pthread_attr_setschedpolicy => %d: %s\n",
+			      err, strerror(err));
+			goto error;
+		}
+
+		err = pthread_attr_setschedparam(&attr, &sp);
+		if (unlikely(err)) {
+			ERROR("pthread_attr_setschedparam => %d: %s\n",
+			      err, strerror(err));
+			goto error;
+		}
+	} /* else set nice */
+
+	if (tp->one_cpu != ZUS_CPU_ALL || tp->nid != ZUS_NUMA_NO_NID) {
+		cpu_set_t affinity;
+
+		if (tp->one_cpu != ZUS_CPU_ALL) {
+			zus_set_onecpu_affinity(&affinity, tp->one_cpu);
+			zbt->one_cpu = tp->one_cpu;
+			zbt->nid = zus_cpu_to_node(tp->one_cpu);
+		} else {
+			err = zus_set_numa_affinity(&affinity, tp->nid);
+			if (unlikely(err))
+				goto error;
+			zbt->nid = tp->nid;
+		}
+
+		err = pthread_attr_setaffinity_np(&attr, sizeof(affinity),
+						  &affinity);
+		if (unlikely(err)) {
+			ERROR("pthread_attr_setaffinity => %d: %s\n", err, strerror(err));
+			goto error;
+		}
+	}
+
+	err = pthread_create(&zbt->thread, &attr, zus_glue_thread, zbt);
+	pthread_attr_destroy(&attr);
+	if (err)  {
+		ERROR("pthread_create => %d: %s\n", err, strerror(errno));
+		goto error;
+	}
+
+	if (tp->name) {
+		err = pthread_setname_np(zbt->thread, tp->name);
+		if (err) {
+			char tname[32];
+			pthread_getname_np(zbt->thread, tname, 32);
+			ERROR("pthread_setname_np(%s) => %d\n", tname, err);
+		}
+	}
+	return 0;
+
+error:
+	pthread_attr_destroy(&attr);
+	zbt->thread = 0;
+	return zbt->err = err;
+}
+
+int zus_thread_create(pthread_t *new_tread, struct zus_thread_params *tp,
+		      __start_routine fn, void *user_arg)
+{
+	struct zus_base_thread *zbt = calloc(1, sizeof(*zbt));
+	int err;
+
+	if (unlikely(!zbt))
+		return -ENOMEM;
+
+	zbt->flags = __ZT_PLEASE_FREE;
+	err = __zus_thread_create(zbt, tp, fn, user_arg);
+	if (unlikely(err)) {
+		free (zbt);
+		return err;
+	}
+
+	*new_tread = zbt->thread;
+	return 0;
+}
+
+/* ~~~ Zu Threads ZT(s) ~~~ */
+/* These are the zus-core dispatchers threads */
+
+struct _zu_thread {
+	struct zus_base_thread zbt;
+
+	uint no;	/* TODO: just the zbt->one_cpu above, please rename */
 	int fd;
 	void *api_mem;
 	volatile bool stop;
 };
 
-/* TODO: Put all these g_xx(s) on a zus object and point to it from
- * _zu_thread. Then be Boaz Happy
- */
+/* TODO: Yes put on a zts struct */
 static struct _zu_thread *g_zts = NULL;
 static int g_num_gts = 0;
 static struct wait_til_zero g_wtz;
-static pthread_key_t g_zts_id_key;
 static struct fba g_wait_structs;
-
-int zus_getztno(void)
-{
-	struct _zu_thread *zt;
-
-	zt = (struct _zu_thread *)pthread_getspecific(g_zts_id_key);
-	return likely(zt && !zt->err) ? zt->no : -1;
-}
-
-typedef unsigned int uint;
 
 static int _zu_mmap(struct _zu_thread *zt)
 {
@@ -106,141 +343,55 @@ static __s32 _errno_UtoK(__s32 err)
 	return (err < 0) ? err : -err;
 }
 
-static void *zu_thread(void *callback_info)
+static void *_zu_thread(void *callback_info)
 {
 	struct _zu_thread *zt = callback_info;
 	struct zufs_ioc_wait_operation *op =
 				g_wait_structs.ptr + zt->no * ZUS_MAX_OP_SIZE;
 
-	zt->err = zuf_root_open_tmp(&zt->fd);
-	if (zt->err)
+	zt->zbt.err = zuf_root_open_tmp(&zt->fd);
+	if (zt->zbt.err)
 		return NULL;
 
-	zt->err = zuf_zt_init(zt->fd, zt->no, ZUS_MAX_OP_SIZE);
-	if (zt->err)
+	zt->zbt.err = zuf_zt_init(zt->fd, zt->no, ZUS_MAX_OP_SIZE);
+	if (zt->zbt.err)
 		return NULL; /* leak the file it is fine */
 
-	zt->err = _zu_mmap(zt);
-	if (zt->err)
+	zt->zbt.err = _zu_mmap(zt);
+	if (zt->zbt.err)
 		return NULL; /* leak the file it is fine */
 
-	INFO("[%d] thread Init fd=%d api_mem=%p\n",
+	DBG("[%d] thread Init fd=%d api_mem=%p\n",
 	     zt->no, zt->fd, zt->api_mem);
 
 	wtz_release(&g_wtz);
 
-	pthread_setspecific(g_zts_id_key, zt);
-
 	while(!zt->stop) {
-		zt->err = zuf_wait_opt(zt->fd, op);
+		zt->zbt.err = zuf_wait_opt(zt->fd, op);
 
-		if (zt->err) {
-			INFO("zu_thread: err=%d\n", zt->err);
+		if (zt->zbt.err) {
+			DBG("zu_thread: err=%d\n", zt->zbt.err);
 			break;
 		}
 		op->hdr.err = _errno_UtoK(_do_op(zt, op));
 	}
 
-	pthread_setspecific(g_zts_id_key, NULL);
-
 	zuf_root_close(&zt->fd);
 
-	INFO("[%d] thread Exit\n", zt->no);
+	DBG("[%d] thread Exit\n", zt->no);
 	return zt;
 }
 
-static
-int _start_one_zu_thread(struct _zu_thread *zt, struct thread_param *tp,
-			 int no, cpu_set_t *affinity)
-{
-	pthread_attr_t attr;
-	int err;
-
-	err = pthread_attr_init(&attr);
-	if (unlikely(err)) {
-		ERROR("pthread_attr_init => %d: %s\n", err, strerror(err));
-		goto error;
-	}
-
-	err = pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
-	if (unlikely(err)) {
-		ERROR("pthread_attr_setinheritsched => %d: %s\n",
-		      err, strerror(err));
-		goto error;
-	}
-
-	if (tp->policy != SCHED_OTHER) {
-		struct sched_param sp = {
-			.__sched_priority = tp->rr_priority,
-		};
-
-		err = pthread_attr_setschedpolicy(&attr, tp->policy);
-		if (unlikely(err)) {
-			ERROR("pthread_attr_setschedpolicy => %d: %s\n",
-			      err, strerror(err));
-			goto error;
-		}
-
-		err = pthread_attr_setschedparam(&attr, &sp);
-		if (unlikely(err)) {
-			ERROR("pthread_attr_setschedparam => %d: %s\n",
-			      err, strerror(err));
-			goto error;
-		}
-	} /* else set nice */
-
-	err = pthread_attr_setaffinity_np(&attr,sizeof(*affinity), affinity);
-	if (unlikely(err)) {
-		ERROR("pthread_attr_setaffinity => %d: %s\n", err, strerror(err));
-		goto error;
-	}
-
-	zt->no = no;
-	err = pthread_create(&zt->thread, &attr, &zu_thread, zt);
-	pthread_attr_destroy(&attr);
-
-	if (err)  {
-		ERROR("pthread_create => %d: %s\n", err, strerror(errno));
-		goto error;
-	}
-
-	return 0;
-
-error:
-	zt->thread = 0;
-	zt->err = err;
-	return err;
-}
-
-static void _dbg_print_affinity(int cpu, cpu_set_t *affinity)
-{
-	long *pr_aff = (void *)affinity;
-	size_t b;
-
-	if (!g_DBG)
-		return;
-
-	DBG("cpu[%d]: ", cpu);
-	for (b = 0; b < sizeof(*affinity) / sizeof(long); b++)
-		if(pr_aff[b])
-			DBGCONT(".%04lx", pr_aff[b]);
-		else
-			DBGCONT(".");
-	DBGCONT("(%zd)\n", b);
-}
-
-static int zus_start_all_threads(struct thread_param *tp, uint num_cpus)
+static int zus_start_all_threads(struct zus_thread_params *tp, uint num_cpus)
 {
 	uint i, err;
 
 	wtz_init(&g_wtz);
 
-	g_zus_root_path = tp->path;
 	g_zts = calloc(num_cpus, sizeof(*g_zts));
 	if (!g_zts)
 		return ENOMEM;
 	g_num_gts = num_cpus;
-	pthread_key_create(&g_zts_id_key, NULL);
 
 	err = fba_alloc(&g_wait_structs, num_cpus * ZUS_MAX_OP_SIZE);
 	if (unlikely(err)) {
@@ -251,18 +402,20 @@ static int zus_start_all_threads(struct thread_param *tp, uint num_cpus)
 	wtz_arm(&g_wtz, num_cpus);
 
 	for (i = 0; i < num_cpus; ++i) {
-		cpu_set_t affinity;
+		char zt_name[32];
+		struct _zu_thread *zt = &g_zts[i];
 
-		CPU_ZERO(&affinity);
-		CPU_SET(i, &affinity);
-		_dbg_print_affinity(i, &affinity);
-
-		err = _start_one_zu_thread(&g_zts[i], tp, i, &affinity);
+		snprintf(zt_name, sizeof(zt_name), "ZT(%d)", i);
+		tp->name = zt_name;
+		zt->no = tp->one_cpu = i;
+		err = __zus_thread_create(&zt->zbt, tp, _zu_thread, zt);
 		if (err)
 			return err;
 	}
 
 	wtz_wait(&g_wtz);
+
+	INFO("%d ZT threads ready\n", num_cpus);
 	return 0;
 }
 
@@ -282,9 +435,9 @@ static void zus_stop_all_threads(void)
 	for (i = 0; i < g_num_gts; ++i) {
 		struct _zu_thread *zt = &g_zts[i];
 
-		if (zt->thread) {
-			pthread_join(zt->thread, &tret);
-			zt->thread = 0;
+		if (zt->zbt.thread) {
+			pthread_join(zt->zbt.thread, &tret);
+			zt->zbt.thread = 0;
 		}
 	}
 
@@ -293,61 +446,22 @@ static void zus_stop_all_threads(void)
 	g_zts = NULL;
 }
 
-/* ~~~~ mount ~~~~~ */
+/* ~~~~ mount thread ~~~~~ */
 struct _zu_mount_thread {
-	struct thread_param tp;
-	pthread_t thread;
-	int err;
+	struct zus_base_thread zbt;
+	struct zus_thread_params tp;
+
 	int fd;
 	volatile bool stop;
-} g_mount;
-
-struct zufs_ioc_numa_map g_zus_numa_map;
-
-int zus_cpu_to_node(int cpu)
-{
-	/* TODO(sagi): put this 'if' under WARN_ON */
-	if ((cpu < 0) || ((int)g_zus_numa_map.online_cpus < cpu)) {
-		ERROR("Bad cpu=%d\n", cpu);
-		return 0; /* yell, but do not crash */
-	}
-
-	return g_zus_numa_map.cpu_to_node[cpu];
-}
-
-int zus_set_numa_affinity(cpu_set_t *affinity, int nid)
-{
-	uint i;
-
-	CPU_ZERO(affinity);
-
-	for (i = 0; i < g_zus_numa_map.online_cpus; ++i) {
-		if (zus_cpu_to_node(i) == nid)
-			break;
-	}
-
-	if (i == g_zus_numa_map.online_cpus)
-		return -EINVAL;
-
-	for (; i < g_zus_numa_map.online_cpus; ++i) {
-		if (zus_cpu_to_node(i) != nid)
-			break;
-		CPU_SET(i, affinity);
-	}
-	return 0;
-}
-
-static int _numa_map_init(int fd)
-{
-	return zuf_numa_map(fd, &g_zus_numa_map);
-}
+	struct _zu_thread mnt_th;
+} g_mount = {};
 
 static void *zus_mount_thread(void *callback_info)
 {
 	struct zufs_ioc_mount zim = {};
 
-	g_mount.err = zuf_root_open_tmp(&g_mount.fd);
-	if (g_mount.err)
+	g_mount.zbt.err = zuf_root_open_tmp(&g_mount.fd);
+	if (g_mount.zbt.err)
 		return NULL;
 
 	INFO("Mount thread Running fd=%d\n", g_mount.fd);
@@ -359,14 +473,14 @@ static void *zus_mount_thread(void *callback_info)
 	}
 
 	while(!g_mount.stop) {
-		g_mount.err = zuf_recieve_mount(g_mount.fd, &zim);
-		if (g_mount.err || g_mount.stop) {
+		g_mount.zbt.err = zuf_recieve_mount(g_mount.fd, &zim);
+		if (g_mount.zbt.err || g_mount.stop) {
 			break;
 		}
 
 		if (!g_zts) {
-			g_mount.err = _numa_map_init(g_mount.fd);
-			if (unlikely(g_mount.err))
+			g_mount.zbt.err = _numa_map_init(g_mount.fd);
+			if (unlikely(g_mount.zbt.err))
 				break;
 
 			zus_start_all_threads(&g_mount.tp,
@@ -386,35 +500,35 @@ static void *zus_mount_thread(void *callback_info)
 	return &g_mount;
 }
 
-int zus_mount_thread_start(struct thread_param *tp)
+int zus_mount_thread_start(struct zus_thread_params *tp, const char* zuf_path)
 {
-	pthread_attr_t attr;
+	struct zus_thread_params mnttp = {};
 	int err;
 
-	g_mount.tp = *tp;
+	pthread_key_create(&g_zts_id_key, NULL);
+	strncpy(g_zus_root_path_stor, zuf_path, sizeof(g_zus_root_path_stor));
+	g_mount.tp = *tp; /* this is for the _zu threads */
 
-	err = pthread_attr_init(&attr);
-	if (unlikely(err)) {
-		ERROR("pthread_attr_init => %d: %s\n", err, strerror(err));
-		goto error;
-	}
+	ZTP_INIT(&mnttp); /* Just a Plain thread */
 
-	g_zus_root_path = tp->path;
-	err = pthread_create(&g_mount.thread, &attr, &zus_mount_thread,
-			     &g_mount);
-	pthread_attr_destroy(&attr);
+	mnttp.name = "zus_mounter";
 
+	err = __zus_thread_create(&g_mount.zbt, &mnttp, &zus_mount_thread,
+				  &g_mount);
 	if (err)  {
-		ERROR("pthread_create => %d: %s\n", err, strerror(errno));
-		goto error;
+		ERROR("zus_thread_create => %d: %s\n", err, strerror(errno));
+		return err;
 	}
+
+	/* We assume all per_cpu objects are per super_block.
+	 * so since there is only one mnt_thread and any object handling
+	 * is before any zt(s) start to operate on these objects we tell
+	 * the system we are cpu-0 with out any locks
+	 */
+	g_mount.zbt.one_cpu = 0;
+	g_mount.zbt.nid = 0;
 
 	return 0;
-
-error:
-	g_mount.thread = 0;
-	g_mount.err = err;
-	return err;
 }
 
 void zus_mount_thread_stop(void)
@@ -424,15 +538,15 @@ void zus_mount_thread_stop(void)
 	zus_stop_all_threads();
 
 	g_mount.stop = true;
-	pthread_join(g_mount.thread, &tret);
-	g_mount.thread = 0;
+	pthread_join(g_mount.zbt.thread, &tret);
+	g_mount.zbt.thread = 0;
 }
 
 void zus_join(void)
 {
 	void *tret;
 
-	pthread_join(g_mount.thread, &tret);
+	pthread_join(g_mount.zbt.thread, &tret);
 }
 
 /* ~~~ callbacks from FS code into kernel ~~~ */

@@ -10,12 +10,6 @@
 
 #include "zus.h"
 
-struct thread_param {
-	const char* path;
-	int policy;
-	int rr_priority;
-};
-
-int zus_mount_thread_start(struct thread_param *tp);
+int zus_mount_thread_start(struct zus_thread_params *tp, const char* zuf_path);
 void zus_mount_thread_stop(void);
 void zus_join(void);

@@ -87,13 +87,11 @@ int main(int argc, char *argv[])
 		{.name = 0, .has_arg = 0, .flag = 0, .val = 0} ,
 	};
 	char op;
-	struct thread_param tp = {
-		.path = ZUF_DEF_PATH,
-		.policy = SCHED_FIFO,
-		.rr_priority = 20,
-	};
+	struct zus_thread_params tp;
+	const char *path = ZUF_DEF_PATH;
 	int err;
 
+	ZTP_INIT(&tp);
 	while ((op = getopt_long(argc, argv, "r::f::n::d::v", opt, NULL)) != -1) {
 		switch (op) {
 		case 'r':
@@ -133,13 +131,13 @@ int main(int argc, char *argv[])
 		usage(argc + optind, argv - optind);
 		return 1;
 	} else if (argc == 1) {
-		tp.path = argv[0];
+		path = argv[0];
 	}
 
 	if (signal(SIGINT, sig_handler) == SIG_ERR)
 		ERROR("signal SIGINT not installed\n");
 
-	err = zus_mount_thread_start(&tp);
+	err = zus_mount_thread_start(&tp, path);
 	if (unlikely(err))
 		goto stop;
 

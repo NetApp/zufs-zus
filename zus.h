@@ -224,11 +224,42 @@ static inline void zus_std_remove_dentry(struct zus_inode *dir_zi,
 int zuf_root_open_tmp(int *fd);
 void zuf_root_close(int *fd);
 
-/* CPU & NUMA topology by zus */
+/* ~~~ CPU & NUMA topology by zus ~~~ */
+
+/* For all these to work user must create
+ * his threads with zus_create_thread() below
+ * Or from ZTs, or from mount-thread
+ */
+#define ZUS_NUMA_NO_NID	(~0U)
+#define ZUS_CPU_ALL	(~0U)
+
 extern struct zufs_ioc_numa_map g_zus_numa_map;
-int zus_getztno(void);
 int zus_cpu_to_node(int cpu);
-int zus_set_numa_affinity(cpu_set_t *affinity, int nid);
+int zus_current_onecpu(void);
+int zus_current_cpu(void);
+int zus_current_nid(void);
+
+int zus_get_cpu(void);
+void zus_put_cpu(int cpu);
+
+struct zus_thread_params {
+	const char *name; /* only used for the duration of the call */
+	int policy;
+	int rr_priority;
+	uint one_cpu;	/* either set this one. Else ZUS_CPU_ALL */
+	uint nid;	/* Or set this one. Else ZUS_NUMA_NO_NID */
+	ulong __flags; /* warnings on/off */
+};
+
+#define ZTP_INIT(ztp) 			\
+{					\
+	memset((ztp), 0, sizeof(*(ztp)));	\
+	(ztp)->nid = (ztp)->one_cpu = (-1);	\
+}
+
+typedef void *(*__start_routine) (void *); /* pthread programming style NOT */
+int zus_thread_create(pthread_t *new_tread, struct zus_thread_params *params,
+		      __start_routine fn, void *user_arg);
 
 /* zus-vfs.c */
 int zus_register_all(int fd);
