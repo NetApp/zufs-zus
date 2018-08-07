@@ -488,7 +488,7 @@ static struct zus_fs_info foo_zfi = {
 	.rfi.def_mode	= /*FOO_DEF_SBI_MODE*/0755,
 	.rfi.s_maxbytes = MAX_LFS_FILESIZE,
 
-	.rfi.acl_on	= 1,
+// 	.rfi.acl_on	= 1,
 
 	.op		= &foofs_zfi_operations,
 	.sbi_op		= &foofs_sbi_operations,
