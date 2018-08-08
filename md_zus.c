@@ -352,12 +352,13 @@ int md_t2_mdt_write(struct multi_devices *md, struct md_dev_table *mdt)
 	int i;
 
 	iomb.ziom = &a.ziome.ziom;
-	_zus_ioc_ziom_init(iomb.ziom, sizeof(a));
-	_zus_ioc_iom_start(&iomb, md->sbi, NULL, NULL, NULL, &a.ziome.ziom);
 
 	/* FIXME: must make copies and execute at end. one by one for now */
 	for (i = 0; i < md->t2_count; ++i) {
 		ulong bn = md_o2p(md_t2_dev(md, i)->offset);
+
+		_zus_ioc_ziom_init(iomb.ziom, sizeof(a));
+		_zus_ioc_iom_start(&iomb, md->sbi, NULL, NULL, NULL, &a.ziome.ziom);
 
 		mdt->s_dev_list.id_index = mdt->s_dev_list.t1_count + i;
 		mdt->s_sum = cpu_to_le16(md_calc_csum(mdt));
