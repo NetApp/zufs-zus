@@ -14,3 +14,4 @@
 int zus_mount_thread_start(struct zus_thread_params *tp, const char* zuf_path);
 void zus_mount_thread_stop(void);
 void zus_join(void);
+void zus_register_sigactions(void);

@@ -16,7 +16,6 @@
 #include <getopt.h>
 #include <stdbool.h>
 #include <stdlib.h>
-#include <signal.h>
 
 #include "zus.h"
 #include "zusd.h"
@@ -66,13 +65,6 @@ static void usage(int argc, char *argv[])
 		m += l; s -= l;
 	}
 	fprintf(stderr, "%s\n", spf);
-}
-
-static void sig_handler(int signo)
-{
-	INFO("received sig(%d)\n", signo);
-	zus_mount_thread_stop();
-	exit(signo);
 }
 
 int main(int argc, char *argv[])
@@ -129,8 +121,7 @@ int main(int argc, char *argv[])
 		path = argv[0];
 	}
 
-	if (signal(SIGINT, sig_handler) == SIG_ERR)
-		ERROR("signal SIGINT not installed\n");
+	zus_register_sigactions();
 
 	err = zus_mount_thread_start(&tp, path);
 	if (unlikely(err))

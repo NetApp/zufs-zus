@@ -114,7 +114,7 @@ _LDFLAG=-Wl,--no-undefined
 $(LIBZUS): $(libzus_OBJ:.o=.c)
 	$(CC) -shared $(_LDFLAG) $(CFLAGS) $(C_LIBS) -o $@ $^
 
-zusd_OBJ = main.o
+zusd_OBJ = main.o signals.o
 
 zusd: $(zusd_OBJ) $(LIBZUS)
 	$(CC) $(_LDFLAG) $(CFLAGS) $(C_LIBS) -o $@ $^
