@@ -424,7 +424,7 @@ static int foofs_write(void *ptr, struct zufs_ioc_IO *op)
 
 	for(;app_ptr < app_end; ++app_ptr, ++start) {
 		if (*app_ptr != start) {
-			if (g_verify)
+			if (g_DBGMASK & 0x10)
 				ERROR("*app_ptr(0x%lx) != start(0x%lx) offset=0x%x len=0x%x\n",
 					*app_ptr, start, op->hdr.offset, op->hdr.len);
 		}

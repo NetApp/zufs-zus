@@ -38,7 +38,6 @@
 
 #include "md.h"
 
-extern bool g_verify;
 #define MAX_LFS_FILESIZE 	((loff_t)0x7fffffffffffffffLL)
 #define ZUS_MAX_OP_SIZE		(PAGE_SIZE * 8)
 

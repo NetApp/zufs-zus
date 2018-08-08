@@ -28,7 +28,6 @@
 #endif
 
 ulong g_DBGMASK = 0;
-bool g_verify = false;
 
 static void usage(int argc, char *argv[])
 {
@@ -83,7 +82,6 @@ int main(int argc, char *argv[])
 		{.name = "policyFIFO", .has_arg = 2, .flag = NULL, .val = 'f'} ,
 		{.name = "nice", .has_arg = 2, .flag = NULL, .val = 'n'} ,
 		{.name = "verbose", .has_arg = 2, .flag = NULL, .val = 'd'} ,
-		{.name = "verify", .has_arg = 0, .flag = NULL, .val = 'v'} ,
 		{.name = 0, .has_arg = 0, .flag = 0, .val = 0} ,
 	};
 	char op;
@@ -92,7 +90,7 @@ int main(int argc, char *argv[])
 	int err;
 
 	ZTP_INIT(&tp);
-	while ((op = getopt_long(argc, argv, "r::f::n::d::v", opt, NULL)) != -1) {
+	while ((op = getopt_long(argc, argv, "r::f::n::d::", opt, NULL)) != -1) {
 		switch (op) {
 		case 'r':
 			tp.policy = SCHED_RR;
@@ -115,9 +113,6 @@ int main(int argc, char *argv[])
 			} else {
 				g_DBGMASK = 0x1;
 			}
-			break;
-		case 'v':
-			g_verify = true;
 			break;
 		default:;
 			/* Just ignore we are not the police */
