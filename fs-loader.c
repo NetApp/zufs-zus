@@ -12,99 +12,125 @@
 #define _GNU_SOURCE
 #include <dlfcn.h>
 #include <errno.h>
+#include <stdarg.h>
 
 #include "zus.h"
 #include "zuf_call.h"
 
-static void *dl_list[ZUS_LIBFS_MAX_NR] = {};
-
-/*
- * TODO: support a comma separated list of names in ZUS_LIBFS_LIST_ENV
- */
-static int _load_libfs(int fd)
+/* ~~~ called by FS code to add an FS-type ~~~ */
+int zus_register_one(int fd, struct zus_fs_info *zfi)
 {
-	const char *libfs_env = getenv(ZUS_LIBFS_LIST_ENV);
+	int err;
+
+	err = zuf_register_fs(fd, zfi);
+	if (err)
+		return err;
+
+	return 0;
+}
+
+/* ~~~ dynamic loading of FS plugins ~~~ */
+static void *g_dl_list[ZUS_LIBFS_MAX_NR] = {};
+
+static int _try_load_from(void **handle, const char namefmt[], ...)
+{
 	char libfs_path[ZUS_LIBFS_MAX_PATH];
-	char libfs_register[32];
-	int (*register_fs)(int);
+	void *dl_lib;
+	va_list args;
+	int err;
+
+	va_start (args, namefmt);
+	err = vsnprintf(libfs_path, sizeof(libfs_path), namefmt, args);
+	va_end (args);
+
+	if (err < 0) {
+		ERROR("Path reconstruction too long [%s]\n", namefmt);
+		return -EINVAL;
+	}
+
+	dl_lib = dlopen(libfs_path, RTLD_NOW);
+	DBG("dlopen(%s) = %p, dlerror=%s\n", libfs_path, dl_lib, dlerror());
+	if (!dl_lib)
+		return -ENOENT;
+
+	*handle = dl_lib;
+	return 0;
+}
+
+static int _load_one_fs(int fd, const char* fs_name, void **handle)
+{
+	void *dl_lib;
+	int (*register_fn)(int);
 	char *dl_err;
-	int i, err;
+	int err;
 
-	INFO("%s: %s\n", ZUS_LIBFS_LIST_ENV, libfs_env);
-	if (!libfs_env || strnlen(libfs_env, ZUS_LIBFS_MAX_PATH) == 0)
-		return 0;
-
-	/* find vacant slot in dl_list */
-	for (i = 0; i < ZUS_LIBFS_MAX_NR; ++i) {
-		if (!dl_list[i])
-			break;
-	}
-	if (ZUS_LIBFS_MAX_NR == i) {
-		ERROR("Reached limit of max loaded libfs (%d)\n",
-		      ZUS_LIBFS_MAX_NR);
-		return -ENOMEM;
-	}
-
-	/* load production path */
-	err = snprintf(libfs_path, ZUS_LIBFS_MAX_PATH, "%s/lib%s.so",
-		       ZUS_LIBFS_DIR, libfs_env);
-	if (err < 0)
-		goto fail_load;
-
-	dl_list[i] = dlopen(libfs_path, RTLD_NOW);
-	DBG("dlopen(%s) = %p, dlerror=%s\n", libfs_path, dl_list[i], dlerror());
-	if (dl_list[i])
+	DBG("p=%s\n", fs_name);
+	/* try to load production path */
+	err = _try_load_from(&dl_lib, "%s/lib%s.so", ZUS_LIBFS_DIR, fs_name);
+	if (!err)
 		goto found;
+	if (err != -ENOENT)
+		return err;
 
-	/* load development path */
-	err = snprintf(libfs_path, ZUS_LIBFS_MAX_PATH, "lib%s.so", libfs_env);
-	if (err < 0)
-		goto fail_load;
+	/*  try to load from current dir or LD_LIBRARY_PATH */
+	err = _try_load_from(&dl_lib, "lib%s.so", fs_name);
+	if (!err)
+		goto found;
+	if (err != -ENOENT)
+		return err;
 
-	dl_list[i] = dlopen(libfs_path, RTLD_NOW);
-	DBG("dlopen(%s) = %p, dlerror=%s\n", libfs_path, dl_list[i], dlerror());
-	if (!dl_list[i])
-		goto fail_load;
+	/*  try to load from full path name */
+	err = _try_load_from(&dl_lib, "%s", fs_name);
+	if (!err)
+		goto found;
+	if (err)
+		return err;
 
 found:
-	err = snprintf(libfs_register, 32, "%s_register_fs", libfs_env);
-	if (err < 0)
-		goto fail_sym;
-
-	/* clear existing errors */
+	/* clear existing errors (in the case DBG not compiled) */
 	dlerror();
 
-	register_fs = (int (*)(int))dlsym(dl_list[i], libfs_register);
+	register_fn = dlsym(dl_lib, REGISTER_FS_NAME);
 	dl_err = dlerror();
-	if (dl_err)
-		goto fail_sym;
+	if (dl_err) {
+		ERROR("register_fs retrieval failed => %s\n", dl_err);
+		dlclose(dl_lib);
+		return -EBADF;
+	}
 
-	err = register_fs(fd);
+	err = register_fn(fd);
 	if (err) {
-		ERROR("%s_register_fs failed => %d\n", libfs_env, err);
-		dlclose(dl_list[i]);
-		dl_list[i] = NULL;
+		ERROR("%s::register_fs failed => %d\n", fs_name, err);
+		dlclose(dl_lib);
 		return err;
+	}
+
+	*handle = dl_lib;
+	return 0;
+}
+
+static int _load_libfs(int fd)
+{
+	const char *libfs_env = getenv(ZUFS_LIBFS_LIST);
+	char *orig_libfs_str, *libfs_str, *p;
+	int lib_no = 0;
+	int err;
+
+	INFO("%s: %s\n", ZUFS_LIBFS_LIST, libfs_env);
+	if (!libfs_env || !*libfs_env)
+		return 0;
+
+	libfs_str = orig_libfs_str = strdup(libfs_env);
+	while ((p = strsep(&libfs_str, ",")) != NULL) {
+		if (!*p)
+			continue;
+		err = _load_one_fs(fd, p, &g_dl_list[lib_no]);
+		if (unlikely(err))
+			return err;
+		++lib_no;
 	}
 
 	return 0;
-
-fail_load:
-	if (err < 0) {
-		ERROR("libfs path construction failed => %d\n", err);
-		return err;
-	}
-	ERROR("load of %s failed => %s\n", libfs_path, dlerror());
-	return -ENOENT;
-
-fail_sym:
-	if (err < 0)
-		ERROR("register_fs construction failed => %d\n", err);
-	else
-		ERROR("register_fs retrieval failed => %s\n", dl_err);
-	dlclose(dl_list[i]);
-	dl_list[i] = NULL;
-	return err ? err : -EBADF;
 }
 
 static void _unload_libfs(void *handle)
@@ -118,18 +144,7 @@ static void _unload_libfs(void *handle)
 	}
 }
 
-int zus_register_one(int fd, struct zus_fs_info *zfi)
-{
-	int err;
-
-	err = zuf_register_fs(fd, zfi);
-	if (err)
-		return err;
-
-	return 0;
-}
-
-/* TODO: We need some registry of all fss to load */
+/* ~~~ called by zus thread ~~~ */
 int zus_register_all(int fd)
 {
 	int err;
@@ -154,8 +169,7 @@ void zus_unregister_all(void)
 	int i;
 
 	for (i = 0; i < ZUS_LIBFS_MAX_NR; ++i) {
-		if (dl_list[i])
-			_unload_libfs(dl_list[i]);
+		if (g_dl_list[i])
+			_unload_libfs(g_dl_list[i]);
 	}
 }
-

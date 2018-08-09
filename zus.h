@@ -315,9 +315,15 @@ void zus_bug(const char *cond, const char *file, int line);
 	unlikely(__ret_bug_on); \
 })
 
-#define ZUS_LIBFS_MAX_NR	16			/* see also MAX_LOCKDEP_FSs in zuf */
+#define ZUS_LIBFS_MAX_NR	16	/* see also MAX_LOCKDEP_FSs in zuf */
 #define ZUS_LIBFS_MAX_PATH	256
 #define ZUS_LIBFS_DIR		"/usr/lib/zufs"
-#define ZUS_LIBFS_LIST_ENV	"ZUFS_LIBFS_LIST"
+#define ZUFS_LIBFS_LIST		"ZUFS_LIBFS_LIST"
+
+/* declare so compiler will not complain */
+extern int register_fs(int fd);
+/* below two need to match. C is not bash */
+#define REGISTER_FS_FN		 register_fs
+#define REGISTER_FS_NAME	"register_fs"
 
 #endif /* define __ZUS_H__ */
