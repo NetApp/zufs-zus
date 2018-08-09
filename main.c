@@ -27,7 +27,6 @@
 #define ZUF_DEF_PATH "/sys/fs/zuf"
 #endif
 
-ulong g_DBGMASK = 0;
 
 static void usage(int argc, char *argv[])
 {

@@ -30,6 +30,8 @@ typedef unsigned int uint;
 char g_zus_root_path_stor[PATH_MAX];
 const char const *g_zus_root_path = g_zus_root_path_stor;
 
+ulong g_DBGMASK = 0;
+
 int zuf_root_open_tmp(int *fd)
 {
 	/* RDWR also for the mmap */
