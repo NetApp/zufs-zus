@@ -171,3 +171,10 @@ rpm:
 	rm -rf $(TMPDIR)
 
 .PHONY: all clean install rpm
+
+# =============== tags =================================================
+
+cscope:
+	cscope -bcqR
+
+.PHONY: cscope

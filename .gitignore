@@ -26,3 +26,6 @@ fs/*
 *.o
 *.so
 *.rpm
+
+# tags
+cscope.*
