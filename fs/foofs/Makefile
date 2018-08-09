@@ -21,7 +21,6 @@ clean:
 
 CFLAGS += -Wno-missing-prototypes -Wno-missing-declarations
 CFLAGS += -I../..
-LDFLAGS += -L../.. -lzus
 
 $(foofs_lib): $(foofs_OBJ)
 	$(CC) -shared $(LDFLAGS) $(CFLAGS) $(C_LIBS) -o $@ $^

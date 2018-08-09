@@ -70,7 +70,13 @@ export CFLAGS
 CFLAGS += "-DKERNEL=0"
 
 # List of -L -l libs
-C_LIBS = -lrt -lcurses -lc -luuid -lunwind $(CONFIG_C_LIBS)
+C_LIBS = -lrt -lcurses -lc -luuid -lunwind -ldl $(CONFIG_C_LIBS)
+
+# Any libzus dependent code and any zusFS plugins in fs/XXX should
+# include $(LDFLAGS) in the $(cc) -shared compilation
+# We force all symbols to resolve at compile time with -Wl,--no-undefined
+LDFLAGS += -Wl,-L$(CURDIR) -lzus -Wl,--no-undefined
+export LDFLAGS
 
 # Targets
 ALL = zusd libzus.so
@@ -103,13 +109,15 @@ LIBZUS = libzus.so
 libzus_OBJ += zus-core.o zus-vfs.o module.o md_zus.o nvml_movnt.o \
 	      utils.o fs-loader.o
 
+_LDFLAG=-Wl,--no-undefined
+
 $(LIBZUS): $(libzus_OBJ:.o=.c)
-	$(CC) -shared $(LDFLAGS) $(CFLAGS) $(C_LIBS) -o $@ $^
+	$(CC) -shared $(_LDFLAG) $(CFLAGS) $(C_LIBS) -o $@ $^
 
 zusd_OBJ = main.o
 
 zusd: $(zusd_OBJ) $(LIBZUS)
-	$(CC) $(LDFLAGS) $(CFLAGS) $(C_LIBS) -o $@ $^
+	$(CC) $(_LDFLAG) $(CFLAGS) $(C_LIBS) -o $@ $^
 
 $(DEPEND): $(zusd_OBJ:.o=.c) $(libzus_OBJ:.o:.c)
 
