@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * iom_enc.h - Encodes an iom_elemets array to send to Kernel
  *
@@ -9,7 +10,7 @@
  * ZUFS-License: BSD-3-Clause. See module.c for LICENSE details.
  *
  * Authors:
- *	Boaz Harrosh <boaz@plexistor.com>
+ *	Boaz Harrosh <boazh@netapp.com>
  */
 #ifndef __ZUS_IOM_H__
 #define __ZUS_IOM_H__

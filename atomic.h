@@ -1,13 +1,13 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * BRIEF DESCRIPTION
  *
  * Some General x86_64 operations.
  * NT means Non-Temporal (Intel's terminology)
  *
- * Copyright (c) 2014 Plexistor Ltd. All rights reserved.
+ * Copyright (c) 2018 NetApp, Inc. All rights reserved.
  *
- * This software source code is the sole property of Plexistor Ltd. and
- * is proprietary and confidential.
+ * ZUFS-License: BSD-3-Clause. See module.c for LICENSE details.
  */
 
 #ifndef __ZUS_ATOMIC_H

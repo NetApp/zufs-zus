@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * zus-vfs.c - Abstract FS interface that calls into the um-FS
  *

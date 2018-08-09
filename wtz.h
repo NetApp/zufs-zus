@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * wtz.h - Wait Til Zero wait object
  *
@@ -15,7 +16,7 @@
  * ZUFS-License: BSD-3-Clause. See module.c for LICENSE details.
  *
  * Authors:
- *	Boaz Harrosh <boaz@plexistor.com>
+ *	Boaz Harrosh <boazh@netapp.com>
  */
 #ifndef __WTZ_H__
 #define __WTZ_H__

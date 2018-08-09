@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * md.c - The user-mode imp of what we need from md.h
  *
@@ -6,7 +7,7 @@
  * ZUFS-License: BSD-3-Clause. See module.c for LICENSE details.
  *
  * Authors:
- *	Boaz Harrosh <boaz@plexistor.com>
+ *	Boaz Harrosh <boazh@netapp.com>
  */
 
 #include <linux/types.h>

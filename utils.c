@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * utils.c - Common utilities provided to fs via libzus
  *
@@ -80,7 +81,7 @@ static void _dump_addr2line(FILE *fp)
 		l = snprintf(m, s, "%p ", arr[i + 1]);
 		s -= l; m += l;
 	}
-	
+
 	fprintf(fp, "<4>zus_warn: addr2line -a -C -e %s -f -p -s %s\n",
 		program_invocation_name, ptrS);
 }

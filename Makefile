@@ -6,7 +6,7 @@
 # ZUFS-License: BSD-3-Clause. See module.c for LICENSE details.
 #
 # Authors:
-#	Boaz Harrosh <boaz@plexistor.com>
+#	Boaz Harrosh <boazh@netapp.com>
 #	Shachar Sharon <sshachar@netapp.com>
 #
 

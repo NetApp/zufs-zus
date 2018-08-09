@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * toyfs.h - The toyfs reference file-system implementation via zufs
  *

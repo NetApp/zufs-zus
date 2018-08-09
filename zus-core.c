@@ -1,12 +1,13 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * zus.c - A program that calls into the ZUS IOCTL server API
+ * zus-core.c - A program that calls into the ZUS IOCTL server API
  *
  * Copyright (c) 2018 NetApp, Inc. All rights reserved.
  *
  * ZUFS-License: BSD-3-Clause. See module.c for LICENSE details.
  *
  * Authors:
- *	Boaz Harrosh <boaz@plexistor.com>
+ *	Boaz Harrosh <boazh@netapp.com>
  */
 
 #define _GNU_SOURCE
