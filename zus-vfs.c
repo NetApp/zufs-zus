@@ -327,6 +327,17 @@ static int _get_block(struct zufs_ioc_hdr *hdr)
 	return err;
 }
 
+static int _mmap_close(struct zufs_ioc_hdr *hdr)
+{
+	struct zufs_ioc_mmap_close *mmap_close = (void *)hdr;
+	struct zus_inode_info *zii = mmap_close->zus_ii;
+
+	if (unlikely(!zii->op->mmap_close))
+		return 0;
+
+	return zii->op->mmap_close(zii, mmap_close);
+}
+
 static int _symlink(struct zufs_ioc_hdr *hdr)
 {
 	struct zufs_ioc_get_link *ioc_sym = (void *)hdr;
@@ -449,6 +460,7 @@ static const char *_op_name(int op)
 		CASE_ENUM_NAME(ZUS_OP_READ		);
 		CASE_ENUM_NAME(ZUS_OP_WRITE		);
 		CASE_ENUM_NAME(ZUS_OP_GET_BLOCK		);
+		CASE_ENUM_NAME(ZUS_OP_MMAP_CLOSE	);
 		CASE_ENUM_NAME(ZUS_OP_GET_SYMLINK	);
 		CASE_ENUM_NAME(ZUS_OP_SETATTR		);
 		CASE_ENUM_NAME(ZUS_OP_UPDATE_TIME	);
@@ -494,6 +506,8 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 		return _io_write(app_ptr, hdr);
 	case ZUS_OP_GET_BLOCK:
 		return _get_block(hdr);
+	case ZUS_OP_MMAP_CLOSE:
+		return _mmap_close(hdr);
 	case ZUS_OP_GET_SYMLINK:
 		return _symlink(hdr);
 	case ZUS_OP_SETATTR:
