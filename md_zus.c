@@ -14,7 +14,7 @@
 #include <errno.h>
 
 #include "zus.h"
-#include "atomic.h"
+#include "movnt.h"
 #include "md.h"
 #include "iom_enc.h"
 

@@ -10,8 +10,8 @@
  * ZUFS-License: BSD-3-Clause. See module.c for LICENSE details.
  */
 
-#ifndef __ZUS_ATOMIC_H
-#define __ZUS_ATOMIC_H
+#ifndef __ZUS_MOVENT_H
+#define __ZUS_MOVENT_H
 
 #define CACHELINE_SHIFT	(6)
 #define CACHELINE_SIZE	(1UL << CACHELINE_SHIFT)
@@ -117,4 +117,4 @@ void *pmem_memmove_persist(void *pmemdest, const void *src, size_t len);
 
 #define  memcpy_to_pmem pmem_memmove_persist
 
-#endif /* ifndef __ZUS_ATOMIC_H */
+#endif /* ifndef __ZUS_MOVENT_H */

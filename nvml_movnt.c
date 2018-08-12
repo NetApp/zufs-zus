@@ -33,7 +33,7 @@
  *	Boaz Harrosh <boazh@netapp.com>
  */
 
-#include "atomic.h"
+#include "movnt.h"
 
 #include <emmintrin.h>
 
