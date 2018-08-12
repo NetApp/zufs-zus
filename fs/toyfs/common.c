@@ -154,6 +154,7 @@ const struct zus_zii_operations toyfs_zii_op = {
 	.fallocate = toyfs_fallocate,
 	.seek = toyfs_seek,
 	.get_block = toyfs_get_block,
+	.put_block = toyfs_put_block,
 };
 
 const struct zus_sbi_operations toyfs_sbi_op = {

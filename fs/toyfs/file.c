@@ -17,7 +17,6 @@
 #include <unistd.h>
 #include <limits.h>
 #include <errno.h>
-#include <libpmem.h>
 #include <linux/falloc.h>
 
 #include "_pr.h"
@@ -181,7 +180,7 @@ _copy_in(struct toyfs_page *page, const void *src, loff_t off, size_t len)
 	toyfs_assert(page != NULL);
 	toyfs_assert(len <= sizeof(page->dat));
 	toyfs_assert((size_t)off + len <= sizeof(page->dat));
-	pmem_memcpy_persist(&page->dat[off], src, len);
+	pmem_memmove_persist(&page->dat[off], src, len);
 }
 
 static void _copy_page(struct toyfs_page *page, const struct toyfs_page *other)
@@ -355,18 +354,20 @@ int toyfs_read(void *buf, struct zufs_ioc_IO *ioc_io)
 }
 
 int toyfs_get_block(struct zus_inode_info *zii,
-		    struct zufs_ioc_get_block *get_block)
+		    struct zufs_ioc_IO *get_block)
 {
 	int err = 0;
-	loff_t off;
-	const size_t blkidx = get_block->index;
-	struct toyfs_page *page;
-	struct toyfs_iblkref *iblkref;
+	const size_t blkidx = get_block->filepos / PAGE_SIZE;
 	struct toyfs_inode_info *tii = Z2II(zii);
 
 	if (!zi_isreg(tii->zii.zi))
 		return -ENOTSUP;
 
+	if (!blkidx)
+		return -EINVAL;
+
+	/* TODO: FIXME */
+#if 0
 	off = (loff_t)(blkidx * PAGE_SIZE);
 	page = _fetch_page(tii, off);
 	if (page) {
@@ -394,7 +395,16 @@ int toyfs_get_block(struct zus_inode_info *zii,
 		    tii->ino, (long)off, (long)get_block->pmem_bn);
 	}
 out:
+#endif
 	return err;
+}
+
+int toyfs_put_block(struct zus_inode_info *zii, struct zufs_ioc_IO *get_block)
+{
+	/* TODO: Complete */
+	(void)zii;
+	(void)get_block;
+	return 0;
 }
 
 static void _clone_data(struct toyfs_sb_info *sbi,

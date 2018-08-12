@@ -21,7 +21,7 @@ clean:
 	@rm -vf *.o $(toyfs_lib) $(toyfs_mkfs)
 
 CFLAGS += -I../..
-LDFLAGS += -L../.. -luuid -lzus -lpmem
+LDFLAGS += -L../.. -luuid -lzus
 
 $(toyfs_mkfs): mkfs.o
 	$(CC) $(LDFLAGS) $(CFLAGS) $(C_LIBS) -o $@ $^

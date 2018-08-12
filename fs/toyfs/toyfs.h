@@ -249,8 +249,8 @@ void toyfs_remove_dirent(struct toyfs_inode_info *dir_tii,
 /* file.c */
 int toyfs_read(void *buf, struct zufs_ioc_IO *ioc_io);
 int toyfs_write(void *buf, struct zufs_ioc_IO *ioc_io);
-int toyfs_get_block(struct zus_inode_info *zii,
-		    struct zufs_ioc_get_block *get_block);
+int toyfs_get_block(struct zus_inode_info *zii, struct zufs_ioc_IO *get_block);
+int toyfs_put_block(struct zus_inode_info *zii, struct zufs_ioc_IO *get_block);
 int toyfs_fallocate(struct zus_inode_info *zii,
 		    struct zufs_ioc_range *ioc_range);
 int toyfs_seek(struct zus_inode_info *zii, struct zufs_ioc_seek *zis);
