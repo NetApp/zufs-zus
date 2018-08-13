@@ -99,10 +99,6 @@ $(LINUX_STAT_H):
 	ln -sTf $(shell realpath --relative-to=$(ROOT)/linux \
 		  $(ZUF_KERN_DIR))/include/uapi/$(LINUX_STAT_H) $(LINUX_STAT_H)
 
-# ============== sub-projects===================================================
--include fs/Makefile
-
-
 # ============== libzus & zusd =================================================
 LIBZUS = libzus.so
 
@@ -120,6 +116,9 @@ zusd: $(zusd_OBJ) $(LIBZUS)
 	$(CC) $(_LDFLAG) $(CFLAGS) $(C_LIBS) -o $@ $^
 
 $(DEPEND): $(zusd_OBJ:.o=.c) $(libzus_OBJ:.o:.c)
+
+# ============== sub-projects===================================================
+-include fs/Makefile
 
 # =============== common rules =================================================
 # every thing should compile if Makefile or .config changed
