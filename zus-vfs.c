@@ -586,3 +586,13 @@ void fba_free(struct fba *fba)
 		fba->fd = -1;
 	}
 }
+
+int fba_punch_hole(struct fba *fba, ulong index, uint nump)
+{
+	int ret = fallocate(fba->fd, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE,
+			    md_p2o(index), md_p2o(nump));
+
+	if (unlikely(ret))
+		return -errno;
+	return 0;
+}
