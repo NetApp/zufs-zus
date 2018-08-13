@@ -103,7 +103,7 @@ $(LINUX_STAT_H):
 LIBZUS = libzus.so
 
 libzus_OBJ += zus-core.o zus-vfs.o module.o md_zus.o nvml_movnt.o \
-	      utils.o fs-loader.o
+	      utils.o fs-loader.o pa.o
 
 _LDFLAG=-Wl,--no-undefined
 

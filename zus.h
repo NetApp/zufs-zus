@@ -165,6 +165,15 @@ struct zus_sbi_operations {
 		      struct zufs_ioc_statfs *ioc_statfs);
 };
 
+#define ZUS_MAX_POOLS	7
+struct pa {
+	struct fba pages;
+	struct fba data;
+	struct a_list_head head;
+	size_t size;
+	pthread_spinlock_t lock;
+};
+
 struct zus_sb_info {
 	struct multi_devices	md;
 	struct zus_fs_info	*zfi;
@@ -173,6 +182,7 @@ struct zus_sb_info {
 	struct zus_inode_info	*z_root;
 	ulong			flags;
 	__u64			kern_sb_id;
+	struct pa		pa[ZUS_MAX_POOLS];
 };
 
 enum E_zus_sbi_flags {
@@ -309,14 +319,123 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr);
 int __zus_iom_exec(struct zus_sb_info *sbi, struct zufs_ioc_iomap_exec *ziome,
 		   bool sync);
 
-/* Currently at zus-vfs.c */
-/* File backed Allocator - Gives user an allocated pointer
- * which is derived from a /tmp/O_TMPFILE mmap. The size
- * is round up to 4K alignment.
+/* pa.c */
+
+/* fba - File backed Allocator
+ * Gives user an allocated pointer which is derived from a /tmp/O_TMPFILE mmap.
+ * The size is round up to 4K alignment.
  */
 int  fba_alloc(struct fba *fba, size_t size);
 void fba_free(struct fba *fba);
 int fba_punch_hole(struct fba *fba, ulong index, uint nump);
+
+/* pa - Page Allocator
+ * Gives users a page Allocator pa_pages are ref-counted last put
+ * frees the page. (pa_free is just a pa_put_page
+ */
+int pa_init(struct zus_sb_info *sbi);
+void pa_fini(struct zus_sb_info *sbi);
+
+struct pa_page {
+	unsigned long		flags;
+	void			*owner;
+
+	unsigned long		index;
+	int			units;
+	int			refcount;
+
+	struct a_list_head	list;
+
+	unsigned long		private;
+	void			*private2;
+} __aligned(64);
+
+struct pa_page *pa_alloc(struct zus_sb_info *sbi);
+/* Must not be used by users, private to pa implementation */
+void __pa_free(struct pa_page *page);
+
+#define ZONE_SHIFT 56 /* last 8 bits */
+#define ZONE_MASK (~((1UL << ZONE_SHIFT) - 1))
+static inline void pa_set_page_zone(struct pa_page *page, int zone)
+{
+	page->flags &= ~ZONE_MASK;
+	page->flags |= ((ulong)zone << ZONE_SHIFT);
+}
+static inline int pa_page_zone(struct pa_page *page)
+{
+	return page->flags >> ZONE_SHIFT;
+}
+
+static inline int _zu_atomic_add_unless(int *v, int a, int u)
+{
+	int c, old;
+
+	c = __atomic_load_n(v, __ATOMIC_SEQ_CST);
+	while (c != u &&
+	       (old = __atomic_exchange_n(v, c + a, __ATOMIC_SEQ_CST)) != c)
+		c = old;
+	return c;
+}
+
+static inline int __atomic_dec_testzero(int *v)
+{
+	return (__atomic_fetch_sub(v, 1, __ATOMIC_SEQ_CST) == 1);
+}
+
+/* Return the incremented refcount, unless 0 */
+static inline int pa_get_page(struct pa_page *page)
+{
+	return _zu_atomic_add_unless(&page->refcount, 1, 0);
+}
+
+/* Return true if the refcount droped to 0 */
+static inline int pa_put_page(struct pa_page *page)
+{
+	if (__atomic_dec_testzero(&page->refcount)) {
+		__pa_free(page);
+		return 1;
+	}
+	return 0;
+}
+
+static inline void pa_free(struct zus_sb_info *sbi, struct pa_page *page)
+{
+	pa_put_page(page);
+}
+
+/* TODO: let the user decide on the pool number */
+#define POOL_NUM	1
+
+static inline struct pa_page *pa_bn_to_page(struct zus_sb_info *sbi, ulong bn)
+{
+	return sbi->pa[POOL_NUM].pages.ptr + bn * sizeof(struct pa_page);
+}
+
+static inline ulong pa_page_to_bn(struct zus_sb_info *sbi, struct pa_page *page)
+{
+	return ((void *)page - sbi->pa[POOL_NUM].pages.ptr) / sizeof(*page);
+}
+
+static inline void *pa_page_address(struct zus_sb_info *sbi,
+				    struct pa_page *page)
+{
+	ulong bn = pa_page_to_bn(sbi, page);
+
+	return sbi->pa[POOL_NUM].data.ptr + bn * PAGE_SIZE;
+}
+
+static inline
+struct pa_page *pa_virt_to_page(struct zus_sb_info *sbi, void *addr)
+{
+	struct pa *pa = &sbi->pa[POOL_NUM];
+
+	if (ZUS_WARN_ON(addr < pa->data.ptr || (pa->data.ptr + pa->size) <= addr)) {
+		ERROR("Invalid address=%p\n", addr);
+		return NULL;
+	}
+
+	return pa_bn_to_page(sbi, md_o2p(addr - pa->data.ptr));
+}
 
 #define ZUS_LIBFS_MAX_NR	16	/* see also MAX_LOCKDEP_FSs in zuf */
 #define ZUS_LIBFS_MAX_PATH	256
