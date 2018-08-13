@@ -31,6 +31,8 @@
 
 #include "zus_api.h"
 #include "_pr.h"
+#include "a_list.h"
+
 /* FIXME: Move to K_in_U include structure */
 #ifndef likely
 #define likely(x_)	__builtin_expect(!!(x_), 1)

@@ -374,12 +374,6 @@ int md_t2_mdt_write(struct multi_devices *md, struct md_dev_table *mdt)
 }
 
 /* ~~~  _zus_iom facility (imp of iom_enc.h) ~~~ */
-
-#ifndef container_of
-#define container_of(ptr, type, member) \
-	(type *)((void *)((char *)ptr - offsetof(type, member)))
-#endif
-
 void _zus_ioc_iom_exec_submit(struct zus_iomap_build *iomb, bool done,
 			      bool sync)
 {
