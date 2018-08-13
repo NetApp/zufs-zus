@@ -10,10 +10,73 @@
  *	Boaz Harrosh <boazh@netapp.com>
  *	Sagi Manole <sagim@netapp.com>
  */
-
+#define _GNU_SOURCE
 #include <pthread.h>
+#include <errno.h>
+#include <unistd.h>
+#include <sys/mman.h>
 
 #include "zus.h"
+#include "zuf_call.h"
+
+/* ~~~~ fba ~~~~ */
+
+/*
+ * Force fba allocations to be 2M aligned. We don't care for out-of-range pages
+ * as they are never touched and therefore remains unallocated.
+ */
+#define FBA_ALIGNSIZE 	(ZUFS_ALLOC_MASK + 1)
+
+int  fba_alloc(struct fba *fba, size_t size)
+{
+	ulong addr;
+
+	size += FBA_ALIGNSIZE;
+
+	/* Our buffers are allocated from a tmpfile so all is aligned and easy
+	 */
+	fba->fd = open("/tmp/", O_RDWR | O_TMPFILE | O_EXCL, 0666);
+	if (fba->fd < 0) {
+		ERROR("Error opening <%s>: %s\n","/tmp/", strerror(errno));
+		return errno;
+	}
+	ftruncate(fba->fd, size);
+
+	fba->ptr = mmap(NULL, size, PROT_WRITE | PROT_READ, MAP_SHARED,
+			fba->fd, 0);
+	if (fba->ptr == MAP_FAILED) {
+		ERROR("mmap failed=> %d: %s\n", errno, strerror(errno));
+		fba_free(fba);
+		return errno ?: ENOMEM;
+	}
+
+	addr = ALIGN((ulong)fba->ptr, FBA_ALIGNSIZE);
+	DBG("fba: fd=%d mmap-addr=0x%lx align-addr=0x%lx msize=%lu\n",
+		fba->fd, (ulong)fba->ptr, addr, size);
+	fba->ptr = (void *)addr;
+
+	return 0;
+}
+
+void fba_free(struct fba *fba)
+{
+	if (fba->fd >= 0) {
+		close(fba->fd);
+		fba->fd = -1;
+	}
+}
+
+int fba_punch_hole(struct fba *fba, ulong index, uint nump)
+{
+	int ret = fallocate(fba->fd, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE,
+			    md_p2o(index), md_p2o(nump));
+
+	if (unlikely(ret))
+		return -errno;
+	return 0;
+}
+
+/* ~~~ pa - Page Allocator ~~~ */
 
 /* TODO: get this param from FS... */
 #define PA_SIZE		(1UL << 31)	/* 2GB */
