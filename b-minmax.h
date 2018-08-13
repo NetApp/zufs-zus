@@ -2,7 +2,7 @@
 /*
  * Copyright (c) 2018 NetApp, Inc. All rights reserved.
  *
- * ZUFS-License: BSD-3-Clause. See module.c for LICENSE details.
+ * See module.c for LICENSE details.
  *
  * min()/max() macros that also do
  * strict type-checking.. See the

@@ -4,7 +4,7 @@
  *
  * Copyright (c) 2018 NetApp, Inc. All rights reserved.
  *
- * ZUFS-License: BSD-3-Clause. See module.c for LICENSE details.
+ * See module.c for LICENSE details.
  *
  * Authors:
  *      Shachar Sharon <sshachar@netapp.com>

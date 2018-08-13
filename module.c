@@ -1,5 +1,6 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * ZUFS-License: BSD-3-Clause
+ * BSD-3-Clause License
  *
  * Copyright (c) 2018 NetApp, Inc. All rights reserved.
  *
