@@ -47,6 +47,34 @@
 	#define NSEC_PER_SEC 1000000000UL
 #endif
 
+/* utils.c */
+void zus_warn(const char *cond, const char *file, int line);
+void zus_bug(const char *cond, const char *file, int line);
+
+#define ZUS_WARN_ON(x_) ({ \
+	int __ret_warn_on = !!(x_); \
+	if (unlikely(__ret_warn_on)) \
+		zus_warn(#x_, __FILE__, __LINE__); \
+	unlikely(__ret_warn_on); \
+})
+
+#define ZUS_WARN_ON_ONCE(x_) ({				\
+	int __ret_warn_on = !!(x_);			\
+	static bool __once = false;			\
+	if (unlikely(__ret_warn_on && !__once))	{	\
+		zus_warn(#x_, __FILE__, __LINE__); 	\
+		__once = true;				\
+	}						\
+	unlikely(__ret_warn_on);			\
+})
+
+#define ZUS_BUG_ON(x_) ({ \
+	int __ret_bug_on = !!(x_); \
+	if (unlikely(__ret_bug_on)) \
+		zus_bug(#x_, __FILE__, __LINE__); \
+	unlikely(__ret_bug_on); \
+})
+
 static inline __le32 le32_add(__le32 *val, __s16 add)
 {
 	return *val = cpu_to_le32(le32_to_cpu(*val) + add);
@@ -286,35 +314,6 @@ int __zus_iom_exec(struct zus_sb_info *sbi, struct zufs_ioc_iomap_exec *ziome,
  */
 int  fba_alloc(struct fba *fba, size_t size);
 void fba_free(struct fba *fba);
-
-
-/* utils.c */
-void zus_warn(const char *cond, const char *file, int line);
-void zus_bug(const char *cond, const char *file, int line);
-
-#define ZUS_WARN_ON(x_) ({ \
-	int __ret_warn_on = !!(x_); \
-	if (unlikely(__ret_warn_on)) \
-		zus_warn(#x_, __FILE__, __LINE__); \
-	unlikely(__ret_warn_on); \
-})
-
-#define ZUS_WARN_ON_ONCE(x_) ({				\
-	int __ret_warn_on = !!(x_);			\
-	static bool __once = false;			\
-	if (unlikely(__ret_warn_on && !__once))	{	\
-		zus_warn(#x_, __FILE__, __LINE__); 	\
-		__once = true;				\
-	}						\
-	unlikely(__ret_warn_on);			\
-})
-
-#define ZUS_BUG_ON(x_) ({ \
-	int __ret_bug_on = !!(x_); \
-	if (unlikely(__ret_bug_on)) \
-		zus_bug(#x_, __FILE__, __LINE__); \
-	unlikely(__ret_bug_on); \
-})
 
 #define ZUS_LIBFS_MAX_NR	16	/* see also MAX_LOCKDEP_FSs in zuf */
 #define ZUS_LIBFS_MAX_PATH	256
