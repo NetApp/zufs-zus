@@ -437,6 +437,26 @@ struct pa_page *pa_virt_to_page(struct zus_sb_info *sbi, void *addr)
 	return pa_bn_to_page(sbi, md_o2p(addr - pa->data.ptr));
 }
 
+static inline
+ulong pa_addr_to_offset(struct zus_sb_info *sbi, void *addr)
+{
+	struct pa *pa = &sbi->pa[POOL_NUM];
+
+	if (ZUS_WARN_ON(addr < pa->data.ptr || (pa->data.ptr + pa->size) <= addr)) {
+		ERROR("Invalid address=%p\n", addr);
+		return 0;
+	}
+
+	return (addr - pa->data.ptr);
+}
+
+static inline void *pa_addr(struct zus_sb_info *sbi, ulong offset)
+{
+	struct pa *pa = &sbi->pa[POOL_NUM];
+
+	return offset ? pa->data.ptr + offset : NULL;
+}
+
 #define ZUS_LIBFS_MAX_NR	16	/* see also MAX_LOCKDEP_FSs in zuf */
 #define ZUS_LIBFS_MAX_PATH	256
 #define ZUS_LIBFS_DIR		"/usr/lib/zufs"
