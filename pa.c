@@ -15,6 +15,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <sys/mman.h>
+#include <linux/falloc.h>
 
 #include "zus.h"
 #include "zuf_call.h"
