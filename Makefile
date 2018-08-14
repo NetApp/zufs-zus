@@ -71,7 +71,7 @@ export CFLAGS
 CFLAGS += "-DKERNEL=0"
 
 # List of -L -l libs
-C_LIBS = -lrt -lcurses -lc -luuid -lunwind -ldl $(CONFIG_C_LIBS)
+C_LIBS = -lrt -luuid -lunwind -ldl $(CONFIG_C_LIBS)
 
 # Any libzus dependent code and any zusFS plugins in fs/XXX should
 # include $(LDFLAGS) in the $(cc) -shared compilation
