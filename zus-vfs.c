@@ -448,10 +448,12 @@ static int _statfs(struct zufs_ioc_hdr *hdr)
 	return sbi->op->statfs(sbi, ioc_statfs);
 }
 
-static const char *_op_name(int op)
+static const char *_op_name(enum e_zufs_operation op)
 {
 #define CASE_ENUM_NAME(e) case e: return #e
 	switch  (op) {
+		CASE_ENUM_NAME(ZUS_OP_NULL		);
+		CASE_ENUM_NAME(ZUS_OP_STATFS		);
 		CASE_ENUM_NAME(ZUS_OP_NEW_INODE		);
 		CASE_ENUM_NAME(ZUS_OP_FREE_INODE	);
 		CASE_ENUM_NAME(ZUS_OP_EVICT_INODE	);
@@ -473,9 +475,13 @@ static const char *_op_name(int op)
 		CASE_ENUM_NAME(ZUS_OP_SYNC		);
 		CASE_ENUM_NAME(ZUS_OP_FALLOCATE		);
 		CASE_ENUM_NAME(ZUS_OP_LLSEEK		);
+		CASE_ENUM_NAME(ZUS_OP_IOM_DONE		);
 		CASE_ENUM_NAME(ZUS_OP_IOCTL		);
-		CASE_ENUM_NAME(ZUS_OP_STATFS		);
+		CASE_ENUM_NAME(ZUS_OP_XATTR_GET		);
+		CASE_ENUM_NAME(ZUS_OP_XATTR_SET		);
+		CASE_ENUM_NAME(ZUS_OP_XATTR_LIST	);
 		CASE_ENUM_NAME(ZUS_OP_BREAK		);
+		CASE_ENUM_NAME(ZUS_OP_MAX_OPT		);
 	default:
 		return "UNKNOWN";
 	}
