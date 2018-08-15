@@ -57,12 +57,12 @@ static inline void _zus_ioc_ziom_init(struct zufs_iomap *ziom, uint bytes)
 }
 
 static inline void _zus_iom_start(struct zus_iomap_build *iomb, __u64 *iom_e,
-				  uint max)
+				  uint max, struct zufs_iomap *ziom)
 {
 	iomb->cur_iom_e = iomb->start_iom_e = iom_e;
 	iomb->end_iom_e = iom_e + max;
 	iom_e[0] = 0;
-	iomb->ziom = NULL;
+	iomb->ziom = ziom;
 }
 
 /* ziom must come zero(ed) and @ziom->max_list denoting
@@ -73,8 +73,7 @@ static inline void _zus_ioc_iom_start(struct zus_iomap_build *iomb,
 				      iomb_done_fn done, iomb_submit_fn submit,
 				      void* priv, struct zufs_iomap *ziom)
 {
-	_zus_iom_start(iomb, ziom->iom_e, ziom->iom_max);
-	iomb->ziom = ziom;
+	_zus_iom_start(iomb, ziom->iom_e, ziom->iom_max, ziom);
 	iomb->sbi = sbi;
 	iomb->done = done;
 	iomb->submit = submit;
