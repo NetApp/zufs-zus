@@ -374,7 +374,10 @@ static void *_zu_thread(void *callback_info)
 
 		if (zt->zbt.err) {
 			DBG("zu_thread: err=%d\n", zt->zbt.err);
-			break;
+			/* Do not break continue and let zt->stop say if to exit
+			 * Otherwise any kill of an app will exit the ZT
+			 * and channel is stuck.
+			 */
 		}
 		op->hdr.err = _errno_UtoK(_do_op(zt, op));
 	}
