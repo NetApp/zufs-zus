@@ -315,7 +315,7 @@ static int _io_write(ulong *app_ptr, struct zufs_ioc_hdr *hdr)
 
 static int _get_put_block(struct zufs_ioc_hdr *hdr)
 {
-	struct zufs_ioc_get_block *get_block = (void *)hdr;
+	struct zufs_ioc_IO *get_block = (void *)hdr;
 	struct zus_inode_info *zii = get_block->zus_ii;
 
 	if (hdr->operation == ZUS_OP_PUT_BLOCK) {
