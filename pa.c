@@ -56,6 +56,11 @@ int  fba_alloc(struct fba *fba, size_t size)
 		return errno ?: ENOMEM;
 	}
 
+	err = madvise(fba->ptr, size, MADV_DONTDUMP);
+	if (err == -1)
+		ERROR("madvise(DONTDUMP) failed=> %d: %s\n", errno,
+		      strerror(errno));
+
 	fba->orig_ptr = fba->ptr;
 	fba->size = size;
 
