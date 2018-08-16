@@ -438,11 +438,11 @@ static int foofs_write(void *ptr, struct zufs_ioc_IO *op)
 }
 
 static int foofs_get_block(struct zus_inode_info *zii,
-			   struct zufs_ioc_get_block *get_block)
+			   struct zufs_ioc_IO *get_block)
 {
-//	get_block->pmem_bn = _file_bn(zii) + get_block->index % _foo_file_max(zii->sbi);
+//	get_block->gp_block.pmem_bn = _file_bn(zii) + get_block->index % _foo_file_max(zii->sbi);
 	/* foo-fs stands for foo-l */
-	get_block->pmem_bn = zii->zi->i_ino + 1;
+	get_block->gp_block.pmem_bn = zii->zi->i_ino + 1;
 	return 0;
 }
 
