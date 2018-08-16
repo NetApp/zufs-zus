@@ -148,9 +148,10 @@ SERVICE = zusd.service
 SYSTEMD_SERVICE_DIR = /lib/systemd/system
 SYSTEMD_DEPS_DIR = /etc/systemd/system/multi-user.target.wants
 ZUFS_LIB_DIR = /usr/lib/zufs
+ZUFS_LOG_DIR = /var/log/zufs
 
 install:
-	mkdir -p $(DESTDIR){/sbin,/usr/lib64,$(ZUFS_LIB_DIR)}
+	mkdir -p $(DESTDIR){/sbin,/usr/lib64,$(ZUFS_LIB_DIR),$(ZUFS_LOG_DIR)}
 	mkdir -p $(DESTDIR){$(SYSTEMD_SERVICE_DIR),$(SYSTEMD_DEPS_DIR)}
 	cp -f zusd $(DESTDIR)/sbin
 	cp -f $(LIBZUS) $(DESTDIR)/usr/lib64
