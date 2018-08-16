@@ -10,11 +10,18 @@
 #	Shachar Sharon <sshachar@netapp.com>
 #
 
-LIBFS_SUBDIRS = $(addprefix fs/,$(CONFIG_LIBFS_MODULES))
+all-libs	= $(addprefix all-,$(CONFIG_LIBFS_MODULES))
+clean-libs	= $(addprefix clean-,$(CONFIG_LIBFS_MODULES))
 
-all clean: $(LIBFS_SUBDIRS)
+all: $(all-libs)
+clean: $(clean-libs)
 
-$(LIBFS_SUBDIRS): $(LIBZUS)
-	$(MAKE) -C $@ $(MAKECMDGOALS)
+$(all-libs): all-% : fs/%
+	$(MAKE) -C $< all
 
-.PHONY: $(LIBFS_SUBDIRS)
+$(all-libs): $(LIBZUS)
+
+$(clean-libs): clean-% : fs/%
+	$(MAKE) -C $< clean
+
+.PHONY: $(all-libs) $(clean-libs)
