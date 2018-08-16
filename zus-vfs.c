@@ -25,6 +25,7 @@ static int _pmem_mmap(struct multi_devices *md)
 {
 	int prot = PROT_WRITE | PROT_READ;
 	int flags = MAP_SHARED;
+	int err;
 
 	md->p_pmem_addr = mmap(NULL, md_p2o(md_t1_blocks(md)), prot, flags,
 			       md->fd, 0);
@@ -32,6 +33,11 @@ static int _pmem_mmap(struct multi_devices *md)
 		ERROR("mmap failed=> %d: %s\n", errno, strerror(errno));
 		return errno ?: ENOMEM;
 	}
+
+	err = madvise(md->p_pmem_addr, md_p2o(md_t1_blocks(md)), MADV_DONTDUMP);
+	if (err == -1)
+		ERROR("pmem madvise(DONTDUMP) failed=> %d: %s\n", errno,
+		      strerror(errno));
 
 	return 0;
 }
