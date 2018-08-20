@@ -156,6 +156,7 @@ install:
 	cp -f zusd $(DESTDIR)/sbin
 	cp -f $(LIBZUS) $(DESTDIR)/usr/lib64
 	cp -f fs/foofs/libfoofs.so $(DESTDIR)$(ZUFS_LIB_DIR) || :
+	cp -f pkg/zusd.helper $(DESTDIR)$(ZUFS_LIB_DIR)
 	cp -f $(SERVICE) $(DESTDIR)$(SYSTEMD_SERVICE_DIR)
 	ln -sf $(SYSTEMD_SERVICE_DIR)/$(SERVICE) $(DESTDIR)$(SYSTEMD_DEPS_DIR)
 	[[ -z "$(DESTDIR)" ]] && pkg/post_install.sh || :
@@ -168,7 +169,7 @@ rpm:
 		--iteration $(BUILD_ID) --epoch 1 \
 		--url "netapp.com" --license "GPL/BSD" --vendor "NetApp Inc." \
 		--description "`printf "ZUS - Zero-copy User-mode Server\nID: $(GIT_HASH)"`" \
-		-d libunwind -d libuuid -d zufs-zuf \
+		-d libunwind -d libuuid -d lsof -d zufs-zuf \
 		--rpm-rpmbuild-define "_build_id_links none" \
 		--before-remove pkg/pre_uninstall.sh \
 		--after-remove pkg/post_uninstall.sh \

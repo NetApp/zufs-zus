@@ -21,12 +21,11 @@ After=local-fs.target
 Type=simple
 EnvironmentFile=-/etc/zufs.conf
 LimitCORE=50M
-ExecStartPre=/sbin/modprobe zuf
-ExecStartPre=/bin/mount -t zuf nodev /sys/fs/zuf
+ExecStartPre=/usr/lib/zufs/zusd.helper up
 ExecStart=/sbin/zusd
-ExecStopPost=/bin/umount -t zuf /sys/fs/zuf
-ExecStopPost=/sbin/rmmod zuf
+ExecStopPost=/usr/lib/zufs/zusd.helper down
 WorkingDirectory=/var/log/zufs
+Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target

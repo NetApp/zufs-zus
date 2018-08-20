@@ -1,0 +1,73 @@
+#!/bin/bash -e
+#
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# zusd shutdown script
+#
+# Copyright (C) 2018 NetApp, Inc.  All rights reserved.
+#
+# See module.c for LICENSE details.
+#
+# Authors:
+#	Yigal Korman <yigalk@netapp.com>
+
+ZUF_ROOT=/sys/fs/zuf
+
+signal_apps()
+{
+	local signal=$1
+	local mntdev=$2
+	local pids
+
+	pids=$(/sbin/lsof -t ${mntdev})
+
+	if [[ -n "${pids}" ]] ; then
+		kill -s ${signal} ${pids}
+	else
+		echo "No apps founds"
+	fi
+}
+
+unload_libfs()
+{
+	local libfs=$1
+	local mntdevs mntdev
+
+	mntdevs=$(/bin/grep ${libfs} /proc/self/mounts | /bin/cut -d" " -f1)
+
+	for mntdev in ${mntdevs} ; do
+		signal_apps SIGTERM ${mntdev}
+		sleep 1 # wait a bit for apps to stop
+		signal_apps SIGKILL ${mntdev}
+		/bin/umount -v -t ${libfs} ${mntdev}
+		/sbin/fsck.${libfs} ${mntdev}
+	done
+}
+
+unload() {
+	for libfs in ${ZUFS_LIBFS_LIST/,/ } ; do
+		unload_libfs ${libfs}
+	done
+
+	/bin/umount -v -t zuf ${ZUF_ROOT}
+	/sbin/rmmod -v zuf
+}
+
+load()
+{
+	/sbin/modprobe -v zuf
+	/bin/mount -v -t zuf nodev ${ZUF_ROOT}
+}
+
+case $1 in
+up)
+	/bin/grep -qw zuf /proc/self/mounts && unload || :
+	load
+	;;
+down)
+	unload
+	;;
+*)
+	echo "Unknown command!" >&2
+	;;
+esac
