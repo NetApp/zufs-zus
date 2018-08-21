@@ -157,7 +157,7 @@ install:
 	cp -f $(LIBZUS) $(DESTDIR)/usr/lib64
 	cp -f fs/foofs/libfoofs.so $(DESTDIR)$(ZUFS_LIB_DIR) || :
 	cp -f pkg/zusd.helper $(DESTDIR)$(ZUFS_LIB_DIR)
-	cp -f $(SERVICE) $(DESTDIR)$(SYSTEMD_SERVICE_DIR)
+	cp -f pkg/$(SERVICE) $(DESTDIR)$(SYSTEMD_SERVICE_DIR)
 	ln -sf $(SYSTEMD_SERVICE_DIR)/$(SERVICE) $(DESTDIR)$(SYSTEMD_DEPS_DIR)
 	[[ -z "$(DESTDIR)" ]] && pkg/post_install.sh || :
 
