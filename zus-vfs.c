@@ -471,7 +471,6 @@ static const char *_op_name(enum e_zufs_operation op)
 		CASE_ENUM_NAME(ZUS_OP_MMAP_CLOSE	);
 		CASE_ENUM_NAME(ZUS_OP_GET_SYMLINK	);
 		CASE_ENUM_NAME(ZUS_OP_SETATTR		);
-		CASE_ENUM_NAME(ZUS_OP_UPDATE_TIME	);
 		CASE_ENUM_NAME(ZUS_OP_SYNC		);
 		CASE_ENUM_NAME(ZUS_OP_FALLOCATE		);
 		CASE_ENUM_NAME(ZUS_OP_LLSEEK		);
@@ -524,7 +523,6 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 	case ZUS_OP_GET_SYMLINK:
 		return _symlink(hdr);
 	case ZUS_OP_SETATTR:
-	case ZUS_OP_UPDATE_TIME:
 		return _setattr(hdr);
 	case ZUS_OP_SYNC:
 		return _sync(hdr);
