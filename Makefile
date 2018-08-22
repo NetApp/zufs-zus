@@ -40,6 +40,9 @@ install:
 rpm:
 	pkg/create_pkg.sh
 cscope:
+	find . -type f -name '*.[c|h]' > cscope.files
+	find . -type l -name '*.[c|h]' -exec realpath \
+			--relative-to=$(CURDIR) '{}' \; >> cscope.files
 	cscope -bcqR
 
 .PHONY: install rpm all clean cscope
