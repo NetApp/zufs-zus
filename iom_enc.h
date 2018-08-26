@@ -170,6 +170,5 @@ static inline int _zus_iom_enc_t2_zusmem_read(struct zus_iomap_build *iomb,
 
 /* Two services for submit */
 void _zus_ioc_iom_exec_submit(struct zus_iomap_build *iomb, bool done, bool sync);
-void _zus_iom_read_submit(struct zus_iomap_build *iomb, bool done, bool sync);
 
 #endif /* define __ZUS_IOM_H__ */

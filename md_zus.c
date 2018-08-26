@@ -389,12 +389,3 @@ void _zus_ioc_iom_exec_submit(struct zus_iomap_build *iomb, bool done,
 	if (sync && iomb->done)
 		iomb->done(iomb);
 }
-
-void _zus_iom_read_submit(struct zus_iomap_build *iomb, bool done, bool sync)
-{
-	/* FIXME: perhaps chain the bios */
-	if (ZUS_WARN_ON(!done)) {
-		_zus_iom_end(iomb);
-		ERROR("should not happen bio should be big enough %ld\n", _zus_iom_len(iomb));
-	}
-}
