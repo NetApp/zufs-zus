@@ -79,10 +79,14 @@ int fba_punch_hole(struct fba *fba, ulong index, uint nump)
 
 /* ~~~ pa - Page Allocator ~~~ */
 
-/* TODO: get this param from FS... */
-#define PA_SIZE		(1UL << 31)	/* 2GB */
-//#define PA_NEW_ALLOC	(1UL << 27)	/* 128MB */
-#define PA_PAGES_SIZE	(1UL << 21)	/* 2MB */
+/* PA_SIZE - 2GB  total allowed data held in pages */
+/* TODO: get this param from FS
+ * TODO2: grow dynamically
+ */
+#define PA_SIZE		(1UL << 31)
+
+/* 2MB worth of pages (= 32k pages) */
+#define PA_PAGES_AT_A_TIME ((1UL << 21) / sizeof(struct pa_page))
 
 static void _init_one_page(struct zus_sb_info *sbi, struct pa *pa,
 			   struct pa_page *page)
@@ -99,10 +103,10 @@ static void _init_page_of_pages(struct zus_sb_info *sbi, struct pa *pa)
 	uint i;
 
 	page = pa->pages.ptr + pa->size * sizeof(*page);
-	for (i = 0; i < PA_PAGES_SIZE / sizeof(*page); ++i, ++page)
+	for (i = 0; i < PA_PAGES_AT_A_TIME; ++i, ++page)
 		_init_one_page(sbi, pa, page);
 
-	pa->size += PA_PAGES_SIZE / sizeof(*page);
+	pa->size += PA_PAGES_AT_A_TIME;
 }
 
 static void _alloc_one_page(struct pa_page *page)
