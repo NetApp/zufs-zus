@@ -353,7 +353,12 @@ struct pa_page {
 	void			*private2;
 } __aligned(64);
 
-struct pa_page *pa_alloc(struct zus_sb_info *sbi);
+struct pa_page *pa_alloc_order(struct zus_sb_info *sbi, int order);
+static inline struct pa_page *pa_alloc(struct zus_sb_info *sbi)
+{
+	return pa_alloc_order(sbi, 0);
+}
+
 /* Must not be used by users, private to pa implementation */
 void __pa_free(struct pa_page *page);
 
