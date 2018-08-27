@@ -97,16 +97,23 @@ static void _init_one_page(struct zus_sb_info *sbi, struct pa *pa,
 	page->owner = sbi;
 }
 
-static void _init_page_of_pages(struct zus_sb_info *sbi, struct pa *pa)
+static int _init_page_of_pages(struct zus_sb_info *sbi, struct pa *pa)
 {
 	struct pa_page *page;
 	uint i;
+
+	/* Better check here before we SIG_BUS on access of data */
+	if (unlikely(PA_SIZE < pa->size * PAGE_SIZE)) {
+		ERROR("Trouble in paradise PA_SIZE too small\n");
+		return -ENOMEM;
+	}
 
 	page = pa->pages.ptr + pa->size * sizeof(*page);
 	for (i = 0; i < PA_PAGES_AT_A_TIME; ++i, ++page)
 		_init_one_page(sbi, pa, page);
 
 	pa->size += PA_PAGES_AT_A_TIME;
+	return 0;
 }
 
 static void _alloc_one_page(struct pa_page *page)
@@ -133,8 +140,14 @@ struct pa_page *pa_alloc_order(struct zus_sb_info *sbi, int order)
 
 	pthread_spin_lock(&pa->lock);
 
-	if (a_list_empty(&pa->head))
-		_init_page_of_pages(sbi, pa);
+	if (a_list_empty(&pa->head)) {
+		int err = _init_page_of_pages(sbi, pa);
+
+		if (unlikely(err)) {
+			page = NULL;
+			goto out;
+		}
+	}
 
 	if (order == 1) {
 		a_list_for_each_entry(page, &pa->head, list) {
