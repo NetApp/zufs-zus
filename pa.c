@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * zus.h - C Wrappers over the ZUFS_IOCTL Api
+ * pa.c - Page Allocator
  *
  * Copyright (c) 2018 NetApp, Inc. All rights reserved.
  *
