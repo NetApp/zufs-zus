@@ -432,15 +432,25 @@ static inline void *pa_page_address(struct zus_sb_info *sbi,
 	return sbi->pa[POOL_NUM].data.ptr + bn * PAGE_SIZE;
 }
 
+static inline bool _pa_valid_addr(struct pa *pa, void *addr)
+{
+	if (ZUS_WARN_ON((addr < pa->data.ptr) ||
+			((pa->data.ptr + pa->size * PAGE_SIZE) <= addr))) {
+		ERROR("Invalid address=%p data.ptr=%p data.end=%p\n",
+		      addr, pa->data.ptr,
+		      (pa->data.ptr + pa->size * PAGE_SIZE));
+		return false;
+	}
+	return true;
+}
+
 static inline
 struct pa_page *pa_virt_to_page(struct zus_sb_info *sbi, void *addr)
 {
 	struct pa *pa = &sbi->pa[POOL_NUM];
 
-	if (ZUS_WARN_ON(addr < pa->data.ptr || (pa->data.ptr + pa->size) <= addr)) {
-		ERROR("Invalid address=%p\n", addr);
+	if (!_pa_valid_addr(pa, addr))
 		return NULL;
-	}
 
 	return pa_bn_to_page(sbi, md_o2p(addr - pa->data.ptr));
 }
@@ -450,10 +460,8 @@ ulong pa_addr_to_offset(struct zus_sb_info *sbi, void *addr)
 {
 	struct pa *pa = &sbi->pa[POOL_NUM];
 
-	if (ZUS_WARN_ON(addr < pa->data.ptr || (pa->data.ptr + pa->size) <= addr)) {
-		ERROR("Invalid address=%p\n", addr);
+	if (!_pa_valid_addr(pa, addr))
 		return 0;
-	}
 
 	return (addr - pa->data.ptr);
 }

@@ -98,11 +98,11 @@ static void _init_page_of_pages(struct zus_sb_info *sbi, struct pa *pa)
 	struct pa_page *page;
 	uint i;
 
-	page = pa->pages.ptr + pa->size;
+	page = pa->pages.ptr + pa->size * sizeof(*page);
 	for (i = 0; i < PA_PAGES_SIZE / sizeof(*page); ++i, ++page)
 		_init_one_page(sbi, pa, page);
 
-	pa->size += PA_PAGES_SIZE;
+	pa->size += PA_PAGES_SIZE / sizeof(*page);
 }
 
 static void _alloc_one_page(struct pa_page *page)
