@@ -93,6 +93,24 @@ static void _init_one_page(struct zus_sb_info *sbi, struct pa *pa,
 	page->owner = sbi;
 }
 
+static void _init_page_of_pages(struct zus_sb_info *sbi, struct pa *pa)
+{
+	struct pa_page *page;
+	uint i;
+
+	page = pa->pages.ptr + pa->size;
+	for (i = 0; i < PA_PAGES_SIZE / sizeof(*page); ++i, ++page)
+		_init_one_page(sbi, pa, page);
+
+	pa->size += PA_PAGES_SIZE;
+}
+
+static void _alloc_one_page(struct pa_page *page)
+{
+	a_list_del_init(&page->list);
+	page->refcount = 1;
+}
+
 struct pa_page *pa_alloc(struct zus_sb_info *sbi)
 {
 	struct pa *pa = &sbi->pa[POOL_NUM];
@@ -100,18 +118,11 @@ struct pa_page *pa_alloc(struct zus_sb_info *sbi)
 
 	pthread_spin_lock(&pa->lock);
 
-	if (a_list_empty(&pa->head)) {
-		uint i;
+	if (a_list_empty(&pa->head))
+		_init_page_of_pages(sbi, pa);
 
-		page = pa->pages.ptr + pa->size;
-		for (i = 0; i < PA_PAGES_SIZE / sizeof(*page); ++i, ++page)
-			_init_one_page(sbi, pa, page);
-		pa->size += PA_PAGES_SIZE;
-	}
 	page = a_list_first_entry(&pa->head, struct pa_page, list);
-	a_list_del_init(&page->list);
-
-	page->refcount = 1;
+	_alloc_one_page(page);
 
 	pthread_spin_unlock(&pa->lock);
 
