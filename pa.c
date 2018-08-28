@@ -54,6 +54,9 @@ int  fba_alloc(struct fba *fba, size_t size)
 		return errno ?: ENOMEM;
 	}
 
+	fba->orig_ptr = fba->ptr;
+	fba->size = size;
+
 	if (align) {
 		ulong addr = ALIGN((ulong)fba->ptr, FBA_ALIGNSIZE);
 
@@ -68,6 +71,7 @@ int  fba_alloc(struct fba *fba, size_t size)
 void fba_free(struct fba *fba)
 {
 	if (fba->fd >= 0) {
+		munmap(fba->orig_ptr, fba->size);
 		close(fba->fd);
 		fba->fd = -1;
 	}
