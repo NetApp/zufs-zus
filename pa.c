@@ -30,6 +30,7 @@
 
 int  fba_alloc(struct fba *fba, size_t size)
 {
+	int err;
 	bool align = false;
 
 	if (!(size & ZUFS_ALLOC_MASK)) {
@@ -44,7 +45,14 @@ int  fba_alloc(struct fba *fba, size_t size)
 		ERROR("Error opening <%s>: %s\n","/tmp/", strerror(errno));
 		return errno;
 	}
-	ftruncate(fba->fd, size);
+
+	err = ftruncate(fba->fd, size);
+	if (unlikely(err)) {
+		err = -errno;
+		ERROR("ftruncate failed size=0x%lx => %d\n", size, err);
+		close(fba->fd);
+		return err;
+	}
 
 	fba->ptr = mmap(NULL, size, PROT_WRITE | PROT_READ, MAP_SHARED,
 			fba->fd, 0);
