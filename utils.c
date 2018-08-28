@@ -90,18 +90,22 @@ void zus_warn(const char *cond, const char *file, int line)
 {
 	FILE *fp = stderr;
 
+	flockfile(fp);
 	fprintf(fp, "<4>%s: %s (%s:%d)\n", __func__, cond, file, line);
 	_dump_backtrace(fp);
 	_dump_addr2line(fp);
+	funlockfile(fp);
 }
 
 void zus_bug(const char *cond, const char *file, int line)
 {
 	FILE *fp = stderr;
 
+	flockfile(fp);
 	fprintf(fp, "<3>%s: %s (%s:%d)\n", __func__, cond, file, line);
 	_dump_backtrace(fp);
 	_dump_addr2line(fp);
+	funlockfile(fp);
 	abort();
 }
 
