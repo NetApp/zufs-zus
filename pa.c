@@ -30,9 +30,12 @@
 
 int  fba_alloc(struct fba *fba, size_t size)
 {
-	ulong addr;
+	bool align = false;
 
-	size += FBA_ALIGNSIZE;
+	if (!(size & ZUFS_ALLOC_MASK)) {
+		align = true;
+		size += FBA_ALIGNSIZE;
+	}
 
 	/* Our buffers are allocated from a tmpfile so all is aligned and easy
 	 */
@@ -51,10 +54,13 @@ int  fba_alloc(struct fba *fba, size_t size)
 		return errno ?: ENOMEM;
 	}
 
-	addr = ALIGN((ulong)fba->ptr, FBA_ALIGNSIZE);
-	DBG("fba: fd=%d mmap-addr=0x%lx align-addr=0x%lx msize=%lu\n",
-		fba->fd, (ulong)fba->ptr, addr, size);
-	fba->ptr = (void *)addr;
+	if (align) {
+		ulong addr = ALIGN((ulong)fba->ptr, FBA_ALIGNSIZE);
+
+		DBG("fba: fd=%d mmap-addr=0x%lx addr=0x%lx msize=0x%lx\n",
+			fba->fd, (ulong)fba->ptr, addr, size);
+		fba->ptr = (void *)addr;
+	}
 
 	return 0;
 }
