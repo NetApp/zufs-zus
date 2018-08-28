@@ -22,6 +22,9 @@ FRAME_SIZE = 4096
 LARGER = 4096
 
 -include $(CONFIG)
+export CFLAGS ?= $(NULL)
+export LDFLAGS ?= $(NULL)
+export DEBUG ?= 0
 
 # list of -I -i dir(s)
 C_INCLUDE = -I./ $(CONFIG_C_INCLUDE)
@@ -52,20 +55,22 @@ CNO_WARN := 	-Wno-unused-parameter -Wno-missing-field-initializers \
 
 # gcc optimization for now also debug with -O2 like
 # in Kernel (Can override in CONFIG_OPTIMIZE_FLAGS = )
-OPTIMIZE_FLAGS = -O2 $(CONFIG_OPTIMIZE_FLAGS)
+ifdef CONFIG_OPTIMIZE_FLAGS
+OPTIMIZE_FLAGS = $(CONFIG_OPTIMIZE_FLAGS)
+else
+OPTIMIZE_FLAGS = -O2
+endif
 
 # Optional debug mode
 ifeq ($(DEBUG), 1)
 CDEBUG_FLAGS = -g -ggdb $(CONFIG_CDEBUG_FLAGS)
 endif
 
-CFLAGS = -fPIC -pthread -std=gnu11 $(CONFIG_CFLAGS)	\
+CFLAGS += -fPIC -pthread -std=gnu11 $(CONFIG_CFLAGS)	\
 	$(C_INCLUDE) $(C_DEFINE)			\
 	$(OPTIMIZE_FLAGS) $(CDEBUG_FLAGS)		\
 	$(CWARN) $(CNO_WARN)				\
 	$(CONFIG_PEDANTIC_FLAGS)
-
-export CFLAGS
 
 # On Linux
 CFLAGS += "-DKERNEL=0"
@@ -77,7 +82,6 @@ C_LIBS = -lrt -luuid -lunwind -ldl $(CONFIG_C_LIBS)
 # include $(LDFLAGS) in the $(cc) -shared compilation
 # We force all symbols to resolve at compile time with -Wl,--no-undefined
 LDFLAGS += -Wl,-L$(CURDIR) -lzus -Wl,--no-undefined
-export LDFLAGS
 
 # Targets
 ALL = zusd libzus.so
