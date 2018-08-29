@@ -42,6 +42,11 @@ static inline ulong _zus_iom_len(struct zus_iomap_build *iomb)
 	return (__u64 *)iomb->cur_iom_e - iomb->start_iom_e;
 }
 
+static inline bool _zus_iom_empty(struct zus_iomap_build *iomb)
+{
+	return !_zus_iom_len(iomb);
+}
+
 static inline void _zus_iom_enc_type_val(__u64 *ptr, enum ZUFS_IOM_TYPE type,
 					 ulong val)
 {
