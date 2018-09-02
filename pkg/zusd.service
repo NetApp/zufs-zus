@@ -20,7 +20,7 @@ After=local-fs.target
 [Service]
 Type=simple
 EnvironmentFile=-/etc/zufs.conf
-LimitCORE=50M
+LimitCORE=100M
 ExecStartPre=/usr/lib/zufs/zusd.helper up
 ExecStart=/sbin/zusd
 ExecStopPost=/usr/lib/zufs/zusd.helper down
