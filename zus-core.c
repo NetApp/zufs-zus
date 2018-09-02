@@ -255,11 +255,11 @@ int __zus_thread_create(struct zus_base_thread *zbt, struct zus_thread_params *t
 	}
 
 	err = pthread_create(&zbt->thread, &attr, zus_glue_thread, zbt);
-	pthread_attr_destroy(&attr);
 	if (err)  {
 		ERROR("pthread_create => %d: %s\n", err, strerror(errno));
 		goto error;
 	}
+	pthread_attr_destroy(&attr);
 
 	if (tp->name) {
 		err = pthread_setname_np(zbt->thread, tp->name);
