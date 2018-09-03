@@ -34,7 +34,7 @@ int  fba_alloc(struct fba *fba, size_t size)
 
 	/* Our buffers are allocated from a tmpfile so all is aligned and easy
 	 */
-	fba->fd = open("/tmp/", O_RDWR | O_TMPFILE | O_EXCL, 0666);
+	fba->fd = open("/dev/shm/", O_RDWR | O_TMPFILE | O_EXCL, 0666);
 	if (fba->fd < 0) {
 		ERROR("Error opening <%s>: %s\n","/tmp/", strerror(errno));
 		return errno;
