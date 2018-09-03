@@ -51,6 +51,7 @@
 #endif
 
 /* utils.c */
+void zus_dump_stack(FILE *fp, const char *fmt, ...);
 void zus_warn(const char *cond, const char *file, int line);
 void zus_bug(const char *cond, const char *file, int line);
 

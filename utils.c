@@ -15,6 +15,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
+#include <stdarg.h>
 #define UNW_LOCAL_ONLY
 #include <libunwind.h>
 #include <zus.h>
@@ -86,26 +87,32 @@ static void _dump_addr2line(FILE *fp)
 		program_invocation_name, ptrS);
 }
 
-void zus_warn(const char *cond, const char *file, int line)
+void zus_dump_stack(FILE *fp, const char *fmt, ...)
 {
-	FILE *fp = stderr;
+	va_list args;
 
 	flockfile(fp);
-	fprintf(fp, "<4>%s: %s (%s:%d)\n", __func__, cond, file, line);
+
+	va_start(args, fmt);
+	vfprintf(fp, fmt, args);
+	va_end(args);
+
 	_dump_backtrace(fp);
 	_dump_addr2line(fp);
+
 	funlockfile(fp);
+}
+
+void zus_warn(const char *cond, const char *file, int line)
+{
+	zus_dump_stack(stderr, "<4>%s: %s (%s:%d)\n", __func__, cond, file,
+		       line);
 }
 
 void zus_bug(const char *cond, const char *file, int line)
 {
-	FILE *fp = stderr;
-
-	flockfile(fp);
-	fprintf(fp, "<3>%s: %s (%s:%d)\n", __func__, cond, file, line);
-	_dump_backtrace(fp);
-	_dump_addr2line(fp);
-	funlockfile(fp);
+	zus_dump_stack(stderr, "<3>%s: %s (%s:%d)\n", __func__, cond, file,
+		       line);
 	abort();
 }
 

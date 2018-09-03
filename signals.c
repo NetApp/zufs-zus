@@ -41,8 +41,8 @@ static void _sigaction_exit_handler(int signum, siginfo_t *si, void *p)
 
 static void _sigaction_abort_handler(int signum, siginfo_t *si, void *p)
 {
-	ZUS_BUG_ON(1);
-	_sigaction_info_handler(signum, si, p);
+	zus_dump_stack(stderr, "abort: signum=%d si_errno=%d\n", signum,
+		       si->si_errno);
 	abort();
 }
 
