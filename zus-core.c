@@ -82,7 +82,7 @@ static inline bool ___BAD_CPU(uint cpu)
 {
 	/* TODO: WARN_ON_ONCE */
 	if (ZUS_WARN_ON(g_zus_numa_map.online_cpus < cpu)) {
-		ERROR("Bad cpu=%d\n", cpu);
+		ERROR("Bad cpu=%u\n", cpu);
 		return true; /* yell, but do not crash */
 	}
 
@@ -364,7 +364,7 @@ static void *_zu_thread(void *callback_info)
 	if (zt->zbt.err)
 		return NULL; /* leak the file it is fine */
 
-	DBG("[%d] thread Init fd=%d api_mem=%p\n",
+	DBG("[%u] thread Init fd=%d api_mem=%p\n",
 	     zt->no, zt->fd, zt->api_mem);
 
 	wtz_release(&g_wtz);
@@ -384,7 +384,7 @@ static void *_zu_thread(void *callback_info)
 
 	zuf_root_close(&zt->fd);
 
-	DBG("[%d] thread Exit\n", zt->no);
+	DBG("[%u] thread Exit\n", zt->no);
 	return zt;
 }
 
@@ -401,7 +401,7 @@ static int zus_start_all_threads(struct zus_thread_params *tp, uint num_cpus)
 
 	err = fba_alloc(&g_wait_structs, num_cpus * ZUS_MAX_OP_SIZE);
 	if (unlikely(err)) {
-		ERROR("fba_alloc => %d\n", err);
+		ERROR("fba_alloc => %u\n", err);
 		return err;
 	}
 
@@ -421,7 +421,7 @@ static int zus_start_all_threads(struct zus_thread_params *tp, uint num_cpus)
 
 	wtz_wait(&g_wtz);
 
-	INFO("%d ZT threads ready\n", num_cpus);
+	INFO("%u ZT threads ready\n", num_cpus);
 	return 0;
 }
 
