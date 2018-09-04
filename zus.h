@@ -207,6 +207,7 @@ struct zus_zfi_operations {
 
 	int (*sbi_init)(struct zus_sb_info *sbi, struct zufs_ioc_mount *zim);
 	int (*sbi_fini)(struct zus_sb_info *sbi);
+	int (*sbi_remount)(struct zus_sb_info *sbi, struct zufs_ioc_mount *zim);
 };
 
 struct zus_fs_info {
@@ -315,6 +316,7 @@ int zus_register_one(int fd, struct zus_fs_info *p_zfi);
 
 int zus_mount(int fd, struct zufs_ioc_mount *zim);
 int zus_umount(int fd, struct zufs_ioc_mount *zim);
+int zus_remount(int fd, struct zufs_ioc_mount *zim);
 struct zus_inode_info *zus_iget(struct zus_sb_info *sbi, ulong ino);
 int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr);
 

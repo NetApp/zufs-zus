@@ -136,6 +136,15 @@ int zus_umount(int fd, struct zufs_ioc_mount *zim)
 	return 0;
 }
 
+int zus_remount(int fd, struct zufs_ioc_mount *zim)
+{
+	struct zus_sb_info *sbi = zim->zus_sbi;
+
+	if (sbi->zfi->op->sbi_remount)
+		return sbi->zfi->op->sbi_remount(sbi, zim);
+	return 0;
+}
+
 /* ~~~ FS operations ~~~~ */
 
 struct zus_inode_info *zus_iget(struct zus_sb_info *sbi, ulong ino)

@@ -504,6 +504,8 @@ static void *zus_mount_thread(void *callback_info)
 			zus_umount(g_mount.fd, zim);
 		else if (zim->hdr.operation == ZUS_M_MOUNT)
 			zus_mount(g_mount.fd, zim);
+		else if (zim->hdr.operation == ZUS_M_REMOUNT)
+			zus_remount(g_mount.fd, zim);
 	}
 
 	zuf_root_close(&g_mount.fd);
