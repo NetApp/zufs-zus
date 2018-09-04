@@ -329,6 +329,7 @@ int __zus_iom_exec(struct zus_sb_info *sbi, struct zufs_ioc_iomap_exec *ziome,
  * The size is round up to 4K alignment.
  */
 int  fba_alloc(struct fba *fba, size_t size);
+int  fba_alloc_align(struct fba *fba, size_t size);
 void fba_free(struct fba *fba);
 int fba_punch_hole(struct fba *fba, ulong index, uint nump);
 

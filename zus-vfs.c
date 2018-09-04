@@ -65,7 +65,7 @@ static int _pmem_grab(struct zus_sb_info *sbi, uint pmem_kern_id)
 	if (!md->user_page_size)
 		return 0; /* User does not want pages */
 
-	err = fba_alloc(&md->pages, md_t1_blocks(md) * md->user_page_size);
+	err = fba_alloc_align(&md->pages, md_t1_blocks(md) * md->user_page_size);
 	return err;
 }
 
