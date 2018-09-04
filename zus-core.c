@@ -500,11 +500,10 @@ static void *zus_mount_thread(void *callback_info)
 					      g_zus_numa_map.online_cpus);
 		}
 
-		if (zim->is_umounting) {
+		if (zim->hdr.operation == ZUS_M_UMOUNT)
 			zus_umount(g_mount.fd, zim);
-		} else {
+		else if (zim->hdr.operation == ZUS_M_MOUNT)
 			zus_mount(g_mount.fd, zim);
-		}
 	}
 
 	zuf_root_close(&g_mount.fd);
