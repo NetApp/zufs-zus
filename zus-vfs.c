@@ -354,7 +354,7 @@ static int _get_put_block(struct zufs_ioc_hdr *hdr)
 	}
 
 	if (unlikely(!zii->op->get_block)) {
-		ERROR("NO WAY crashing the APP\n");
+		ERROR("No get_block operation set\n");
 		return -EIO;
 	}
 
@@ -571,7 +571,7 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 	case ZUS_OP_BREAK:
 		break;
 	default:
-		ERROR("!!! Dont know %d\n", hdr->operation);
+		ERROR("Unknown OP=%d\n", hdr->operation);
 	}
 
 	return 0;

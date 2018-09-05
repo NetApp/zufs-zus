@@ -126,7 +126,7 @@ static int _init_page_of_pages(struct zus_sb_info *sbi, struct pa *pa)
 
 	/* Better check here before we SIG_BUS on access of data */
 	if (unlikely(PA_SIZE < pa->size * PAGE_SIZE)) {
-		ERROR("Trouble in paradise PA_SIZE too small\n");
+		ERROR("PA_SIZE too small pa->size=0x%lx\n", pa->size);
 		return -ENOMEM;
 	}
 

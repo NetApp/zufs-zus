@@ -152,7 +152,7 @@ static int zus_set_numa_affinity(cpu_set_t *affinity, int nid)
 	}
 
 	if (i == g_zus_numa_map.online_cpus) {
-		ERROR("Smoking %d\n", nid);
+		ERROR("Wrong nid=%d\n", nid);
 		return -EINVAL;
 	}
 
