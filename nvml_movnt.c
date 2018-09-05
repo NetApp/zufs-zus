@@ -33,9 +33,17 @@
  *	Boaz Harrosh <boazh@netapp.com>
  */
 
+#include <cpuid.h>
+
 #include "movnt.h"
 
-#include <emmintrin.h>
+#define EAX_IDX 0
+#define EBX_IDX 1
+#define ECX_IDX 2
+#define EDX_IDX 3
+
+#define CLFLUSHOPT_FUNC		0x7
+#define CLFLUSHOPT_BIT		(1 << 23)
 
 #define CACHELINE_ALIGN ((uintptr_t)64)
 #define CACHELINE_MASK	(CACHELINE_ALIGN - 1)
@@ -57,7 +65,7 @@
 /*
  * flush_clflush -- (internal) flush the CPU cache, using clflush
  * (Boaz: Is only used here for the none aligned tails of movnt, clflush
- *  Is always better than slflushopt in this case, even if clflushopt is
+ *  Is always better than clflushopt in this case, even if clflushopt is
  *  available)
  */
 static void
@@ -311,4 +319,39 @@ pmem_memmove_persist(void *pmemdest, const void *src, size_t len)
 	memmove_nodrain_movnt(pmemdest, src, len);
 
 	return pmemdest;
+}
+
+static inline void
+cpuid(unsigned func, unsigned subfunc, unsigned cpuinfo[4])
+{
+	__cpuid_count(func, subfunc, cpuinfo[EAX_IDX], cpuinfo[EBX_IDX],
+		      cpuinfo[ECX_IDX], cpuinfo[EDX_IDX]);
+}
+
+static int cpuid_check(unsigned func, unsigned reg, unsigned bit)
+{
+	unsigned int cpuinfo[4] = {};
+
+	/* func check */
+	cpuid(0x0, 0x0, cpuinfo);
+	if (cpuinfo[EAX_IDX] < func)
+		return 0;
+
+	cpuid(func, 0x0, cpuinfo);
+
+	return (cpuinfo[reg] & bit) != 0;
+}
+
+static int clflushopt_avail(void)
+{
+	return cpuid_check(CLFLUSHOPT_FUNC, EBX_IDX, CLFLUSHOPT_BIT);
+}
+
+/* Old processors don't support clflushopt, so we default to clflush */
+void (*cl_flush_opt)(void *buf, uint32_t len) = cl_flush;
+
+__attribute__((constructor))
+static void clflush_init(void) {
+	if (clflushopt_avail())
+		cl_flush_opt = __cl_flush_opt;
 }

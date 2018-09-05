@@ -34,13 +34,13 @@ static inline void cl_flush(void *buf, uint32_t len)
 		_mm_clflush(buf + i);
 }
 
-#ifdef CONFIG_CL_FLUSH_OPT
-
 /*
  * clflushopt flushes cachelines concurrently and require a store
  * barrier (sfence) to verify completeness.
+ *
+ * WARNING: don't use directly, will crash old unsupported CPUs!
  */
-static inline void cl_flush_opt(void *buf, uint32_t len)
+static inline void __cl_flush_opt(void *buf, uint32_t len)
 {
 	uint32_t i;
 
@@ -51,11 +51,7 @@ static inline void cl_flush_opt(void *buf, uint32_t len)
 	_mm_sfence();
 }
 
-#else /* !CONFIG_CL_FLUSH_OPT */
-
-#define	cl_flush_opt	cl_flush
-
-#endif /* CONFIG_CL_FLUSH_OPT */
+extern void (*cl_flush_opt)(void *buf, uint32_t len);
 
 /* TODO use AVX-512 instructions if available PXS-245 */
 static inline void _memzero_nt_cachelines(void *dst, size_t cachelines)
