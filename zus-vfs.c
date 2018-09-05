@@ -42,6 +42,19 @@ static int _pmem_mmap(struct multi_devices *md)
 	return 0;
 }
 
+static int _pmem_unmap(struct multi_devices *md)
+{
+	int err;
+
+	err = munmap(md->p_pmem_addr, md_p2o(md_t1_blocks(md)));
+	if (err == -1) {
+		ERROR("munmap failed=> %d: %s\n", errno, strerror(errno));
+		return errno;
+	}
+
+	return 0;
+}
+
 static int _pmem_grab(struct zus_sb_info *sbi, uint pmem_kern_id)
 {
 	struct multi_devices *md = &sbi->md;
@@ -80,6 +93,7 @@ static void _pmem_ungrab(struct zus_sb_info *sbi)
 	/* Kernel makes free easy (close couple files) */
 	fba_free(&sbi->md.pages);
 
+	_pmem_unmap(&sbi->md);
 	zuf_root_close(&sbi->md.fd);
 	sbi->md.p_pmem_addr = NULL;
 }
