@@ -379,14 +379,18 @@ void _zus_ioc_iom_exec_submit(struct zus_iomap_build *iomb, bool done,
 {
 	struct zufs_ioc_iomap_exec *ziome =
 			container_of(iomb->ziom, typeof(*ziome), ziom);
+	int err;
 
 	_zus_iom_end(iomb);
 
 	if (ZUS_WARN_ON(!iomb->ziom))
 		return;
 
-	__zus_iom_exec(iomb->sbi, ziome, sync);
+	err = __zus_iom_exec(iomb->sbi, ziome, sync);
 	iomb->err = ziome->hdr.err;
+	if (unlikely(err && !iomb->err))
+		iomb->err = -errno;
+
 	if (sync && iomb->done)
 		iomb->done(iomb);
 }
