@@ -385,7 +385,8 @@ void _zus_ioc_iom_exec_submit(struct zus_iomap_build *iomb, bool done,
 	if (ZUS_WARN_ON(!iomb->ziom))
 		return;
 
-	iomb->err = __zus_iom_exec(iomb->sbi, ziome, sync);
+	__zus_iom_exec(iomb->sbi, ziome, sync);
+	iomb->err = ziome->hdr.err;
 	if (sync && iomb->done)
 		iomb->done(iomb);
 }
