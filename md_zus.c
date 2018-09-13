@@ -330,9 +330,11 @@ int md_t2_mdt_read(struct multi_devices *md, int dev_index,
 		struct zufs_iom_t2_zusmem_io space;
 		__u64 null_term;
 	} a;
+	uint iom_max;
 
 	iomb.ziom = &a.ziome.ziom;
-	_zus_ioc_ziom_init(iomb.ziom, sizeof(a));
+	iom_max = sizeof(a) - offsetof(typeof(a.ziome), ziom);
+	_zus_ioc_ziom_init(iomb.ziom, iom_max);
 	_zus_ioc_iom_start(&iomb, md->sbi, _done, _submit, md, &a.ziome.ziom);
 
 	_zus_iom_enc_t2_zusmem_read(&iomb, 0, mdt, PAGE_SIZE);
@@ -351,14 +353,16 @@ int md_t2_mdt_write(struct multi_devices *md, struct md_dev_table *mdt)
 		__u64 null_term;
 	} a;
 	int i;
+	uint iom_max;
 
 	iomb.ziom = &a.ziome.ziom;
+	iom_max = sizeof(a) - offsetof(typeof(a.ziome), ziom);
 
 	/* FIXME: must make copies and execute at end. one by one for now */
 	for (i = 0; i < md->t2_count; ++i) {
 		ulong bn = md_o2p(md_t2_dev(md, i)->offset);
 
-		_zus_ioc_ziom_init(iomb.ziom, sizeof(a));
+		_zus_ioc_ziom_init(iomb.ziom, iom_max);
 		_zus_ioc_iom_start(&iomb, md->sbi, NULL, NULL, NULL, &a.ziome.ziom);
 
 		mdt->s_dev_list.id_index = mdt->s_dev_list.t1_count + i;
