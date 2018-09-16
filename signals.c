@@ -18,6 +18,15 @@
 #include "zusd.h"
 
 
+static void _sigaction_sigbus_handler(int signum, siginfo_t *si, void *p)
+{
+	INFO("SIGNAL: signum=%d si_errno=%d\n", signum, si->si_errno);
+	ERROR("WARNING: check system LOGS for memory errors and/or MCE.\n"
+		"In case of \"Uncorrectable Memory Error\", check filesystem manual\n");
+	//TODO: call to filesytem(s) memory-error-handling fuction.
+	abort();
+}
+
 static void _sigaction_info_handler(int signum, siginfo_t *si, void *p)
 {
 	INFO("SIGNAL: signum=%d si_errno=%d\n", signum, si->si_errno);
@@ -67,6 +76,16 @@ static void _sigaction_abort(int signum)
 	sigaction(signum, &sa_abort, NULL);
 }
 
+static void _sigaction_sigbus(int signum)
+{
+	static struct sigaction sa_sigbus = {
+		.sa_sigaction   = _sigaction_sigbus_handler,
+		.sa_flags       = SA_SIGINFO
+	};
+
+	sigaction(signum, &sa_sigbus, NULL);
+}
+
 void zus_register_sigactions(void)
 {
 	/*
@@ -78,7 +97,7 @@ void zus_register_sigactions(void)
 	_sigaction_exit(SIGQUIT);
 	_sigaction_abort(SIGILL);
 	_sigaction_info(SIGTRAP);
-	_sigaction_abort(SIGBUS);
+	_sigaction_sigbus(SIGBUS);
 	_sigaction_abort(SIGFPE);
 	_sigaction_abort(SIGKILL);
 	_sigaction_exit(SIGUSR1);
