@@ -31,7 +31,7 @@ static int _pmem_mmap(struct multi_devices *md)
 			       md->fd, 0);
 	if (md->p_pmem_addr == MAP_FAILED) {
 		ERROR("mmap failed=> %d: %s\n", errno, strerror(errno));
-		return errno ?: ENOMEM;
+		return -(errno ?: ENOMEM);
 	}
 
 	err = madvise(md->p_pmem_addr, md_p2o(md_t1_blocks(md)), MADV_DONTDUMP);
