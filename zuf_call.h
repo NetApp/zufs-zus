@@ -94,3 +94,13 @@ int zuf_iomap_exec(int fd, struct zufs_ioc_iomap_exec *ziome)
 {
 	return _ioctl(fd, ZU_IOC_IOMAP_EXEC, &ziome->hdr, "ZU_IOC_IOMAP_EXEC");
 }
+
+/*
+ * Converts user-space error code to kernel conventions: change positive errno
+ * codes to negative.
+ */
+static inline
+__s32 zuf_errno_UtoK(__s32 err)
+{
+	return (err < 0) ? err : -err;
+}
