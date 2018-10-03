@@ -11,6 +11,7 @@
 # Authors:
 #	Yigal Korman <yigalk@netapp.com>
 
+ZUF_MOD=/usr/lib/zufs/extra/zuf.ko
 ZUF_ROOT=/sys/fs/zuf
 
 signal_apps()
@@ -55,6 +56,11 @@ unload() {
 
 load()
 {
+	if ! /sbin/modinfo zuf ; then
+		/bin/ln -sf ${ZUF_MOD} /lib/modules/$(/bin/uname -r)/extra
+		/sbin/depmod
+	fi
+
 	/sbin/modprobe -v zuf
 	/bin/mount -v -t zuf nodev ${ZUF_ROOT}
 }
