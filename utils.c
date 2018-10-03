@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <stdarg.h>
+#include <sys/resource.h>
 #define UNW_LOCAL_ONLY
 #include <libunwind.h>
 #include <zus.h>
@@ -114,5 +115,33 @@ void zus_bug(const char *cond, const char *file, int line)
 	zus_dump_stack(stderr, "<3>%s: %s (%s:%d)\n", __func__, cond, file,
 		       line);
 	abort();
+}
+
+#define ZUS_MAX_FILES 16384
+
+int zus_increase_max_files(void)
+{
+	struct rlimit rl;
+	int err;
+
+	err = getrlimit(RLIMIT_NOFILE, &rl);
+	if (err) {
+		ERROR("getrlimit failed => %d", -errno);
+		return -errno;
+	}
+
+	if (rl.rlim_cur < ZUS_MAX_FILES)
+		rl.rlim_cur = ZUS_MAX_FILES;
+	if (rl.rlim_max < ZUS_MAX_FILES)
+		rl.rlim_max = ZUS_MAX_FILES;
+
+	err = setrlimit(RLIMIT_NOFILE, &rl);
+	if (err) {
+		ERROR("setrlimit %lu/%lu failed => %d\n", rl.rlim_cur,
+		      rl.rlim_max, -errno);
+		return -errno;
+	}
+
+	return 0;
 }
 

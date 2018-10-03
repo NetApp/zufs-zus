@@ -123,6 +123,10 @@ int main(int argc, char *argv[])
 
 	zus_register_sigactions();
 
+	err = zus_increase_max_files();
+	if (unlikely(err))
+		return err;
+
 	err = zus_mount_thread_start(&tp, path);
 	if (unlikely(err))
 		goto stop;
