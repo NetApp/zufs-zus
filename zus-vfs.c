@@ -93,6 +93,8 @@ static void _pmem_ungrab(struct zus_sb_info *sbi)
 	/* Kernel makes free easy (close couple files) */
 	fba_free(&sbi->md.pages);
 
+	md_fini(&sbi->md, NULL);
+
 	_pmem_unmap(&sbi->md);
 	zuf_root_close(&sbi->md.fd);
 	sbi->md.p_pmem_addr = NULL;

@@ -184,6 +184,14 @@ int md_init_from_pmem_info(struct multi_devices *md)
 	return 0;
 }
 
+void md_fini(struct multi_devices *md, struct block_device *s_bdev)
+{
+	if (md->t2_count)
+		free(md->t2a.map);
+	if (md->t1_count)
+		free(md->t1a.map);
+}
+
 static bool _csum_mismatch(struct md_dev_table *mdt, int silent)
 {
 	ushort crc = md_calc_csum(mdt);
