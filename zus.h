@@ -290,6 +290,8 @@ int zus_cpu_to_node(int cpu);
 int zus_current_onecpu(void);
 int zus_current_cpu(void);
 int zus_current_nid(void);
+void *zus_private_get(void);
+void zus_private_set(void*);
 
 int zus_get_cpu(void);
 void zus_put_cpu(int cpu);

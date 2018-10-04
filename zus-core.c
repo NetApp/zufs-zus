@@ -62,6 +62,7 @@ void zuf_root_close(int *fd)
 struct zus_base_thread {
 	__start_routine threadfn;
 	void *user_arg;
+	void *private;
 
 	uint one_cpu;
 	uint nid;
@@ -105,6 +106,23 @@ int zus_current_onecpu(void)
 	if (!zbt)
 		return ZUS_CPU_ALL;
 	return  zbt->one_cpu;
+}
+
+void *zus_private_get(void)
+{
+	struct zus_base_thread *zbt = pthread_getspecific(g_zts_id_key);
+
+	if (!zbt)
+		return NULL;
+	return zbt->private;
+}
+
+void zus_private_set(void *p)
+{
+	struct zus_base_thread *zbt = pthread_getspecific(g_zts_id_key);
+
+	if (zbt)
+		zbt->private = p;
 }
 
 static int __zus_current_cpu(bool warn)
