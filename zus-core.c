@@ -309,11 +309,14 @@ struct _zu_thread {
 	volatile bool stop;
 };
 
-/* TODO: Yes put on a zts struct */
-static struct _zu_thread *g_zts = NULL;
-static int g_num_gts = 0;
-static struct wait_til_zero g_wtz;
-static struct fba g_wait_structs;
+struct zt_pool {
+	struct wait_til_zero wtz;
+	struct fba wait_fba;
+	struct _zu_thread *zts;
+	int num_zts;
+};
+
+static struct zt_pool g_ztp;
 
 static int _zu_mmap(struct _zu_thread *zt)
 {
@@ -350,7 +353,7 @@ static void *_zu_thread(void *callback_info)
 {
 	struct _zu_thread *zt = callback_info;
 	struct zufs_ioc_wait_operation *op =
-				g_wait_structs.ptr + zt->no * ZUS_MAX_OP_SIZE;
+				g_ztp.wait_fba.ptr + zt->no * ZUS_MAX_OP_SIZE;
 
 	zt->zbt.err = zuf_root_open_tmp(&zt->fd);
 	if (zt->zbt.err)
@@ -367,7 +370,7 @@ static void *_zu_thread(void *callback_info)
 	DBG("[%u] thread Init fd=%d api_mem=%p\n",
 	     zt->no, zt->fd, zt->api_mem);
 
-	wtz_release(&g_wtz);
+	wtz_release(&g_ztp.wtz);
 
 	while(!zt->stop) {
 		zt->zbt.err = zuf_wait_opt(zt->fd, op);
@@ -392,24 +395,24 @@ static int zus_start_all_threads(struct zus_thread_params *tp, uint num_cpus)
 {
 	uint i, err;
 
-	wtz_init(&g_wtz);
+	wtz_init(&g_ztp.wtz);
 
-	g_zts = calloc(num_cpus, sizeof(*g_zts));
-	if (!g_zts)
+	g_ztp.zts = calloc(num_cpus, sizeof(*g_ztp.zts));
+	if (!g_ztp.zts)
 		return ENOMEM;
-	g_num_gts = num_cpus;
+	g_ztp.num_zts = num_cpus;
 
-	err = fba_alloc(&g_wait_structs, num_cpus * ZUS_MAX_OP_SIZE);
+	err = fba_alloc(&g_ztp.wait_fba, num_cpus * ZUS_MAX_OP_SIZE);
 	if (unlikely(err)) {
 		ERROR("fba_alloc => %u\n", err);
 		return err;
 	}
 
-	wtz_arm(&g_wtz, num_cpus);
+	wtz_arm(&g_ztp.wtz, num_cpus);
 
 	for (i = 0; i < num_cpus; ++i) {
 		char zt_name[32];
-		struct _zu_thread *zt = &g_zts[i];
+		struct _zu_thread *zt = &g_ztp.zts[i];
 
 		snprintf(zt_name, sizeof(zt_name), "ZT(%d)", i);
 		tp->name = zt_name;
@@ -419,7 +422,7 @@ static int zus_start_all_threads(struct zus_thread_params *tp, uint num_cpus)
 			return err;
 	}
 
-	wtz_wait(&g_wtz);
+	wtz_wait(&g_ztp.wtz);
 
 	INFO("%u ZT threads ready\n", num_cpus);
 	return 0;
@@ -430,16 +433,16 @@ static void zus_stop_all_threads(void)
 	void *tret;
 	int i;
 
-	if (!g_zts)
+	if (!g_ztp.zts)
 		return;
 
-	for (i = 0; i < g_num_gts; ++i)
-		g_zts[i].stop = true;
+	for (i = 0; i < g_ztp.num_zts; ++i)
+		g_ztp.zts[i].stop = true;
 
-	zuf_break_all(g_zts[0].fd);
+	zuf_break_all(g_ztp.zts[0].fd);
 
-	for (i = 0; i < g_num_gts; ++i) {
-		struct _zu_thread *zt = &g_zts[i];
+	for (i = 0; i < g_ztp.num_zts; ++i) {
+		struct _zu_thread *zt = &g_ztp.zts[i];
 
 		if (zt->zbt.thread) {
 			pthread_join(zt->zbt.thread, &tret);
@@ -447,9 +450,9 @@ static void zus_stop_all_threads(void)
 		}
 	}
 
-	fba_free(&g_wait_structs);
-	free (g_zts);
-	g_zts = NULL;
+	fba_free(&g_ztp.wait_fba);
+	free (g_ztp.zts);
+	g_ztp.zts = NULL;
 }
 
 /* ~~~~ mount thread ~~~~~ */
@@ -491,7 +494,7 @@ static void *zus_mount_thread(void *callback_info)
 			break;
 		}
 
-		if (!g_zts) {
+		if (!g_ztp.zts) {
 			g_mount.zbt.err = _numa_map_init(g_mount.fd);
 			if (unlikely(g_mount.zbt.err))
 				break;
