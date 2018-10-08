@@ -64,10 +64,11 @@ int zuf_grab_pmem(int fd, uint pmem_kern_id, struct zufs_ioc_pmem *zip)
 }
 
 static inline
-int zuf_zt_init(int fd, int cpu_num, uint max_command)
+int zuf_zt_init(int fd, int cpu_num, uint chan, uint max_command)
 {
 	struct zufs_ioc_init zii = {
 		.affinity = cpu_num,
+		.channel_no = chan,
 		.max_command = max_command,
 	};
 
