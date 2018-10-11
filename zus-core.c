@@ -499,6 +499,7 @@ static void *zus_mount_thread(void *callback_info)
 {
 	struct fba fba = {};
 	struct zufs_ioc_mount *zim;
+	int err;
 
 	g_mount.zbt.err = fba_alloc(&fba, ZUS_MAX_OP_SIZE);
 	if (unlikely(g_mount.zbt.err))
@@ -536,11 +537,15 @@ static void *zus_mount_thread(void *callback_info)
 					      zim->num_channels);
 
 		if (zim->hdr.operation == ZUS_M_UMOUNT)
-			zus_umount(g_mount.fd, zim);
+			err = zus_umount(g_mount.fd, zim);
 		else if (zim->hdr.operation == ZUS_M_MOUNT)
-			zus_mount(g_mount.fd, zim);
+			err = zus_mount(g_mount.fd, zim);
 		else if (zim->hdr.operation == ZUS_M_REMOUNT)
-			zus_remount(g_mount.fd, zim);
+			err = zus_remount(g_mount.fd, zim);
+		else
+			err = -EINVAL;
+
+		zim->hdr.err = _errno_UtoK(err);
 	}
 
 	zuf_root_close(&g_mount.fd);
