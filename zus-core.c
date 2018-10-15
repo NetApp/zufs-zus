@@ -342,6 +342,15 @@ int _do_op(struct _zu_thread *zt, struct zufs_ioc_wait_operation *op)
 	return zus_do_command(app_ptr, &op->hdr);
 }
 
+/*
+ * Converts user-space error code to kernel conventions: change positive errno
+ * codes to negative.
+ */
+static __s32 _errno_UtoK(__s32 err)
+{
+	return (err < 0) ? err : -err;
+}
+
 static void *_zu_thread(void *callback_info)
 {
 	struct _zu_thread *zt = callback_info;
@@ -376,7 +385,7 @@ static void *_zu_thread(void *callback_info)
 			 * and channel is stuck.
 			 */
 		}
-		op->hdr.err = zuf_errno_UtoK(_do_op(zt, op));
+		op->hdr.err = _errno_UtoK(_do_op(zt, op));
 	}
 
 	zuf_root_close(&zt->fd);
