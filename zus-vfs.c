@@ -477,7 +477,7 @@ static int _statfs(struct zufs_ioc_hdr *hdr)
 	return sbi->op->statfs(sbi, ioc_statfs);
 }
 
-static const char *_op_name(enum e_zufs_operation op)
+const char *zus_op_name(enum e_zufs_operation op)
 {
 #define CASE_ENUM_NAME(e) case e: return #e
 	switch  (op) {
@@ -518,7 +518,7 @@ static const char *_op_name(enum e_zufs_operation op)
 int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 {
 	DBG("[%s] OP=%d off=0x%x len=0x%x\n",
-	    _op_name(hdr->operation), hdr->operation, hdr->offset, hdr->len);
+	    zus_op_name(hdr->operation), hdr->operation, hdr->offset, hdr->len);
 
 	switch(hdr->operation) {
 	case ZUS_OP_NEW_INODE:
