@@ -367,16 +367,45 @@ static inline struct pa_page *pa_alloc(struct zus_sb_info *sbi)
 /* Must not be used by users, private to pa implementation */
 void __pa_free(struct pa_page *page);
 
-#define ZONE_SHIFT 56 /* last 8 bits */
-#define ZONE_MASK (~((1UL << ZONE_SHIFT) - 1))
+#define ZONE_BITLEN	4
+#define ZONE_SHIFT	(64 - ZONE_BITLEN) /* last 4 bits */
+#define ZONE_MASK	(((1UL << ZONE_BITLEN)-1) << ZONE_SHIFT)
+
+#define NODES_BITLEN	4
+#define NODES_PGSHIFT	(ZONE_SHIFT - NODES_BITLEN) /* 4 bits */
+#define NODES_MASK	(((1UL << NODES_BITLEN)-1) << NODES_PGSHIFT)
+
+static inline ulong get_bit_range(ulong x, int start_bit, ulong mask)
+{
+	return (x & mask) >> start_bit;
+}
+
+static inline void set_bit_range(ulong *x, int start_bit, ulong mask, ulong val)
+{
+	*x &= ~mask;
+	*x |= (val << start_bit);
+}
+
 static inline void pa_set_page_zone(struct pa_page *page, int zone)
 {
-	page->flags &= ~ZONE_MASK;
-	page->flags |= ((ulong)zone << ZONE_SHIFT);
+	ZUS_WARN_ON_ONCE(zone >> ZONE_BITLEN);
+	set_bit_range(&page->flags, ZONE_SHIFT, ZONE_MASK, zone);
 }
+
 static inline int pa_page_zone(struct pa_page *page)
 {
-	return page->flags >> ZONE_SHIFT;
+	return get_bit_range(page->flags, ZONE_SHIFT, ZONE_MASK);
+}
+
+static inline void pa_page_nid_set(struct pa_page *page, unsigned long node)
+{
+	ZUS_WARN_ON_ONCE(node >> NODES_BITLEN);
+	set_bit_range(&page->flags, NODES_PGSHIFT, NODES_MASK, node);
+}
+
+static inline int pa_page_to_nid(struct pa_page *page)
+{
+	return get_bit_range(page->flags, NODES_PGSHIFT, NODES_MASK);
 }
 
 static inline int _zu_atomic_add_unless(int *v, int a, int u)
