@@ -39,32 +39,39 @@ static bool issupported(const struct zus_inode *zi)
 	       S_ISFIFO(mode) || S_ISSOCK(mode);
 }
 
-int toyfs_new_inode(struct zus_sb_info *zsbi, struct zus_inode_info *zii,
-		    void *app_ptr, struct zufs_ioc_new_inode *ioc_new)
+struct zus_inode_info *
+toyfs_new_inode(struct zus_sb_info *zsbi,
+		void *app_ptr, struct zufs_ioc_new_inode *ioc_new)
 {
 	ino_t ino;
 	mode_t mode;
 	size_t symlen;
 	struct toyfs_inode *ti;
 	struct toyfs_sb_info *sbi = Z2SBI(zsbi);
-	struct toyfs_inode_info *tii =  Z2II(zii);
+	struct toyfs_inode_info *tii;
 	struct zus_inode *zi = &ioc_new->zi;
 	struct toyfs_inode_info *dir_tii = Z2II(ioc_new->dir_ii);
 	struct toyfs_page *page;
 	bool symlong;
 	const char *symname = (const char *)app_ptr;
+	struct zus_inode_info *zii;
 
+	zii = toyfs_zii_alloc(zsbi);
+	if (!zii)
+		return NULL;
+
+	tii =  Z2II(zii);
 	mode = zi->i_mode;
 	DBG("new_inode:sbi=%p tii=%p mode=%o\n", sbi, tii, mode);
 
 	if (!issupported(zi))
-		return -ENOTSUP;
+		return NULL;
 	if (zi->i_size >= PAGE_SIZE)
-		return -EINVAL;
+		return NULL;
 
 	ti = toyfs_acquire_inode(sbi);
 	if (!ti)
-		return -ENOSPC;
+		return NULL;
 
 	ino = _next_ino(tii->sbi);
 	memset(ti, 0, sizeof(*ti));
@@ -100,7 +107,7 @@ int toyfs_new_inode(struct zus_sb_info *zsbi, struct zus_inode_info *zii,
 			page = toyfs_acquire_page(sbi);
 			if (!page) {
 				toyfs_release_inode(sbi, ti);
-				return -ENOSPC;
+				return NULL;
 			}
 			memcpy(page->dat, symname, symlen);
 			ti->ti.symlnk.sl_long = page;
@@ -111,15 +118,22 @@ int toyfs_new_inode(struct zus_sb_info *zsbi, struct zus_inode_info *zii,
 		ti->ti.reg.r_first_parent = dir_tii->zii.zi->i_ino;
 	}
 	toyfs_track_inode(tii);
-	return 0;
+	return zii;
 }
 
-int toyfs_free_inode(struct zus_inode_info *zii)
+void toyfs_free_inode(struct zus_inode_info *zii)
 {
+	int ref;
 	struct toyfs_inode_info *tii = Z2II(zii);
 	struct toyfs_sb_info *sbi = tii->sbi;
 	struct toyfs_inode *ti = tii->ti;
 	struct zus_inode *zi = tii->zii.zi;
+
+	toyfs_sbi_lock(sbi);
+	ref = --(tii->ref);
+	toyfs_sbi_lock(sbi);
+	if (!ref)
+		return;
 
 	DBG("free_inode: ino=%lu mode=%o nlink=%ld size=%ld\n",
 	    tii->ino, (int)zi->i_mode,
@@ -128,7 +142,7 @@ int toyfs_free_inode(struct zus_inode_info *zii)
 	if (zi_isdir(zi)) {
 		DBG("free_inode(dir): ino=%lu\n", tii->ino);
 		if (tii->ti->ti.dir.d_ndentry)
-			return -ENOTEMPTY;
+			return;
 		zi->i_dir.parent = 0; /* TODO: Maybe zus_std helper ? */
 	} else if (zi_islnk(zi)) {
 		DBG("free_inode(symlink): ino=%lu symlnk=%s\n",
@@ -144,7 +158,7 @@ int toyfs_free_inode(struct zus_inode_info *zii)
 
 	toyfs_untrack_inode(tii);
 	toyfs_release_inode(sbi, ti);
-	return 0;
+	toyfs_zii_free(zii);
 }
 
 int toyfs_iget(struct zus_sb_info *zsbi, ulong ino, struct zus_inode_info **zii)

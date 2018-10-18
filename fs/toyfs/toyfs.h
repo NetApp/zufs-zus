@@ -160,6 +160,7 @@ struct toyfs_inode_info {
 	struct toyfs_inode_info *next;
 	ino_t ino;
 	unsigned long imagic;
+	int ref;
 	bool mapped;
 	bool valid;
 };
@@ -222,9 +223,10 @@ void toyfs_release_iblkref(struct toyfs_sb_info *sbi,
 
 /* inode.c */
 void toyfs_evict(struct zus_inode_info *zii);
-int toyfs_new_inode(struct zus_sb_info *zsbi, struct zus_inode_info *zii,
-		    void *app_ptr, struct zufs_ioc_new_inode *ioc_new);
-int toyfs_free_inode(struct zus_inode_info *zii);
+struct zus_inode_info *
+toyfs_new_inode(struct zus_sb_info *zsbi,
+		void *app_ptr, struct zufs_ioc_new_inode *ioc_new);
+void toyfs_free_inode(struct zus_inode_info *zii);
 int toyfs_iget(struct zus_sb_info *zsbi, ulong ino, struct zus_inode_info **zii);
 int toyfs_setattr(struct zus_inode_info *zii,
 		  uint enable_bits, ulong truncate_size);

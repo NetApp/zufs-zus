@@ -158,8 +158,6 @@ const struct zus_zii_operations toyfs_zii_op = {
 };
 
 const struct zus_sbi_operations toyfs_sbi_op = {
-	.zii_alloc = toyfs_zii_alloc,
-	.zii_free = toyfs_zii_free,
 	.new_inode = toyfs_new_inode,
 	.free_inode = toyfs_free_inode,
 	.add_dentry = toyfs_add_dentry,

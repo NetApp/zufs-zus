@@ -124,6 +124,7 @@ struct toyfs_inode_info *toyfs_alloc_ii(struct toyfs_sb_info *sbi)
 
 	memset(tii, 0, sizeof(*tii));
 	tii->imagic = TOYFS_IMAGIC;
+	tii->ref = 1;
 	tii->valid = true;
 	tii->next = NULL;
 	tii->sbi = sbi;
