@@ -231,14 +231,20 @@ static int foofs_statfs(struct zus_sb_info *sbi, struct zufs_ioc_statfs *ioc)
 	return 0;
 }
 
-static int foofs_new_inode(struct zus_sb_info *sbi, struct zus_inode_info *zii,
-			   void *app_ptr, struct zufs_ioc_new_inode *ioc_new)
+static struct zus_inode_info *
+foofs_new_inode(struct zus_sb_info *sbi,
+		void *app_ptr, struct zufs_ioc_new_inode *ioc_new)
 {
 	struct zus_inode *zi = find_free_ino(sbi);
 	ulong ino;
+	struct zus_inode_info *zii;
 
 	if (unlikely(!zi))
-		return -ENOSPC;
+		return NULL;
+
+	zii = foofs_zii_alloc(sbi);
+	if (!zii)
+		return NULL;
 
 	zii->zi = zi;
 
@@ -262,16 +268,18 @@ static int foofs_new_inode(struct zus_sb_info *sbi, struct zus_inode_info *zii,
 	    zi->i_ino, zi->i_size, zi->i_blocks, zi->i_ctime, zi->i_mtime,
 	    zi->i_nlink, zi->i_mode);
 
-	return 0;
+	return zii;
 }
 
-static int foofs_free_inode(struct zus_inode_info *zii)
+static void foofs_free_inode(struct zus_inode_info *zii)
 {
 	DBG("\n");
 	zii->zi->i_mode = 0;
 	zii->zi->i_ino = 0;
 	/* Do we need to clean anything */
-	return 0;
+
+	/* TODO: Have ref-count and free on last */
+	foofs_zii_free(zii);
 }
 
 static int foofs_iget(struct zus_sb_info *sbi, ulong ino,
@@ -454,8 +462,6 @@ static const struct zus_zii_operations foofs_zii_operations = {
 };
 
 static const struct zus_sbi_operations foofs_sbi_operations = {
-	.zii_alloc	= foofs_zii_alloc,
-	.zii_free	= foofs_zii_free,
 	.new_inode	= foofs_new_inode,
 	.free_inode	= foofs_free_inode,
 
