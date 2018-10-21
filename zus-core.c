@@ -562,7 +562,8 @@ int zus_mount_thread_start(struct zus_thread_params *tp, const char* zuf_path)
 	int err;
 
 	pthread_key_create(&g_zts_id_key, NULL);
-	strncpy(g_zus_root_path_stor, zuf_path, sizeof(g_zus_root_path_stor));
+	strncpy(g_zus_root_path_stor, zuf_path,
+		sizeof(g_zus_root_path_stor) - 1);
 	g_mount.tp = *tp; /* this is for the _zu threads */
 
 	ZTP_INIT(&mnttp); /* Just a Plain thread */
