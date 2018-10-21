@@ -115,23 +115,27 @@ static int _load_libfs(int fd)
 	const char *libfs_env = getenv(ZUFS_LIBFS_LIST);
 	char *orig_libfs_str, *libfs_str, *p;
 	int lib_no = 0;
-	int err;
+	int err = 0;
 
 	INFO("%s: %s\n", ZUFS_LIBFS_LIST, libfs_env);
 	if (!libfs_env || !*libfs_env)
 		return 0;
 
 	libfs_str = orig_libfs_str = strdup(libfs_env);
+	if (!orig_libfs_str)
+		return -ENOMEM;
+
 	while ((p = strsep(&libfs_str, ",")) != NULL) {
 		if (!*p)
 			continue;
 		err = _load_one_fs(fd, p, &g_dl_list[lib_no]);
 		if (unlikely(err))
-			return err;
+			break;
 		++lib_no;
 	}
+	free(orig_libfs_str);
 
-	return 0;
+	return err;
 }
 
 static void _unload_libfs(void *handle)
