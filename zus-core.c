@@ -444,7 +444,7 @@ static int zus_start_all_threads(struct zus_thread_params *tp, uint num_cpus,
 	}
 
 	wtz_wait(&g_ztp.wtz);
-	INFO("%u ZT threads ready\n", num_cpus);
+	INFO("%u * %u ZT threads ready\n", num_cpus, num_chans);
 	return 0;
 }
 
