@@ -51,7 +51,7 @@ toyfs_new_inode(struct zus_sb_info *zsbi,
 	struct toyfs_inode_info *tii;
 	struct zus_inode *zi = &ioc_new->zi;
 	struct toyfs_inode_info *dir_tii = Z2II(ioc_new->dir_ii);
-	struct toyfs_page *page;
+	struct toyfs_pmemb *pmemb;
 	bool symlong;
 	const char *symname = (const char *)app_ptr;
 	struct zus_inode_info *zii;
@@ -75,65 +75,55 @@ toyfs_new_inode(struct zus_sb_info *zsbi,
 
 	ino = _next_ino(tii->sbi);
 	memset(ti, 0, sizeof(*ti));
-	memcpy(&ti->zi, zi, sizeof(ti->zi));
+	memcpy(ti, zi, sizeof(*ti));
 	tii->ti = ti;
 	tii->ino = ino;
-	tii->zii.zi = &tii->ti->zi;
-	ti->i_parent_ino = TOYFS_NULL_INO;
-	ti->zi.i_ino = ino;
+	tii->zii.zi = toyfs_ti2zi(tii->ti);
+	ti->i_ino = ino;
 
 	if (zi_isdir(zi)) {
 		DBG("new_inode(dir): ino=%lu\n", ino);
-		toyfs_list_init(&ti->ti.dir.d_childs);
-		ti->ti.dir.d_ndentry = 0;
-		ti->ti.dir.d_off_max = 2;
-		ti->zi.i_size = PAGE_SIZE;
-		ti->i_parent_ino = dir_tii->zii.zi->i_ino;
-		zus_std_new_dir(dir_tii->zii.zi, &ti->zi);
+		toyfs_list_init(toyfs_childs_list_of(tii));
+		ti->i_size = 0;
+		ti->i_dir.parent = dir_tii->ti->i_ino;
+		zus_std_new_dir(dir_tii->zii.zi, toyfs_ti2zi(ti));
 	} else if (zi_isreg(zi)) {
 		DBG("new_inode(reg): ino=%lu\n", ino);
-		toyfs_list_init(&ti->ti.reg.r_iblkrefs);
-		ti->ti.reg.r_first_parent = dir_tii->zii.zi->i_ino;
+		toyfs_list_init(toyfs_iblkrefs_list_of(tii));
 		if (ioc_new->flags & ZI_TMPFILE)
-			ti->zi.i_nlink = 1;
+			ti->i_nlink = 1;
 	} else if (zi_islnk(zi)) {
-		symlen = ti->zi.i_size;
-		symlong = symlen >= sizeof(ti->zi.i_symlink);
+		symlen = ti->i_size;
+		symlong = symlen >= sizeof(ti->i_symlink);
 		symname = symlong ? (const char *)symname :
 			  (const char *)zi->i_symlink;
 		DBG("new_inode(symlnk): ino=%lu lnk=%.*s\n",
 		    ino, (int)symlen, symname);
 		if (symlong) {
-			page = toyfs_acquire_page(sbi);
-			if (!page) {
+			pmemb = toyfs_acquire_pmemb(sbi);
+			if (!pmemb) {
 				toyfs_release_inode(sbi, ti);
 				return NULL;
 			}
-			memcpy(page->dat, symname, symlen);
-			ti->ti.symlnk.sl_long = page;
-			tii->zii.zi->i_sym_dpp = toyfs_page2dpp(sbi, page);
+			memcpy(pmemb->dat, symname, symlen);
+			tii->ti->i_sym_dpp = toyfs_page2dpp(sbi, pmemb);
 		}
-	} else {
+	} else
 		DBG("new_inode: ino=%lu mode=%o\n", ino, mode);
-		ti->ti.reg.r_first_parent = dir_tii->zii.zi->i_ino;
-	}
-	toyfs_track_inode(tii);
+
+	toyfs_lock_inodes(sbi);
+	toyfs_i_track(tii);
+	tii->ref++;
+	toyfs_unlock_inodes(sbi);
+
 	return zii;
 }
 
-void toyfs_free_inode(struct zus_inode_info *zii)
+void toyfs_free_inode(struct toyfs_inode_info *tii)
 {
-	int ref;
-	struct toyfs_inode_info *tii = Z2II(zii);
 	struct toyfs_sb_info *sbi = tii->sbi;
 	struct toyfs_inode *ti = tii->ti;
 	struct zus_inode *zi = tii->zii.zi;
-
-	toyfs_sbi_lock(sbi);
-	ref = --(tii->ref);
-	toyfs_sbi_lock(sbi);
-	if (!ref)
-		return;
 
 	DBG("free_inode: ino=%lu mode=%o nlink=%ld size=%ld\n",
 	    tii->ino, (int)zi->i_mode,
@@ -141,12 +131,12 @@ void toyfs_free_inode(struct zus_inode_info *zii)
 
 	if (zi_isdir(zi)) {
 		DBG("free_inode(dir): ino=%lu\n", tii->ino);
-		if (tii->ti->ti.dir.d_ndentry)
+		if (tii->ti->i_size)
 			return;
+		toyfs_release_dir(tii);
 		zi->i_dir.parent = 0; /* TODO: Maybe zus_std helper ? */
 	} else if (zi_islnk(zi)) {
-		DBG("free_inode(symlink): ino=%lu symlnk=%s\n",
-		    tii->ino, toyfs_symlink_value(tii));
+		DBG("free_inode(symlink): ino=%lu \n", tii->ino);
 		toyfs_release_symlink(tii);
 	} else if (zi_isreg(zi)) {
 		DBG("free_inode(reg): ino=%lu\n", tii->ino);
@@ -155,43 +145,74 @@ void toyfs_free_inode(struct zus_inode_info *zii)
 		DBG("free_inode: ino=%lu mode=%o\n", tii->ino, zi->i_mode);
 		zi->i_rdev = 0;
 	}
-
-	toyfs_untrack_inode(tii);
+	toyfs_drop_xattr(tii);
 	toyfs_release_inode(sbi, ti);
-	toyfs_zii_free(zii);
 }
 
 int toyfs_iget(struct zus_sb_info *zsbi, ulong ino, struct zus_inode_info **zii)
 {
+	int err = 0;
 	struct toyfs_sb_info *sbi = Z2SBI(zsbi);
 	struct toyfs_inode_info *tii;
+	struct toyfs_inode_ref *tir;
 
 	DBG("iget: ino=%lu\n", ino);
 
-	tii = toyfs_find_inode(sbi, ino);
-	if (!tii) {
+	tir = toyfs_find_inode_ref_by_ino(sbi, ino);
+	if (!tir) {
 		*zii = NULL;
 		DBG("iget: ino=%lu => -ENOENT\n", ino);
 		return -ENOENT;
 	}
 
-	tii = toyfs_alloc_ii(sbi);
-	if (unlikely(!tii)) {
-		DBG("iget: ino=%lu => ENOMEM\n", ino);
-		return -ENOMEM;
+	toyfs_lock_inodes(sbi);
+	tii = tir->tii;
+	if (!tir->tii) {
+		tii = toyfs_alloc_ii(sbi);
+		if (unlikely(!tii)) {
+			DBG("iget: ino=%lu => ENOMEM\n", ino);
+			err = -ENOMEM;
+			goto out;
+		}
+		tir->tii = tii;
+		tii->mapped = true;
 	}
+	++tii->ref;
 
 	*zii = &tii->zii;
 	DBG("iget: ino=%lu zi=%p\n", ino, tii->zii.zi);
-	return 0;
+out:
+	toyfs_unlock_inodes(sbi);
+	return err;
 }
 
 void toyfs_evict(struct zus_inode_info *zii)
 {
 	struct toyfs_inode_info *tii = Z2II(zii);
+	struct toyfs_sb_info *sbi = tii->sbi;
+	struct toyfs_inode *ti = tii->ti;
 
 	DBG("evict: ino=%lu\n", tii->ino);
-	/* TODO: What here? */
+
+	toyfs_lock_inodes(sbi);
+	if (--tii->ref)
+		goto out;
+
+	toyfs_sbi_lock(tii->sbi);
+	if (!ti->i_nlink) {
+		toyfs_free_inode(tii);
+		if (tii->mapped)
+			toyfs_i_untrack(tii, true);
+	} else {
+		if (tii->mapped)
+			toyfs_i_untrack(tii, false);
+	}
+
+	toyfs_tii_free(tii);
+	toyfs_sbi_unlock(sbi);
+
+out:
+	toyfs_unlock_inodes(sbi);
 }
 
 static int _setattr(struct toyfs_inode_info *tii,

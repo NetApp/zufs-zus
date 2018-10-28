@@ -25,16 +25,21 @@
 static int _get_symlink(struct toyfs_inode_info *tii, void **symlink)
 {
 	struct toyfs_inode *ti = tii->ti;
+	struct toyfs_pmemb *pmemb;
 
 	DBG("get_symlink: ino=%lu\n", tii->ino);
 
-	if (!zi_islnk(&ti->zi))
+	if (!zi_islnk(toyfs_ti2zi(ti)))
 		return -EINVAL;
 
-	if (ti->zi.i_size >= sizeof(ti->zi.i_symlink))
-		*symlink = ti->ti.symlnk.sl_long->dat;
-	else
-		*symlink = ti->zi.i_symlink;
+	if (ti->i_size < sizeof(ti->i_symlink)) {
+		*symlink = ti->i_symlink;
+		return 0;
+	}
+
+	pmemb = toyfs_dpp2pmemb(tii->sbi, ti->i_sym_dpp);
+	*symlink = pmemb;
+
 	return 0;
 }
 
@@ -43,32 +48,16 @@ int toyfs_get_symlink(struct zus_inode_info *zii, void **symlink)
 	return _get_symlink(Z2II(zii), symlink);
 }
 
-
-const char *toyfs_symlink_value(const struct toyfs_inode_info *tii)
-{
-	const struct toyfs_inode *ti = tii->ti;
-	const struct zus_inode *zi = &ti->zi;
-	const char *symlnk = NULL;
-
-	if (zi_islnk(zi)) {
-		if (zi->i_size >= sizeof(zi->i_symlink))
-			symlnk = (const char *)ti->ti.symlnk.sl_long->dat;
-		else
-			symlnk = (const char *)ti->zi.i_symlink;
-	}
-	return symlnk;
-}
-
 void toyfs_release_symlink(struct toyfs_inode_info *tii)
 {
 	struct toyfs_inode *ti = tii->ti;
-	const size_t symlen = ti->zi.i_size;
-	struct toyfs_page *page;
+	const size_t symlen = ti->i_size;
+	struct toyfs_pmemb *pmemb;
 
-	if (symlen > sizeof(ti->zi.i_symlink)) {
-		page = ti->ti.symlnk.sl_long;
-		toyfs_release_page(tii->sbi, page);
-		ti->ti.symlnk.sl_long = NULL;
+	if (symlen > sizeof(ti->i_symlink)) {
+		pmemb = toyfs_dpp2pmemb(tii->sbi, ti->i_sym_dpp);
+		toyfs_release_pmemb(tii->sbi, pmemb);
 	}
-	ti->zi.i_size = 0;
+	ti->i_size = 0;
+	ti->i_sym_dpp = 0;
 }

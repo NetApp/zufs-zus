@@ -42,29 +42,29 @@ static void _drop_iblkref(struct toyfs_inode_info *tii,
 static struct toyfs_iblkref *
 _require_iblkref(struct toyfs_inode_info *tii, loff_t off);
 
-static struct toyfs_page *
-_unique_page(struct toyfs_sb_info *sbi, struct toyfs_iblkref *iblkref);
+static struct toyfs_pmemb *
+_unique_pmemb(struct toyfs_sb_info *sbi, struct toyfs_iblkref *iblkref);
 
 
 static struct toyfs_dblkref *_new_dblkref(struct toyfs_sb_info *sbi)
 {
-	struct toyfs_page *page;
+	struct toyfs_pmemb *pmemb;
 	struct toyfs_dblkref *dblkref = NULL;
 
-	page = toyfs_acquire_page(sbi);
-	if (!page)
+	pmemb = toyfs_acquire_pmemb(sbi);
+	if (!pmemb)
 		goto out;
 
 	dblkref = toyfs_acquire_dblkref(sbi);
 	if (!dblkref)
 		goto out;
 
-	dblkref->bn = toyfs_addr2bn(sbi, page);
+	dblkref->bn = toyfs_addr2bn(sbi, pmemb);
 	dblkref->refcnt = 1;
 
 out:
-	if (page && !dblkref)
-		toyfs_release_page(sbi, page);
+	if (pmemb && !dblkref)
+		toyfs_release_pmemb(sbi, pmemb);
 	return dblkref;
 }
 
@@ -74,7 +74,7 @@ static void _free_dblkref(struct toyfs_sb_info *sbi,
 	const size_t bn = dblkref->bn;
 
 	toyfs_release_dblkref(sbi, dblkref);
-	toyfs_release_page(sbi, toyfs_bn2page(sbi, bn));
+	toyfs_release_pmemb(sbi, toyfs_bn2pmemb(sbi, bn));
 }
 
 static void _decref_dblkref(struct toyfs_sb_info *sbi,
@@ -165,26 +165,27 @@ static size_t _nbytes_in_range(loff_t off, loff_t next, loff_t end)
 	return (size_t)((next < end) ? (next - off) : (end - off));
 }
 
-static void
-_copy_out(void *tgt, const struct toyfs_page *page, loff_t off, size_t len)
+static void _copy_out(void *tgt, const struct toyfs_pmemb *pmemb,
+		      loff_t off, size_t len)
 {
-	toyfs_assert(len <= sizeof(page->dat));
-	toyfs_assert((size_t)off + len <= sizeof(page->dat));
-	memcpy(tgt, &page->dat[off], len);
+	toyfs_assert(len <= sizeof(pmemb->dat));
+	toyfs_assert((size_t)off + len <= sizeof(pmemb->dat));
+	memcpy(tgt, &pmemb->dat[off], len);
 }
 
-static void
-_copy_in(struct toyfs_page *page, const void *src, loff_t off, size_t len)
+static void _copy_in(struct toyfs_pmemb *pmemb, const void *src,
+		     loff_t off, size_t len)
 {
-	toyfs_assert(page != NULL);
-	toyfs_assert(len <= sizeof(page->dat));
-	toyfs_assert((size_t)off + len <= sizeof(page->dat));
-	pmem_memmove_persist(&page->dat[off], src, len);
+	toyfs_assert(pmemb != NULL);
+	toyfs_assert(len <= sizeof(pmemb->dat));
+	toyfs_assert((size_t)off + len <= sizeof(pmemb->dat));
+	pmem_memmove_persist(&pmemb->dat[off], src, len);
 }
 
-static void _copy_page(struct toyfs_page *page, const struct toyfs_page *other)
+static void _copy_pmemb(struct toyfs_pmemb *pmemb,
+			const struct toyfs_pmemb *other)
 {
-	_copy_in(page, other->dat, 0, sizeof(other->dat));
+	_copy_in(pmemb, other->dat, 0, sizeof(other->dat));
 }
 
 static void _fill_zeros(void *tgt, size_t len)
@@ -192,11 +193,11 @@ static void _fill_zeros(void *tgt, size_t len)
 	memset(tgt, 0, len);
 }
 
-static void _assign_zeros(struct toyfs_page *page, loff_t off, size_t len)
+static void _assign_zeros(struct toyfs_pmemb *pmemb, loff_t off, size_t len)
 {
-	toyfs_assert(len <= sizeof(page->dat));
-	toyfs_assert((size_t)off + len <= sizeof(page->dat));
-	_fill_zeros(&page->dat[off], len);
+	toyfs_assert(len <= sizeof(pmemb->dat));
+	toyfs_assert((size_t)off + len <= sizeof(pmemb->dat));
+	_fill_zeros(&pmemb->dat[off], len);
 }
 
 static int _check_io(loff_t off, size_t len)
@@ -261,16 +262,20 @@ static struct toyfs_iblkref *iblkref_of(struct toyfs_list_head *itr)
 	return container_of(itr, struct toyfs_iblkref, head);
 }
 
+struct toyfs_list_head *toyfs_iblkrefs_list_of(struct toyfs_inode_info *tii)
+{
+	return &tii->ti->list_head;
+}
+
 static struct toyfs_iblkref *
 _fetch_iblkref(struct toyfs_inode_info *tii, loff_t off)
 {
 	struct toyfs_list_head *itr;
 	struct toyfs_list_head *iblkrefs;
 	struct toyfs_iblkref *iblkref;
-	struct toyfs_inode_reg *reg_ti = &tii->ti->ti.reg;
 	const loff_t boff = _off_to_boff(off);
 
-	iblkrefs = &reg_ti->r_iblkrefs;
+	iblkrefs = toyfs_iblkrefs_list_of(tii);
 	itr = iblkrefs->next;
 	while (itr != iblkrefs) {
 		iblkref = iblkref_of(itr);
@@ -287,10 +292,9 @@ _fetch_iblkref_from(struct toyfs_inode_info *tii, loff_t off)
 	struct toyfs_list_head *itr;
 	struct toyfs_list_head *iblkrefs;
 	struct toyfs_iblkref *iblkref;
-	struct toyfs_inode_reg *reg_ti = &tii->ti->ti.reg;
 	const loff_t boff = _off_to_boff(off);
 
-	iblkrefs = &reg_ti->r_iblkrefs;
+	iblkrefs = toyfs_iblkrefs_list_of(tii);
 	itr = iblkrefs->next;
 	while (itr != iblkrefs) {
 		iblkref = iblkref_of(itr);
@@ -301,25 +305,28 @@ _fetch_iblkref_from(struct toyfs_inode_info *tii, loff_t off)
 	return NULL;
 }
 
-
-static struct toyfs_page *_fetch_page(struct toyfs_inode_info *tii, loff_t off)
+static struct toyfs_pmemb *
+_fetch_pmemb_by_offset(struct toyfs_inode_info *tii, loff_t off)
 {
 	struct toyfs_iblkref *iblkref;
-	struct toyfs_page *page = NULL;
 
 	iblkref = _fetch_iblkref(tii, off);
-	if (iblkref)
-		page = toyfs_bn2page(tii->sbi, iblkref->dblkref->bn);
-	return page;
+	return iblkref ? toyfs_bn2pmemb(tii->sbi, iblkref->dblkref->bn) : NULL;
 }
 
-static int
-_read(struct toyfs_inode_info *tii, void *buf, loff_t off, size_t len)
+struct toyfs_pmemb *
+toyfs_resolve_pmemb(struct toyfs_inode_info *tii, loff_t off)
+{
+	return _fetch_pmemb_by_offset(tii, off);
+}
+
+static ssize_t _read(struct toyfs_inode_info *tii,
+		     void *buf, loff_t off, size_t len)
 {
 	int err;
 	size_t cnt = 0;
 	loff_t end, nxt;
-	struct toyfs_page *page;
+	struct toyfs_pmemb *pmemb;
 
 	DBG("read: ino=%ld off=%ld len=%lu\n", tii->ino, off, len);
 
@@ -327,13 +334,13 @@ _read(struct toyfs_inode_info *tii, void *buf, loff_t off, size_t len)
 	if (err)
 		return err;
 
-	end = _tin_offset(off, len, tii->ti->zi.i_size);
+	end = _tin_offset(off, len, tii->ti->i_size);
 	while (off < end) {
-		page = _fetch_page(tii, off);
+		pmemb = _fetch_pmemb_by_offset(tii, off);
 		nxt = _next_page(off);
 		len = _nbytes_in_range(off, nxt, end);
-		if (page)
-			_copy_out(buf, page, _off_in_page(off), len);
+		if (pmemb)
+			_copy_out(buf, pmemb, _off_in_page(off), len);
 		else
 			_fill_zeros(buf, len);
 
@@ -342,81 +349,38 @@ _read(struct toyfs_inode_info *tii, void *buf, loff_t off, size_t len)
 		buf = _advance(buf, len);
 	}
 
-	/* TODO: Output result? */
-	return 0;
+	return (ssize_t)cnt;
 }
 
 int toyfs_read(void *buf, struct zufs_ioc_IO *ioc_io)
 {
-	return _read(Z2II(ioc_io->zus_ii), buf,
-		     (loff_t)ioc_io->filepos, ioc_io->hdr.len);
-}
+	ssize_t ret;
 
-int toyfs_get_block(struct zus_inode_info *zii,
-		    struct zufs_ioc_IO *get_block)
-{
-	int err = 0;
-	const size_t blkidx = get_block->filepos / PAGE_SIZE;
-	struct toyfs_inode_info *tii = Z2II(zii);
+	ret = _read(Z2II(ioc_io->zus_ii), buf,
+		    (loff_t)ioc_io->filepos, ioc_io->hdr.len);
+	if (unlikely(ret < 0))
+		return ret;
 
-	if (!zi_isreg(tii->zii.zi))
-		return -ENOTSUP;
-
-	if (!blkidx)
-		return -EINVAL;
-
-	/* TODO: FIXME */
-#if 0
-	off = (loff_t)(blkidx * PAGE_SIZE);
-	page = _fetch_page(tii, off);
-	if (page) {
-		get_block->pmem_bn = toyfs_addr2bn(tii->sbi, page);
-		get_block->ret_flags = 0;
-		DBG("get_block(exists): ino=%ld off=%ld pmem_bn=%ld\n",
-		    tii->ino, (long)off, (long)get_block->pmem_bn);
-		goto out;
-	} else if (get_block->rw) {
-		iblkref = _require_iblkref(tii, off);
-		if (iblkref) {
-			get_block->pmem_bn = iblkref->dblkref->bn;
-			get_block->ret_flags = ZUFS_GBF_NEW;
-			DBG("get_block(wr): ino=%ld off=%ld pmem_bn=%ld\n",
-			    tii->ino, (long)off, (long)get_block->pmem_bn);
-		} else {
-			ERROR("get_block(new): ino=%ld off=%ld FAILED\n",
-			      tii->ino, (long)off);
-			err = -ENOSPC;
-		}
-	} else {
-		get_block->pmem_bn = 0;
-		get_block->ret_flags = 0;
-		DBG("get_block(rd): ino=%ld off=%ld pmem_bn=%ld\n",
-		    tii->ino, (long)off, (long)get_block->pmem_bn);
-	}
-out:
-#endif
-	return err;
-}
-
-int toyfs_put_block(struct zus_inode_info *zii, struct zufs_ioc_IO *get_block)
-{
-	/* TODO: Complete */
-	(void)zii;
-	(void)get_block;
+	ioc_io->last_pos = ioc_io->filepos + ret;
 	return 0;
+}
+
+int toyfs_pre_read(void *buf, struct zufs_ioc_IO *ioc_io)
+{
+	return toyfs_read(buf, ioc_io);
 }
 
 static void _clone_data(struct toyfs_sb_info *sbi,
 			struct toyfs_dblkref *dst_dblkref,
 			const struct toyfs_dblkref *src_dblkref)
 {
-	struct toyfs_page *dst_page;
-	const struct toyfs_page *src_page;
+	struct toyfs_pmemb *dst_pmemb;
+	const struct toyfs_pmemb *src_pmemb;
 
 	toyfs_sbi_lock(sbi);
-	dst_page = toyfs_bn2page(sbi, dst_dblkref->bn);
-	src_page = toyfs_bn2page(sbi, src_dblkref->bn);
-	_copy_page(dst_page, src_page);
+	dst_pmemb = toyfs_bn2pmemb(sbi, dst_dblkref->bn);
+	src_pmemb = toyfs_bn2pmemb(sbi, src_dblkref->bn);
+	_copy_pmemb(dst_pmemb, src_pmemb);
 	toyfs_sbi_unlock(sbi);
 }
 
@@ -427,10 +391,9 @@ _require_iblkref(struct toyfs_inode_info *tii, loff_t off)
 	struct toyfs_dblkref *dblkref;
 	struct toyfs_iblkref *iblkref = NULL;
 	struct toyfs_list_head *iblkrefs;
-	struct toyfs_inode_reg *reg_ti = &tii->ti->ti.reg;
 	const loff_t boff = _off_to_boff(off);
 
-	iblkrefs = &reg_ti->r_iblkrefs;
+	iblkrefs = toyfs_iblkrefs_list_of(tii);
 	itr = iblkrefs->next;
 	while (itr != iblkrefs) {
 		iblkref = iblkref_of(itr);
@@ -458,14 +421,22 @@ _require_iblkref(struct toyfs_inode_info *tii, loff_t off)
 	return iblkref;
 }
 
-static int
-_write(struct toyfs_inode_info *tii, void *buf, loff_t off, size_t len)
+uint64_t toyfs_require_pmem_bn(struct toyfs_inode_info *tii, loff_t off)
+{
+	struct toyfs_iblkref *iblkref;
+
+	iblkref = _require_iblkref(tii, off);
+	return iblkref ? iblkref->dblkref->bn : 0;
+}
+
+static ssize_t _write(struct toyfs_inode_info *tii,
+		      void *buf, loff_t off, size_t len)
 {
 	int err;
 	size_t cnt = 0;
 	loff_t end, nxt, from = off;
 	struct toyfs_iblkref *iblkref;
-	struct toyfs_page *page = NULL;
+	struct toyfs_pmemb *pmemb = NULL;
 
 	from = off;
 	DBG("write: ino=%ld off=%ld len=%lu\n", tii->ino, off, len);
@@ -479,25 +450,33 @@ _write(struct toyfs_inode_info *tii, void *buf, loff_t off, size_t len)
 		iblkref = _require_iblkref(tii, off);
 		if (!iblkref)
 			return -ENOSPC;
-		page = toyfs_bn2page(tii->sbi, iblkref->dblkref->bn);
+		pmemb = toyfs_bn2pmemb(tii->sbi, iblkref->dblkref->bn);
 
 		nxt = _next_page(off);
 		len = _nbytes_in_range(off, nxt, end);
-		_copy_in(page, buf, _off_in_page(off), len);
+		_copy_in(pmemb, buf, _off_in_page(off), len);
 
 		cnt += len;
 		off = nxt;
 		buf = _advance(buf, len);
 	}
-	tii->zii.zi->i_size =
-		(size_t)_max_offset(from, cnt, tii->zii.zi->i_size);
-	return page ? 0 : -ENOSPC;
+	tii->ti->i_size =
+		(size_t)_max_offset(from, cnt, tii->ti->i_size);
+
+	return (ssize_t)cnt;
 }
 
 int toyfs_write(void *buf, struct zufs_ioc_IO *ioc_io)
 {
-	return _write(Z2II(ioc_io->zus_ii), buf,
-		      (loff_t)ioc_io->filepos, ioc_io->hdr.len);
+	ssize_t ret;
+
+	ret = _write(Z2II(ioc_io->zus_ii), buf,
+		     (loff_t)ioc_io->filepos, ioc_io->hdr.len);
+	if (unlikely(ret < 0))
+		return ret;
+
+	ioc_io->last_pos = ioc_io->filepos + ret;
+	return 0;
 }
 
 static void _zero_range_at(struct toyfs_inode_info *tii,
@@ -506,16 +485,16 @@ static void _zero_range_at(struct toyfs_inode_info *tii,
 {
 	size_t plen;
 	loff_t poff, pnxt;
-	struct toyfs_page *page;
+	struct toyfs_pmemb *pmemb;
 
 	DBG("zero range: ino=%lu off=%ld len=%lu bn=%lu\n",
 	    tii->ino, off, len, iblkref->dblkref->bn);
-	page = toyfs_bn2page(tii->sbi, iblkref->dblkref->bn);
+	pmemb = toyfs_bn2pmemb(tii->sbi, iblkref->dblkref->bn);
 
 	poff = _off_in_page(off);
 	pnxt = _next_page(poff);
 	plen = _nbytes_in_range(poff, pnxt, poff + (loff_t)len);
-	_assign_zeros(page, poff, plen);
+	_assign_zeros(pmemb, poff, plen);
 }
 
 static void _punch_hole_at(struct toyfs_inode_info *tii,
@@ -553,7 +532,7 @@ static int _zero_range(struct toyfs_inode_info *tii, loff_t from, size_t nbytes)
 	loff_t off, end, nxt;
 	struct toyfs_list_head *itr;
 	struct toyfs_iblkref *iblkref;
-	struct toyfs_list_head *iblkrefs = &tii->ti->ti.reg.r_iblkrefs;
+	struct toyfs_list_head *iblkrefs = toyfs_iblkrefs_list_of(tii);
 
 	off = from;
 	end = off + (loff_t)nbytes;
@@ -580,13 +559,13 @@ static int _collapse_range(struct toyfs_inode_info *tii,
 	int err;
 	struct toyfs_list_head *itr;
 	struct toyfs_iblkref *iblkref;
-	struct toyfs_list_head *iblkrefs = &tii->ti->ti.reg.r_iblkrefs;
+	struct toyfs_list_head *iblkrefs = toyfs_iblkrefs_list_of(tii);
 
 	err = _punch_hole(tii, from, nbytes);
 	if (err)
 		return err;
 	if (nbytes <= tii->zii.zi->i_size)
-		tii->zii.zi->i_size -= nbytes;
+		tii->ti->i_size -= nbytes;
 	iblkref = _fetch_iblkref_from(tii, from);
 	if (iblkref) {
 		itr = &iblkref->head;
@@ -620,8 +599,8 @@ static int _falloc_range(struct toyfs_inode_info *tii,
 		off = nxt;
 	}
 
-	tii->zii.zi->i_size =
-		(size_t)_max_offset(from, cnt, tii->zii.zi->i_size);
+	tii->ti->i_size =
+		(size_t)_max_offset(from, cnt, tii->ti->i_size);
 	return 0;
 }
 
@@ -664,13 +643,13 @@ static int _seek_block(struct toyfs_inode_info *tii, loff_t from,
 		       bool seek_exist, loff_t *out_off)
 {
 	loff_t off, end;
-	const struct toyfs_page *page;
+	const struct toyfs_pmemb *pmemb;
 
 	off = from;
-	end = tii->zii.zi->i_size;
+	end = tii->ti->i_size;
 	while (off < end) {
-		page = _fetch_page(tii, off);
-		if ((page && seek_exist) || (!page && !seek_exist)) {
+		pmemb = _fetch_pmemb_by_offset(tii, off);
+		if ((pmemb && seek_exist) || (!pmemb && !seek_exist)) {
 			*out_off = off;
 			break;
 		}
@@ -725,8 +704,7 @@ static void _drop_range(struct toyfs_inode_info *tii, loff_t pos)
 {
 	struct toyfs_list_head *itr;
 	struct toyfs_iblkref *iblkref = NULL;
-	struct toyfs_inode_reg *reg_ti = &tii->ti->ti.reg;
-	struct toyfs_list_head *iblkrefs = &reg_ti->r_iblkrefs;
+	struct toyfs_list_head *iblkrefs = toyfs_iblkrefs_list_of(tii);
 
 	if (pos % PAGE_SIZE)
 		pos = _next_page(pos);
@@ -745,7 +723,7 @@ static int _zero_after(struct toyfs_inode_info *tii, loff_t pos)
 {
 	loff_t poff;
 	struct toyfs_iblkref *iblkref;
-	struct toyfs_page *page;
+	struct toyfs_pmemb *pmemb;
 
 	if (!(pos % PAGE_SIZE))
 		return 0;
@@ -754,12 +732,12 @@ static int _zero_after(struct toyfs_inode_info *tii, loff_t pos)
 	if (!iblkref)
 		return 0;
 
-	page = _unique_page(tii->sbi, iblkref);
-	if (!page)
+	pmemb = _unique_pmemb(tii->sbi, iblkref);
+	if (!pmemb)
 		return -ENOSPC;
 
 	poff = _off_in_page(pos);
-	_assign_zeros(page, poff, PAGE_SIZE - poff);
+	_assign_zeros(pmemb, poff, PAGE_SIZE - poff);
 	return 0;
 }
 
@@ -790,8 +768,8 @@ static int _clone_entire_file_range(struct toyfs_inode_info *src_tii,
 	struct toyfs_iblkref *src_iblkref, *dst_iblkref;
 	struct zus_inode *src_zi = src_tii->zii.zi;
 	struct zus_inode *dst_zi = dst_tii->zii.zi;
-	struct toyfs_list_head *src_iblkrefs = &src_tii->ti->ti.reg.r_iblkrefs;
-	struct toyfs_list_head *dst_iblkrefs = &dst_tii->ti->ti.reg.r_iblkrefs;
+	struct toyfs_list_head *src_iblkrefs = toyfs_iblkrefs_list_of(src_tii);
+	struct toyfs_list_head *dst_iblkrefs = toyfs_iblkrefs_list_of(dst_tii);
 
 	_drop_range(dst_tii, 0);
 
@@ -817,27 +795,27 @@ static int _clone_entire_file_range(struct toyfs_inode_info *src_tii,
 	return 0;
 }
 
-static struct toyfs_page *
-_unique_page(struct toyfs_sb_info *sbi, struct toyfs_iblkref *iblkref)
+static struct toyfs_pmemb *
+_unique_pmemb(struct toyfs_sb_info *sbi, struct toyfs_iblkref *iblkref)
 {
-	struct toyfs_page *page, *new_page;
+	struct toyfs_pmemb *pmemb, *new_pmemb;
 	struct toyfs_dblkref *dblkref = iblkref->dblkref;
 
-	page = toyfs_bn2page(sbi, dblkref->bn);
+	pmemb = toyfs_bn2pmemb(sbi, dblkref->bn);
 	if (dblkref->refcnt > 1) {
 		dblkref = _new_dblkref(sbi);
 		if (!dblkref)
 			return NULL;
-		new_page = toyfs_bn2page(sbi, dblkref->bn);
-		toyfs_assert(new_page != NULL);
+		new_pmemb = toyfs_bn2pmemb(sbi, dblkref->bn);
+		toyfs_assert(new_pmemb != NULL);
 
-		_copy_page(new_page, page);
+		_copy_pmemb(new_pmemb, pmemb);
 
 		iblkref->dblkref->refcnt--;
 		iblkref->dblkref = dblkref;
-		page = new_page;
+		pmemb = new_pmemb;
 	}
-	return page;
+	return pmemb;
 }
 
 static void _share_page(struct toyfs_sb_info *sbi,
@@ -867,7 +845,7 @@ static int _clone_range(struct toyfs_inode_info *src_tii,
 			loff_t src_off, loff_t dst_off, size_t len)
 {
 	size_t size;
-	struct toyfs_page *dst_page;
+	struct toyfs_pmemb *dst_pmemb;
 	struct toyfs_iblkref *dst_iblkref, *src_iblkref;
 	struct toyfs_sb_info *sbi = dst_tii->sbi;
 	struct zus_inode *dst_zi = dst_tii->zii.zi;
@@ -885,10 +863,10 @@ static int _clone_range(struct toyfs_inode_info *src_tii,
 		dst_iblkref = _fetch_iblkref(dst_tii, dst_off);
 		if (!dst_iblkref)
 			return 0;
-		dst_page = _unique_page(sbi, dst_iblkref);
-		if (!dst_page)
+		dst_pmemb = _unique_pmemb(sbi, dst_iblkref);
+		if (!dst_pmemb)
 			return -ENOSPC;
-		_assign_zeros(dst_page, _off_in_page(dst_off), len);
+		_assign_zeros(dst_pmemb, _off_in_page(dst_off), len);
 	}
 	size = (size_t)dst_off + len;
 	if (size > dst_zi->i_size)

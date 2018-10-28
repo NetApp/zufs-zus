@@ -22,45 +22,196 @@
 
 static mode_t _mode_of(const struct toyfs_inode_info *tii)
 {
-	return tii->ti->zi.i_mode;
+	return tii->ti->i_mode;
 }
 
-static loff_t _next_doff(struct toyfs_inode_info *dir_tii)
+static size_t _namelen_to_nde(const struct toyfs_dirent *de, size_t nlen)
 {
-	loff_t off, *d_off_max = &dir_tii->ti->ti.dir.d_off_max;
+	size_t nde = 1;
+	const size_t base = sizeof(de->d_name);
+	const size_t desz = sizeof(*de);
 
-	off = __atomic_fetch_add(d_off_max, 1, __ATOMIC_CONSUME);
-	return off * PAGE_SIZE;
+	if (nlen > base)
+		nde += (nlen - base + desz - 1) / desz;
+
+	return nde;
 }
 
 static void _set_dirent(struct toyfs_dirent *dirent,
 			const char *name, size_t nlen,
 			const struct toyfs_inode_info *tii, loff_t off)
 {
-	toyfs_assert(nlen < sizeof(dirent->d_name));
+	const size_t nde = _namelen_to_nde(NULL, nlen);
 
-	memset(dirent, 0, sizeof(*dirent)); /* TODO: rm */
-	toyfs_list_init(&dirent->d_head);
+	memset(dirent, 0, nde * sizeof(*dirent));
+	memcpy(dirent->d_name, name, nlen);
 	dirent->d_nlen = nlen;
 	dirent->d_ino = tii->ino;
 	dirent->d_type = IFTODT(_mode_of(tii));
 	dirent->d_off = off;
-	strncpy(dirent->d_name, name, nlen);
 }
 
-void toyfs_add_dirent(struct toyfs_inode_info *dir_tii,
-		      struct toyfs_inode_info *tii, struct zufs_str *str,
-		      struct toyfs_dirent *dirent)
+static bool _is_active(const struct toyfs_dirent *dirent)
 {
-	loff_t doff;
-	struct toyfs_list_head *childs = &dir_tii->ti->ti.dir.d_childs;
+	return (dirent->d_nlen > 0) && (dirent->d_ino != 0);
+}
 
-	doff = _next_doff(dir_tii);
-	_set_dirent(dirent, str->name, str->len, tii, doff);
-	toyfs_list_add_tail(&dirent->d_head, childs);
-	dir_tii->ti->ti.dir.d_ndentry++;
-	dir_tii->ti->zi.i_size = (size_t)(doff + PAGE_SIZE + 2);
+struct toyfs_list_head *toyfs_childs_list_of(struct toyfs_inode_info *dir_tii)
+{
+	struct toyfs_inode *ti = dir_tii->ti;
+
+	return &ti->list_head;
+}
+
+static int _hasname(const struct toyfs_dirent *dirent,
+		    const struct zufs_str *str)
+{
+	return (dirent->d_nlen == str->len) &&
+	       !strncmp(dirent->d_name, str->name, dirent->d_nlen);
+}
+
+static struct toyfs_dentries *_dentries_of(struct toyfs_list_head *head)
+{
+	return container_of(head, struct toyfs_dentries, head);
+}
+
+static struct toyfs_dirent *_next_dirent(struct toyfs_dirent *de)
+{
+	size_t step;
+
+	step = _is_active(de) ? _namelen_to_nde(de, de->d_nlen) : 1;
+	return de + step;
+}
+
+static size_t _count_free_de(const struct toyfs_dirent *itr,
+			     const struct toyfs_dirent *end)
+{
+	size_t count = 0;
+
+	while (itr < end) {
+		if (itr->d_nlen)
+			break;
+		++count;
+		++itr;
+	}
+	return count;
+}
+
+static struct toyfs_dirent *
+_search_free(struct toyfs_dentries *dentries, size_t nlen)
+{
+	size_t count, required = _namelen_to_nde(NULL, nlen);
+	struct toyfs_dirent *itr = &dentries->de[0];
+	struct toyfs_dirent *end = itr + ARRAY_SIZE(dentries->de);
+
+	while (itr < end) {
+		count = _count_free_de(itr, end);
+		if (count >= required)
+			return itr;
+		itr += count ? count : _namelen_to_nde(itr, itr->d_nlen);
+	}
+	return NULL;
+}
+
+static struct toyfs_dirent *
+_find_dirent(struct toyfs_dentries *dentries, const struct zufs_str *str)
+{
+	struct toyfs_dirent *itr = &dentries->de[0];
+	struct toyfs_dirent *end = itr + ARRAY_SIZE(dentries->de);
+
+	while (itr < end) {
+		if (_hasname(itr, str))
+			return itr;
+		itr = _next_dirent(itr);
+	}
+	return NULL;
+}
+
+static void _reset_dirent(struct toyfs_dirent *de)
+{
+	const size_t nde = _namelen_to_nde(de, de->d_nlen);
+
+	toyfs_assert(de->d_nlen > 0);
+	memset(de, 0, nde * sizeof(*de));
+}
+
+struct toyfs_dirent *toyfs_lookup_dirent(struct toyfs_inode_info *dir_tii,
+		const struct zufs_str *str)
+{
+	struct toyfs_dirent *dirent;
+	struct toyfs_list_head *childs, *itr;
+
+	childs = toyfs_childs_list_of(dir_tii);
+	itr = childs->next;
+	while (itr != childs) {
+		dirent = _find_dirent(_dentries_of(itr), str);
+		if (dirent != NULL)
+			return dirent;
+		itr = itr->next;
+	}
+	return NULL;
+}
+
+static struct toyfs_dirent *
+_acquire_dirent(struct toyfs_inode_info *dir_tii, size_t nlen)
+{
+	int64_t d_off = 2;
+	struct toyfs_dirent *dirent;
+	struct toyfs_list_head *childs, *itr;
+	struct toyfs_pmemb *pmemb;
+	struct toyfs_dentries *dentries;
+
+	childs = toyfs_childs_list_of(dir_tii);
+	itr = childs->next;
+	while (itr != childs) {
+		dentries = _dentries_of(itr);
+		dirent = _search_free(dentries, nlen);
+		if (dirent != NULL) {
+			d_off += dirent - dentries->de;
+			goto out;
+		}
+		itr = itr->next;
+		d_off += ARRAY_SIZE(dentries->de);
+	}
+
+	pmemb = toyfs_acquire_pmemb(dir_tii->sbi);
+	if (!pmemb)
+		return NULL;
+
+	dir_tii->ti->i_blocks += 1;
+
+	dentries = (struct toyfs_dentries *)pmemb;
+	toyfs_list_add_tail(&dentries->head, childs);
+	dirent = dentries->de;
+
+out:
+	dirent->d_off = d_off;
+	return dirent;
+}
+
+static void _add_dirent(struct toyfs_inode_info *dir_tii,
+			struct toyfs_inode_info *tii, struct zufs_str *str,
+			struct toyfs_dirent *dirent)
+{
+	_set_dirent(dirent, str->name, str->len, tii, dirent->d_off);
+	/* Can not inc/dec by 1 because readdir will fail (it checks i_size) */
+	dir_tii->ti->i_size += PAGE_SIZE;
 	zus_std_add_dentry(dir_tii->zii.zi, tii->zii.zi);
+}
+
+int toyfs_add_dirent(struct toyfs_inode_info *dir_tii,
+		     struct toyfs_inode_info *tii, struct zufs_str *str,
+		     struct toyfs_dirent **out_dirent)
+{
+	struct toyfs_dirent *dirent;
+
+	dirent = _acquire_dirent(dir_tii, str->len);
+	if (!dirent)
+		return -ENOSPC;
+
+	_add_dirent(dir_tii, tii, str, dirent);
+	*out_dirent = dirent;
+	return 0;
 }
 
 int toyfs_add_dentry(struct zus_inode_info *dir_zii,
@@ -75,40 +226,25 @@ int toyfs_add_dentry(struct zus_inode_info *dir_zii,
 	DBG("add_dentry: dirino=%lu %.*s ino=%lu mode=%o\n",
 	    dirino, str->len, str->name, ino, _mode_of(tii));
 
-	dirent = toyfs_acquire_dirent(dir_tii->sbi);
-	if (!dirent)
-		return -ENOSPC;
-
-	toyfs_add_dirent(dir_tii, tii, str, dirent);
-
-	DBG("add_dentry: dirino=%lu dirnlink=%u dirsize=%ld "
-	    "%.*s ino=%lu nlink=%d\n", dirino, dir_tii->zii.zi->i_nlink,
-	    (long)dir_tii->ti->zi.i_size, str->len, str->name,
-	    ino, (int)tii->zii.zi->i_nlink);
-	if (zi_islnk(tii->zii.zi))
-		DBG("add_dentry: symlnk=%s\n", toyfs_symlink_value(tii));
-	return 0;
+	return toyfs_add_dirent(dir_tii, tii, str, &dirent);
 }
 
 void toyfs_remove_dirent(struct toyfs_inode_info *dir_tii,
 			 struct toyfs_inode_info *tii,
 			 struct toyfs_dirent *dirent)
 {
-	toyfs_list_del(&dirent->d_head);
-	dir_tii->ti->ti.dir.d_ndentry--;
+	_reset_dirent(dirent);
+	dir_tii->ti->i_size -= PAGE_SIZE;
 	zus_std_remove_dentry(dir_tii->zii.zi, tii->zii.zi);
 }
 
 int toyfs_remove_dentry(struct zus_inode_info *dir_zii,
 			struct zus_inode_info *zii, struct zufs_str *str)
 {
-	ino_t ino;
-	mode_t mode;
-	struct toyfs_dirent *dirent;
-	struct toyfs_inode_info *tii;
 	struct zus_inode *zi;
-	const char *symval;
+	struct toyfs_dirent *dirent;
 	struct toyfs_inode_info *dir_tii = Z2II(dir_zii);
+	struct toyfs_inode_info *tii = Z2II(zii);
 
 	DBG("remove_dentry: dirino=%lu %.*s\n",
 	    dir_tii->ino, str->len, str->name);
@@ -117,32 +253,19 @@ int toyfs_remove_dentry(struct zus_inode_info *dir_zii,
 	if (!dirent)
 		return -ENOENT;
 
-	ino = dirent->d_ino;
-	tii = toyfs_find_inode(dir_tii->sbi, ino);
-	toyfs_assert(tii == Z2II(zii));
-	if (!tii)
-		return -ENOENT;
-
 	zi = tii->zii.zi;
-	if (zi_isdir(zi) && tii->ti->ti.dir.d_ndentry)
+	if (zi_isdir(zi) && tii->ti->i_size)
 		return -ENOTEMPTY;
 
-	if (zi_islnk(zi)) {
-		symval = toyfs_symlink_value(tii);
-		DBG("remove_dentry(symlnk): ino=%lu symlnk=%s\n", ino, symval);
-	} else {
-		mode = zi->i_mode;
-		DBG("remove_dentry: ino=%lu mode=%o\n", ino, mode);
-	}
+	DBG("remove_dentry: ino=%lu mode=%o\n", dirent->d_ino, zi->i_mode);
 
 	toyfs_remove_dirent(dir_tii, tii, dirent);
-	toyfs_release_dirent(dir_tii->sbi, dirent);
 
 	/*
 	 * XXX: Force free_inode by setting i_nlink to 0
 	 * TODO: Maybe in zus? Maybe in zuf?
 	 */
-	if (zi_isdir(zi) && (zi->i_nlink == 1) && !tii->ti->ti.dir.d_ndentry)
+	if (zi_isdir(zi) && (zi->i_nlink == 1) && !tii->ti->i_size)
 		zi->i_nlink = 0;
 
 	return 0;
@@ -202,36 +325,52 @@ static bool _emit(struct toyfs_dir_context *ctx, const char *name,
 static bool _emit_dirent(struct toyfs_dir_context *ctx,
 			 const struct toyfs_dirent *dirent)
 {
-	ctx->pos = dirent->d_off;
-	return _emit(ctx, dirent->d_name, dirent->d_nlen,
-		     dirent->d_ino, dirent->d_type);
+	bool ok;
+
+	ok = _emit(ctx, dirent->d_name, dirent->d_nlen,
+		   dirent->d_ino, dirent->d_type);
+	if (ok)
+		ctx->pos = (dirent->d_off + 1);
+	return ok;
+}
+
+static bool _iterate_dentries(struct toyfs_dentries *dentries,
+			      struct toyfs_dir_context *ctx)
+{
+	bool ok = true;
+	struct toyfs_dirent *itr = &dentries->de[0];
+	struct toyfs_dirent *end = itr + ARRAY_SIZE(dentries->de);
+
+	while ((itr < end) && ok) {
+		if (itr->d_nlen && (itr->d_off >= ctx->pos))
+			ok = _emit_dirent(ctx, itr);
+		itr = _next_dirent(itr);
+	}
+	return ok;
 }
 
 static bool _iterate_dir(struct toyfs_inode_info *dir_tii,
 			 struct toyfs_dir_context *ctx)
 {
 	bool ok = true;
-	struct toyfs_dirent *dirent;
 	struct toyfs_list_head *itr, *childs;
 	struct toyfs_inode *dir_ti = dir_tii->ti;
 
 	if (ctx->pos == 0) {
-		ok = _emit(ctx, ".", 1, dir_ti->zi.i_ino, DT_DIR);
+		ok = _emit(ctx, ".", 1, dir_ti->i_ino, DT_DIR);
 		ctx->pos = 1;
 	}
 	if ((ctx->pos == 1) && ok) {
-		ok = _emit(ctx, "..", 2, dir_ti->i_parent_ino, DT_DIR);
+		ok = _emit(ctx, "..", 2, dir_ti->i_dir.parent, DT_DIR);
 		ctx->pos = 2;
 	}
-	childs = &dir_ti->ti.dir.d_childs;
+	childs = toyfs_childs_list_of(dir_tii);
 	itr = childs->next;
-	while ((itr != childs) && ok) {
-		dirent = container_of(itr, struct toyfs_dirent, d_head);
+	while (itr != childs) {
+		ok = _iterate_dentries(_dentries_of(itr), ctx);
+		if (!ok)
+			break;
 		itr = itr->next;
-		if (dirent->d_off >= ctx->pos) {
-			ok = _emit_dirent(ctx, dirent);
-			ctx->pos = dirent->d_off + 1;
-		}
 	}
 	return (itr != childs);
 }
@@ -239,7 +378,6 @@ static bool _iterate_dir(struct toyfs_inode_info *dir_tii,
 int toyfs_iterate_dir(struct toyfs_inode_info *dir_tii,
 		      struct zufs_ioc_readdir *zir, void *buf)
 {
-
 	struct toyfs_getdents_ctx ctx;
 
 	_init_getdents_ctx(&ctx, dir_tii, zir, buf);
@@ -253,4 +391,29 @@ int toyfs_iterate_dir(struct toyfs_inode_info *dir_tii,
 int toyfs_readdir(void *app_ptr, struct zufs_ioc_readdir *zir)
 {
 	return toyfs_iterate_dir(Z2II(zir->dir_ii), zir, app_ptr);
+}
+
+void toyfs_release_dir(struct toyfs_inode_info *dir_tii)
+{
+	struct toyfs_list_head *itr, *next, *childs;
+	struct toyfs_dentries *dentries;
+	struct toyfs_pmemb *pmemb;
+
+	childs = toyfs_childs_list_of(dir_tii);
+	itr = childs->next;
+	while (itr != childs) {
+		toyfs_assert(dir_tii->ti->i_blocks > 0);
+
+		dentries = _dentries_of(itr);
+		next = itr->next;
+		pmemb = (struct toyfs_pmemb *)dentries;
+
+		toyfs_list_del(itr);
+		toyfs_release_pmemb(dir_tii->sbi, pmemb);
+
+		dir_tii->ti->i_blocks -= 1;
+		itr = next;
+	}
+
+	toyfs_assert(dir_tii->ti->i_blocks == 0);
 }

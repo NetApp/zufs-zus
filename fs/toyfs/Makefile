@@ -17,7 +17,7 @@ TOYMKFS_OBJS := $(TOYFS_DIR)objs/mkfs.o
 TOYMKFS_FLAGS := -I $(ZDIR) -L$(ZDIR) -luuid -lzus
 
 ZM_NAME := toyfs
-ZM_OBJS := common.o super.o inode.o dir.o namei.o symlink.o file.o
+ZM_OBJS := common.o super.o inode.o dir.o namei.o symlink.o file.o xattr.o mmap.o
 ZM_LIBS := uuid
 ZM_PRE_BUILD := mkfs.toyfs
 ZM_PRE_CLEAN := mkfs.toyfs_clean

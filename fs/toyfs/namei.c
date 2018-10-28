@@ -11,6 +11,8 @@
  */
 
 #define _GNU_SOURCE
+#include <sys/types.h>
+#include <linux/fs.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
@@ -21,30 +23,6 @@
 #include "zus.h"
 #include "toyfs.h"
 
-static int _hasname(const struct toyfs_dirent *dirent,
-		    const struct zufs_str *str)
-{
-	return (dirent->d_nlen == str->len) &&
-	       !strncmp(dirent->d_name, str->name, dirent->d_nlen);
-}
-
-struct toyfs_dirent *
-toyfs_lookup_dirent(struct toyfs_inode_info *dir_tii,
-		    struct zufs_str *str)
-{
-	struct toyfs_dirent *dirent;
-	struct toyfs_list_head *childs, *itr;
-
-	childs = &dir_tii->ti->ti.dir.d_childs;
-	itr = childs->next;
-	while (itr != childs) {
-		dirent = container_of(itr, struct toyfs_dirent, d_head);
-		if (_hasname(dirent, str))
-			return dirent;
-		itr = itr->next;
-	}
-	return NULL;
-}
 
 static ino_t _lookup(struct toyfs_inode_info *dir_tii, struct zufs_str *str)
 {
@@ -62,72 +40,16 @@ ulong toyfs_lookup(struct zus_inode_info *dir_zii, struct zufs_str *str)
 	return _lookup(Z2II(dir_zii), str);
 }
 
-static int _rename_inplace(struct toyfs_inode_info *dir_ii,
-			   struct toyfs_inode_info *ii,
-			   struct zufs_str *old_name,
-			   struct zufs_str *new_name)
-{
-	struct toyfs_dirent *dirent;
-
-	dirent = toyfs_lookup_dirent(dir_ii, old_name);
-	if (!dirent)
-		return -ENOENT;
-	if (dirent->d_ino != ii->ino)
-		return -EINVAL;
-
-	memcpy(dirent->d_name, new_name->name, new_name->len);
-	dirent->d_nlen = new_name->len;
-	dirent->d_name[dirent->d_nlen] = '\0';
-	return 0;
-}
-
-static int _rename_move(struct toyfs_inode_info *old_dir_ii,
-			struct toyfs_inode_info *new_dir_ii,
-			struct toyfs_inode_info *ii,
-			struct zufs_str *old_name,
-			struct zufs_str *new_name)
-{
-	struct toyfs_dirent *dirent;
-
-	dirent = toyfs_lookup_dirent(old_dir_ii, old_name);
-	if (!dirent)
-		return -ENOENT;
-	if (dirent->d_ino != ii->ino)
-		return -EINVAL;
-
-	toyfs_remove_dirent(old_dir_ii, ii, dirent);
-	toyfs_add_dirent(new_dir_ii, ii, new_name, dirent);
-	return 0;
-}
-
-static int _rename_replace(struct toyfs_inode_info *old_dir_ii,
-			   struct toyfs_inode_info *new_dir_ii,
-			   struct toyfs_inode_info *old_ii,
-			   struct toyfs_inode_info *new_ii,
-			   struct zufs_str *old_name,
-			   struct zufs_str *new_name)
+static int _do_rename(struct toyfs_inode_info *old_dir_ii,
+		      struct toyfs_inode_info *new_dir_ii,
+		      struct toyfs_inode_info *old_ii,
+		      struct toyfs_inode_info *new_ii,
+		      struct zufs_str *old_name,
+		      struct zufs_str *new_name,
+		      uint64_t time, uint flags)
 {
 	int err;
-
-	err = toyfs_add_dentry(&new_dir_ii->zii, &new_ii->zii, new_name);
-	if (err)
-		return err;
-	err = toyfs_remove_dentry(&old_dir_ii->zii, &old_ii->zii, old_name);
-	if (err)
-		return err;
-	return 0;
-}
-
-static int _rename(struct toyfs_inode_info *old_dir_ii,
-		   struct toyfs_inode_info *new_dir_ii,
-		   struct toyfs_inode_info *old_ii,
-		   struct toyfs_inode_info *new_ii,
-		   struct zufs_str *old_name,
-		   struct zufs_str *new_name,
-		   uint64_t time)
-{
-	int err;
-	struct toyfs_dirent *dirent;
+	struct toyfs_dirent *old_de, *new_de;
 
 	DBG("rename: olddir_ino=%lu newdir_ino=%lu "
 	    "old_name=%.*s new_name=%.*s time=%lu\n",
@@ -138,29 +60,29 @@ static int _rename(struct toyfs_inode_info *old_dir_ii,
 	if (!old_ii)
 		return -EINVAL;
 
-	dirent = toyfs_lookup_dirent(new_dir_ii, new_name);
-	if (dirent) {
-		if (!new_ii)
-			return -EINVAL;
-		err = _rename_replace(old_dir_ii, new_dir_ii, old_ii,
-				      new_ii, old_name, new_name);
+	if (flags)  /* RENAME_NOREPLACE | RENAME_EXCHANGE | RENAME_WHITEOUT */
+		return -ENOTSUP;
 
-	} else {
-		if (old_dir_ii->ino == new_dir_ii->ino)
-			err = _rename_inplace(old_dir_ii, old_ii,
-					      old_name, new_name);
-		else
-			err = _rename_move(old_dir_ii, new_dir_ii,
-					   old_ii, old_name, new_name);
+	old_de = toyfs_lookup_dirent(old_dir_ii, old_name);
+	if (unlikely(!old_de))
+		return -ENOENT;
+
+	new_de = toyfs_lookup_dirent(new_dir_ii, new_name);
+	if (!new_de) {
+		err = toyfs_add_dirent(new_dir_ii, old_ii, new_name, &new_de);
+		if (err)
+			return err;
 	}
-	if (err)
-		return err;
+	toyfs_remove_dirent(old_dir_ii, old_ii, old_de);
 
-	old_dir_ii->zii.zi->i_mtime = time;
-	old_dir_ii->zii.zi->i_ctime = time;
-	new_dir_ii->zii.zi->i_mtime = time;
-	new_dir_ii->zii.zi->i_ctime = time;
-	old_ii->zii.zi->i_ctime = time;
+	if (S_ISDIR(old_ii->ti->i_mode))
+		old_ii->ti->i_nlink += 1;
+
+	old_dir_ii->ti->i_mtime = time;
+	old_dir_ii->ti->i_ctime = time;
+	new_dir_ii->ti->i_mtime = time;
+	new_dir_ii->ti->i_ctime = time;
+	old_ii->ti->i_ctime = time;
 
 	return 0;
 }
@@ -168,19 +90,18 @@ static int _rename(struct toyfs_inode_info *old_dir_ii,
 int toyfs_rename(struct zufs_ioc_rename *zir)
 {
 	int err;
+	struct toyfs_inode_info *old_dir_ii = Z2II(zir->old_dir_ii);
+	struct toyfs_inode_info *new_dir_ii = Z2II(zir->new_dir_ii);
 	struct toyfs_inode_info *old_ii = Z2II(zir->old_zus_ii);
+	struct toyfs_inode_info *new_ii = Z2II(zir->new_zus_ii);
+	struct zufs_str *old_name = &zir->old_d_str;
+	struct zufs_str *new_name = &zir->new_d_str;
 
 	if (!old_ii)
 		return -EINVAL;
 
-	toyfs_sbi_lock(old_ii->sbi);
-	err = _rename(Z2II(zir->old_dir_ii),
-		      Z2II(zir->new_dir_ii),
-		      old_ii,
-		      Z2II(zir->new_zus_ii),
-		      &zir->old_d_str,
-		      &zir->new_d_str,
-		      zir->time);
-	toyfs_sbi_unlock(old_ii->sbi);
+	err = _do_rename(old_dir_ii, new_dir_ii,
+			 old_ii, new_ii, old_name, new_name,
+			 zir->time, zir->flags);
 	return err;
 }

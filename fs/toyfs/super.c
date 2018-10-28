@@ -26,47 +26,36 @@
 
 #define DBG_(fmt, ...)
 
-#define TOYFS_IMAGIC		(0x11E11F5)
-#define TOYFS_STATICASSERT(expr)	_Static_assert(expr, #expr)
-#define TOYFS_STATICASSERT_EQ(a, b)	TOYFS_STATICASSERT(a == b)
-#define TOYFS_STATICASSERT_SIZEOFPAGE(t) \
-	TOYFS_STATICASSERT_EQ(sizeof(t), PAGE_SIZE)
+#define TOYFS_IMAGIC			(0x11E11F5)
+
+#define TOYFS_INODES_PER_PAGE 	(PAGE_SIZE / sizeof(struct toyfs_inode))
+#define TOYFS_DBLKREFS_PER_PAGE	(PAGE_SIZE / sizeof(struct toyfs_dblkref))
+#define TOYFS_IBLKREFS_PER_PAGE	(PAGE_SIZE / sizeof(struct toyfs_iblkref))
+#define TOYFS_DIRENTS_PER_PAGE	(PAGE_SIZE / sizeof(struct toyfs_dirent))
 
 
-#define TOYFS_INODES_PER_PAGE \
-	(sizeof(struct toyfs_page) / sizeof(union toyfs_inode_head))
-
-#define TOYFS_DBLKREFS_PER_PAGE \
-	(sizeof(struct toyfs_page) / sizeof(struct toyfs_dblkref))
-
-#define TOYFS_IBLKREFS_PER_PAGE \
-	(sizeof(struct toyfs_page) / sizeof(struct toyfs_iblkref))
-
-#define TOYFS_DIRENTS_PER_PAGE \
-	(sizeof(struct toyfs_page) / sizeof(struct toyfs_dirent))
-
-union toyfs_pool_page {
-	struct toyfs_page page;
-	union toyfs_pool_page *next;
+union toyfs_pool_pmemb {
+	struct toyfs_pmemb pmemb;
+	union toyfs_pool_pmemb *next;
 };
 
-union toyfs_inodes_page {
-	struct toyfs_page page;
-	union toyfs_inode_head inodes[TOYFS_INODES_PER_PAGE];
+union toyfs_inodes_pmemb {
+	struct toyfs_pmemb pmemb;
+	struct toyfs_inode inodes[TOYFS_INODES_PER_PAGE];
 };
 
-union toyfs_dblkrefs_page {
-	struct toyfs_page page;
+union toyfs_dblkrefs_pmemb {
+	struct toyfs_pmemb pmemb;
 	struct toyfs_dblkref dblkrefs[TOYFS_DBLKREFS_PER_PAGE];
 };
 
-union toyfs_iblkrefs_page {
-	struct toyfs_page page;
+union toyfs_iblkrefs_pmemb {
+	struct toyfs_pmemb pmemb;
 	struct toyfs_iblkref iblkrefs[TOYFS_IBLKREFS_PER_PAGE];
 };
 
-union toyfs_dirents_page {
-	struct toyfs_page page;
+union toyfs_dirents_pmemb {
+	struct toyfs_pmemb pmemb;
 	struct toyfs_dirent dirents[TOYFS_DIRENTS_PER_PAGE];
 };
 
@@ -87,16 +76,21 @@ void *toyfs_bn2addr(struct toyfs_sb_info *sbi, size_t bn)
 	return md_baddr(md, bn);
 }
 
-struct toyfs_page *toyfs_bn2page(struct toyfs_sb_info *sbi, size_t bn)
+struct toyfs_pmemb *toyfs_bn2pmemb(struct toyfs_sb_info *sbi, size_t bn)
 {
-	return (struct toyfs_page *)toyfs_bn2addr(sbi, bn);
+	return (struct toyfs_pmemb *)toyfs_bn2addr(sbi, bn);
 }
 
-zu_dpp_t toyfs_page2dpp(struct toyfs_sb_info *sbi, struct toyfs_page *page)
+zu_dpp_t toyfs_page2dpp(struct toyfs_sb_info *sbi, struct toyfs_pmemb *page)
 {
 	struct multi_devices *md = &sbi->s_zus_sbi.md;
 
 	return pmem_dpp_t(md_addr_to_offset(md, page));
+}
+
+struct toyfs_pmemb *toyfs_dpp2pmemb(struct toyfs_sb_info *sbi, zu_dpp_t dpp)
+{
+	return toyfs_bn2pmemb(sbi, md_o2p(dpp));
 }
 
 void toyfs_sbi_lock(struct toyfs_sb_info *sbi)
@@ -107,6 +101,16 @@ void toyfs_sbi_lock(struct toyfs_sb_info *sbi)
 void toyfs_sbi_unlock(struct toyfs_sb_info *sbi)
 {
 	toyfs_mutex_unlock(&sbi->s_mutex);
+}
+
+void toyfs_lock_inodes(struct toyfs_sb_info *sbi)
+{
+	toyfs_mutex_lock(&sbi->s_inodes_lock);
+}
+
+void toyfs_unlock_inodes(struct toyfs_sb_info *sbi)
+{
+	toyfs_mutex_unlock(&sbi->s_inodes_lock);
 }
 
 struct toyfs_inode_info *toyfs_alloc_ii(struct toyfs_sb_info *sbi)
@@ -124,9 +128,8 @@ struct toyfs_inode_info *toyfs_alloc_ii(struct toyfs_sb_info *sbi)
 
 	memset(tii, 0, sizeof(*tii));
 	tii->imagic = TOYFS_IMAGIC;
-	tii->ref = 1;
+	tii->ref = 0;
 	tii->valid = true;
-	tii->next = NULL;
 	tii->sbi = sbi;
 	tii->zii.op = &toyfs_zii_op;
 	tii->zii.sbi = &sbi->s_zus_sbi;
@@ -150,18 +153,13 @@ struct zus_inode_info *toyfs_zii_alloc(struct zus_sb_info *zsbi)
 	return tii ? &tii->zii : NULL;
 }
 
-void toyfs_zii_free(struct zus_inode_info *zii)
+void toyfs_tii_free(struct toyfs_inode_info *tii)
 {
-	struct toyfs_inode_info *tii = Z2II(zii);
 	struct toyfs_sb_info *sbi = tii->sbi;
 
-	toyfs_sbi_lock(sbi);
 	toyfs_assert(tii->sbi != NULL);
-	if (tii->mapped)
-		toyfs_untrack_inode(tii);
 	memset(tii, 0xAB, sizeof(*tii));
 	tii->zii.op = NULL;
-	tii->next = NULL;
 	tii->ti = NULL;
 	tii->sbi = NULL;
 	tii->valid = false;
@@ -170,36 +168,6 @@ void toyfs_zii_free(struct zus_inode_info *zii)
 	sbi->s_statvfs.f_favail++;
 	DBG("free_ii tii=%p files=%lu ffree=%lu\n", tii,
 	    sbi->s_statvfs.f_files, sbi->s_statvfs.f_ffree);
-	toyfs_sbi_unlock(sbi);
-}
-
-static int _mmap_memory(size_t msz, void **pp)
-{
-	int err = 0;
-	void *mem;
-	const int prot = PROT_WRITE | PROT_READ;
-	const int flags = MAP_PRIVATE | MAP_ANONYMOUS;
-
-	if (msz < PAGE_SIZE)
-		return -EINVAL;
-
-	mem = mmap(NULL, msz, prot, flags, -1, 0);
-	if (mem != MAP_FAILED) {
-		*pp = mem;
-		INFO("mmap ok: %p\n", mem);
-	} else {
-		err = -errno;
-		ERROR("mmap failed: %d\n", err);
-	}
-	return err;
-}
-
-static void _munmap_memory(void *mem, size_t msz)
-{
-	if (mem) {
-		INFO("munmap %p %lu\n", mem, msz);
-		munmap(mem, msz);
-	}
 }
 
 static void _pool_init(struct toyfs_pool *pool)
@@ -209,17 +177,15 @@ static void _pool_init(struct toyfs_pool *pool)
 	pool->pages = NULL;
 	toyfs_list_init(&pool->free_dblkrefs);
 	toyfs_list_init(&pool->free_iblkrefs);
-	toyfs_list_init(&pool->free_dirents);
 	toyfs_list_init(&pool->free_inodes);
 	toyfs_mutex_init(&pool->mutex);
 }
 
-static void
-_pool_setup(struct toyfs_pool *pool, void *mem, size_t msz, bool pmem)
+static void _pool_setup(struct toyfs_pool *pool, void *mem, size_t msz)
 {
 	size_t npages, pagei;
-	union toyfs_pool_page *page, *next;
-	union toyfs_pool_page *pages_arr = mem;
+	union toyfs_pool_pmemb *page, *next;
+	union toyfs_pool_pmemb *pages_arr = mem;
 
 	page = next = NULL;
 	npages = msz / sizeof(*page);
@@ -231,13 +197,10 @@ _pool_setup(struct toyfs_pool *pool, void *mem, size_t msz, bool pmem)
 	pool->mem = mem;
 	pool->msz = msz;
 	pool->pages = page;
-	pool->pmem = pmem;
 }
 
 static void _pool_destroy(struct toyfs_pool *pool)
 {
-	if (pool->mem && !pool->pmem)
-		_munmap_memory(pool->mem, pool->msz);
 	pool->mem = NULL;
 	pool->msz = 0;
 	pool->pages = NULL;
@@ -254,64 +217,69 @@ static void _pool_unlock(struct toyfs_pool *pool)
 	toyfs_mutex_unlock(&pool->mutex);
 }
 
-static struct toyfs_page *_pool_pop_page_without_lock(struct toyfs_pool *pool)
+static struct toyfs_pmemb *_pool_pop_pmemb_without_lock(struct toyfs_pool *pool)
 {
-	struct toyfs_page *page = NULL;
-	union toyfs_pool_page *ppage;
+	struct toyfs_pmemb *pmemb = NULL;
+	union toyfs_pool_pmemb *pp;
 
 	if (pool->pages) {
-		ppage = pool->pages;
-		pool->pages = ppage->next;
-		ppage->next = NULL;
-		page = &ppage->page;
+		pp = pool->pages;
+		pool->pages = pp->next;
+		pp->next = NULL;
+		pmemb = &pp->pmemb;
 	}
-	return page;
+	return pmemb;
 }
 
-static struct toyfs_page *_pool_pop_page(struct toyfs_pool *pool)
+static struct toyfs_pmemb *_pool_pop_pmemb(struct toyfs_pool *pool)
 {
-	struct toyfs_page *page;
+	struct toyfs_pmemb *pmemb;
 
 	_pool_lock(pool);
-	page = _pool_pop_page_without_lock(pool);
+	pmemb = _pool_pop_pmemb_without_lock(pool);
 	_pool_unlock(pool);
-	return page;
+	return pmemb;
 }
 
-static void _pool_push_page(struct toyfs_pool *pool, struct toyfs_page *page)
+static void _pool_push_pmemb(struct toyfs_pool *pool, struct toyfs_pmemb *pmemb)
 {
-	union toyfs_pool_page *ppage;
+	union toyfs_pool_pmemb *pp;
 
 	_pool_lock(pool);
-	ppage = container_of(page, union toyfs_pool_page, page);
-	ppage->next = pool->pages;
-	pool->pages = ppage;
+	pp = container_of(pmemb, union toyfs_pool_pmemb, pmemb);
+	pp->next = pool->pages;
+	pool->pages = pp;
 	_pool_unlock(pool);
+}
+
+static struct toyfs_list_head *_inode_to_list_head(struct toyfs_inode *ti)
+{
+	return &ti->list_head;
 }
 
 static int _pool_add_free_inodes(struct toyfs_pool *pool)
 {
 	size_t i;
-	struct toyfs_page *page;
-	union toyfs_inodes_page *ipage;
+	struct toyfs_pmemb *pmemb;
+	union toyfs_inodes_pmemb *ipmb;
+	struct toyfs_list_head *list_head;
 
-	page = _pool_pop_page_without_lock(pool);
-	if (!page)
+	pmemb = _pool_pop_pmemb_without_lock(pool);
+	if (!pmemb)
 		return -ENOMEM;
 
-	ipage = (union toyfs_inodes_page *)page;
-	for (i = 0; i < ARRAY_SIZE(ipage->inodes); ++i)
-		toyfs_list_add(&ipage->inodes[i].head, &pool->free_inodes);
+	ipmb = (union toyfs_inodes_pmemb *)pmemb;
+	for (i = 0; i < ARRAY_SIZE(ipmb->inodes); ++i) {
+		list_head = _inode_to_list_head(&ipmb->inodes[i]);
+		toyfs_list_add(list_head, &pool->free_inodes);
+	}
 
 	return 0;
 }
 
 static struct toyfs_inode *_list_head_to_inode(struct toyfs_list_head *head)
 {
-	union toyfs_inode_head *ihead;
-
-	ihead = container_of(head, union toyfs_inode_head, head);
-	return &ihead->inode;
+	return container_of(head, struct toyfs_inode, list_head);
 }
 
 static struct toyfs_inode *_pool_pop_free_inode(struct toyfs_pool *pool)
@@ -347,13 +315,13 @@ out:
 
 static void _pool_push_inode(struct toyfs_pool *pool, struct toyfs_inode *inode)
 {
-	union toyfs_inode_head *ihead;
+	struct toyfs_list_head *list_head;
 
-	ihead = container_of(inode, union toyfs_inode_head, inode);
-	memset(ihead, 0, sizeof(*ihead));
+	memset(inode, 0, sizeof(*inode));
+	list_head = _inode_to_list_head(inode);
 
 	_pool_lock(pool);
-	toyfs_list_add_tail(&ihead->head, &pool->free_inodes);
+	toyfs_list_add_tail(list_head, &pool->free_inodes);
 	_pool_unlock(pool);
 }
 
@@ -367,76 +335,20 @@ void toyfs_release_inode(struct toyfs_sb_info *sbi, struct toyfs_inode *inode)
 	_pool_push_inode(&sbi->s_pool, inode);
 }
 
-static int _pool_add_free_dirents(struct toyfs_pool *pool)
-{
-	size_t i;
-	struct toyfs_page *page;
-	union toyfs_dirents_page *dpage;
-	struct toyfs_dirent *dirent;
-
-	page = _pool_pop_page_without_lock(pool);
-	if (!page)
-		return -ENOMEM;
-
-	dpage = (union toyfs_dirents_page *)page;
-	for (i = 0; i < ARRAY_SIZE(dpage->dirents); ++i) {
-		dirent = &dpage->dirents[i];
-		toyfs_list_add_tail(&dirent->d_head, &pool->free_dirents);
-	}
-	return 0;
-}
-
-static struct toyfs_dirent *_pool_pop_free_dirent(struct toyfs_pool *pool)
-{
-	struct toyfs_list_head *elem;
-	struct toyfs_dirent *dirent = NULL;
-
-	if (!toyfs_list_empty(&pool->free_dirents)) {
-		elem = pool->free_dirents.next;
-		toyfs_list_del(elem);
-		dirent = container_of(elem, struct toyfs_dirent, d_head);
-	}
-	return dirent;
-}
-
-static struct toyfs_dirent *_pool_pop_dirent(struct toyfs_pool *pool)
-{
-	int err;
-	struct toyfs_dirent *dirent;
-
-	_pool_lock(pool);
-	dirent = _pool_pop_free_dirent(pool);
-	if (!dirent) {
-		err = _pool_add_free_dirents(pool);
-		if (!err)
-			dirent = _pool_pop_free_dirent(pool);
-	}
-	_pool_unlock(pool);
-	return dirent;
-}
-
-static void _pool_push_dirent(struct toyfs_pool *pool,
-			      struct toyfs_dirent *dirent)
-{
-	_pool_lock(pool);
-	toyfs_list_add_tail(&dirent->d_head, &pool->free_dirents);
-	_pool_unlock(pool);
-}
-
 static int _pool_add_free_dblkrefs(struct toyfs_pool *pool)
 {
 	size_t i;
-	struct toyfs_page *page;
-	union toyfs_dblkrefs_page *ppage;
+	struct toyfs_pmemb *pmemb;
+	union toyfs_dblkrefs_pmemb *pp;
 	struct toyfs_dblkref *dblkref;
 
-	page = _pool_pop_page_without_lock(pool);
-	if (!page)
+	pmemb = _pool_pop_pmemb_without_lock(pool);
+	if (!pmemb)
 		return -ENOMEM;
 
-	ppage = (union toyfs_dblkrefs_page *)page;
-	for (i = 0; i < ARRAY_SIZE(ppage->dblkrefs); ++i) {
-		dblkref = &ppage->dblkrefs[i];
+	pp = (union toyfs_dblkrefs_pmemb *)pmemb;
+	for (i = 0; i < ARRAY_SIZE(pp->dblkrefs); ++i) {
+		dblkref = &pp->dblkrefs[i];
 		toyfs_list_add_tail(&dblkref->head, &pool->free_dblkrefs);
 	}
 	return 0;
@@ -482,17 +394,17 @@ static void _pool_push_dblkref(struct toyfs_pool *pool,
 static int _pool_add_free_iblkrefs(struct toyfs_pool *pool)
 {
 	size_t i;
-	struct toyfs_page *page;
-	union toyfs_iblkrefs_page *bpage;
+	struct toyfs_pmemb *pmemb;
+	union toyfs_iblkrefs_pmemb *pp;
 	struct toyfs_iblkref *iblkref;
 
-	page = _pool_pop_page_without_lock(pool);
-	if (!page)
+	pmemb = _pool_pop_pmemb_without_lock(pool);
+	if (!pmemb)
 		return -ENOMEM;
 
-	bpage = (union toyfs_iblkrefs_page *)page;
-	for (i = 0; i < ARRAY_SIZE(bpage->iblkrefs); ++i) {
-		iblkref = &bpage->iblkrefs[i];
+	pp = (union toyfs_iblkrefs_pmemb *)pmemb;
+	for (i = 0; i < ARRAY_SIZE(pp->iblkrefs); ++i) {
+		iblkref = &pp->iblkrefs[i];
 		toyfs_list_add_tail(&iblkref->head, &pool->free_iblkrefs);
 	}
 	return 0;
@@ -564,42 +476,43 @@ static size_t _itable_slot_of(const struct toyfs_itable *itable, ino_t ino)
 	return ino % ARRAY_SIZE(itable->imap);
 }
 
-static struct toyfs_inode_info *
+static struct toyfs_inode_ref *
 _itable_find(struct toyfs_itable *itable, ino_t ino)
 {
 	size_t slot;
-	struct toyfs_inode_info *tii;
+	struct toyfs_inode_ref *tir;
 
 	_itable_lock(itable);
 	slot = _itable_slot_of(itable, ino);
-	tii = itable->imap[slot];
-	while (tii != NULL) {
-		if (tii->ino == ino)
+	tir = itable->imap[slot];
+	while (tir != NULL) {
+		if (tir->ino == ino)
 			break;
-		tii = tii->next;
+		tir = tir->next;
 	}
-	if (tii)
-		toyfs_assert(tii->mapped);
 	_itable_unlock(itable);
-	return tii;
+	return tir;
 }
 
 static void _itable_insert(struct toyfs_itable *itable,
 			   struct toyfs_inode_info *tii)
 {
 	size_t slot;
-	struct toyfs_inode_info **ient;
+	struct toyfs_inode_ref **ient;
+	struct toyfs_inode_ref *tir;
+
+	tir = (struct toyfs_inode_ref *)calloc(1, sizeof(*tir));
+	toyfs_assert(tir != NULL);
 
 	_itable_lock(itable);
-	toyfs_assert(tii->ti);
-	toyfs_assert(tii->sbi);
-	toyfs_assert(!tii->next);
-	toyfs_assert(!tii->mapped);
+	tir->tii = tii;
+	tir->ti = tii->ti;
+	tir->ino = tii->ino;
+
 	slot = _itable_slot_of(itable, tii->ino);
 	ient = &itable->imap[slot];
-	tii->next = *ient;
-	tii->mapped = true;
-	*ient = tii;
+	tir->next = *ient;
+	*ient = tir;
 	itable->icount++;
 	_itable_unlock(itable);
 }
@@ -608,42 +521,52 @@ static void _itable_remove(struct toyfs_itable *itable,
 			   struct toyfs_inode_info *tii)
 {
 	size_t slot;
-	struct toyfs_inode_info **ient;
+	struct toyfs_inode_ref **pp, *tir = NULL;
 
 	_itable_lock(itable);
 	toyfs_assert(itable->icount > 0);
-	toyfs_assert(tii->mapped);
 	slot = _itable_slot_of(itable, tii->ino);
-	ient = &itable->imap[slot];
-	toyfs_assert(*ient != NULL);
-	while (*ient) {
-		if (*ient == tii)
+	pp = &itable->imap[slot];
+	toyfs_assert(*pp != NULL);
+	while ((tir = *pp) != NULL) {
+		if (tir->tii == tii)
 			break;
-		ient = &(*ient)->next;
+		pp = &(*pp)->next;
 	}
-	toyfs_assert(*ient != NULL);
-	*ient = tii->next;
+	toyfs_assert(tir != NULL);
+	*pp = tir->next;
 	itable->icount--;
-	tii->next = NULL;
-	tii->mapped = false;
 	_itable_unlock(itable);
+
+	memset(tir, 0, sizeof(*tir));
+	free(tir);
 }
 
-void toyfs_track_inode(struct toyfs_inode_info *tii)
+void toyfs_i_track(struct toyfs_inode_info *tii)
 {
 	struct toyfs_sb_info *sbi = tii->sbi;
 
 	_itable_insert(&sbi->s_itable, tii);
+	tii->mapped = true;
 }
 
-void toyfs_untrack_inode(struct toyfs_inode_info *tii)
+void toyfs_i_untrack(struct toyfs_inode_info *tii, bool remove)
 {
+	struct toyfs_inode_ref *tir;
 	struct toyfs_sb_info *sbi = tii->sbi;
 
-	_itable_remove(&sbi->s_itable, tii);
+	tir = _itable_find(&sbi->s_itable, tii->ino);
+	toyfs_assert(tir != NULL);
+
+	tii->mapped = false;
+	if (remove)
+		_itable_remove(&sbi->s_itable, tii);
+	else
+		tir->tii = NULL;
 }
 
-struct toyfs_inode_info *toyfs_find_inode(struct toyfs_sb_info *sbi, ino_t ino)
+struct toyfs_inode_ref *
+toyfs_find_inode_ref_by_ino(struct toyfs_sb_info *sbi, ino_t ino)
 {
 	return _itable_find(&sbi->s_itable, ino);
 }
@@ -660,6 +583,7 @@ struct zus_sb_info *toyfs_sbi_alloc(struct zus_fs_info *zfi)
 
 	memset(sbi, 0, sizeof(*sbi));
 	toyfs_mutex_init(&sbi->s_mutex);
+	toyfs_mutex_init(&sbi->s_inodes_lock);
 	_pool_init(&sbi->s_pool);
 	_itable_init(&sbi->s_itable);
 	sbi->s_zus_sbi.op = &toyfs_sbi_op;
@@ -674,9 +598,9 @@ void toyfs_sbi_free(struct zus_sb_info *zsbi)
 	free(sbi);
 }
 
-struct toyfs_page *toyfs_acquire_page(struct toyfs_sb_info *sbi)
+struct toyfs_pmemb *toyfs_acquire_pmemb(struct toyfs_sb_info *sbi)
 {
-	struct toyfs_page *page = NULL;
+	struct toyfs_pmemb *pmemb = NULL;
 
 	/* TODO: Distinguish between user types */
 	toyfs_sbi_lock(sbi);
@@ -684,30 +608,30 @@ struct toyfs_page *toyfs_acquire_page(struct toyfs_sb_info *sbi)
 		goto out;
 	if (!sbi->s_statvfs.f_bavail)
 		goto out;
-	page = _pool_pop_page(&sbi->s_pool);
-	if (!page)
+	pmemb = _pool_pop_pmemb(&sbi->s_pool);
+	if (!pmemb)
 		goto out;
 
-	memset(page, 0x00, sizeof(*page));
+	memset(pmemb, 0x00, sizeof(*pmemb));
 	sbi->s_statvfs.f_bfree--;
 	sbi->s_statvfs.f_bavail--;
 	DBG_("alloc_page: blocks=%lu bfree=%lu pmem_bn=%lu\n",
 	     sbi->s_statvfs.f_blocks, sbi->s_statvfs.f_bfree,
-	     toyfs_addr2bn(sbi, page));
+	     toyfs_addr2bn(sbi, pmemb));
 out:
 	toyfs_sbi_unlock(sbi);
-	return page;
+	return pmemb;
 }
 
-void toyfs_release_page(struct toyfs_sb_info *sbi, struct toyfs_page *page)
+void toyfs_release_pmemb(struct toyfs_sb_info *sbi, struct toyfs_pmemb *pmemb)
 {
 	toyfs_sbi_lock(sbi);
-	_pool_push_page(&sbi->s_pool, page);
+	_pool_push_pmemb(&sbi->s_pool, pmemb);
 	sbi->s_statvfs.f_bfree++;
 	sbi->s_statvfs.f_bavail++;
 	DBG_("free_page: blocks=%lu bfree=%lu pmem_bn=%lu\n",
 	     sbi->s_statvfs.f_blocks, sbi->s_statvfs.f_bfree,
-	     toyfs_addr2bn(sbi, page));
+	     toyfs_addr2bn(sbi, pmemb));
 	toyfs_sbi_unlock(sbi);
 }
 
@@ -750,17 +674,6 @@ void toyfs_release_iblkref(struct toyfs_sb_info *sbi,
 	_pool_push_iblkref(&sbi->s_pool, iblkref);
 }
 
-struct toyfs_dirent *toyfs_acquire_dirent(struct toyfs_sb_info *sbi)
-{
-	return _pool_pop_dirent(&sbi->s_pool);
-}
-
-void toyfs_release_dirent(struct toyfs_sb_info *sbi,
-			  struct toyfs_dirent *dirent)
-{
-	return _pool_push_dirent(&sbi->s_pool, dirent);
-}
-
 static void _sbi_setup(struct toyfs_sb_info *sbi)
 {
 	/* TODO: FIXME */
@@ -795,26 +708,20 @@ static int _new_root_inode(struct toyfs_sb_info *sbi,
 
 	memset(root_ti, 0, sizeof(*root_ti));
 	root_tii->ti = root_ti;
-	root_tii->zii.zi = &root_ti->zi;
+	root_tii->zii.zi = toyfs_ti2zi(root_ti);
 	root_tii->ino = TOYFS_ROOT_INO;
 
 	root_ti = root_tii->ti;
-	root_ti->zi.i_ino = TOYFS_ROOT_INO;
-	root_ti->zi.i_mode = 0755 | S_IFDIR;
-	root_ti->zi.i_nlink = 2;
-	root_ti->zi.i_uid = 0;
-	root_ti->zi.i_gid = 0;
-	root_ti->zi.i_generation = 0;
-	root_ti->zi.i_rdev = 0;
-	root_ti->zi.i_size = 0;
-	/* TODO: FIXME
-	 * root_i->ti_zi.i_blksize = PAGE_SIZE;
-	 * root_i->ti_zi.i_blocks = 0;
-	 */
-	root_ti->i_parent_ino = TOYFS_ROOT_INO;
-	root_ti->ti.dir.d_ndentry = 0;
-	root_ti->ti.dir.d_off_max = 2;
-	toyfs_list_init(&root_ti->ti.dir.d_childs);
+	root_ti->i_ino = TOYFS_ROOT_INO;
+	root_ti->i_mode = 0755 | S_IFDIR;
+	root_ti->i_nlink = 2;
+	root_ti->i_uid = 0;
+	root_ti->i_gid = 0;
+	root_ti->i_generation = 0;
+	root_ti->i_rdev = 0;
+	root_ti->i_size = 0;
+	root_ti->i_blocks = 0;
+	toyfs_list_init(toyfs_childs_list_of(root_tii));
 
 	_itable_insert(&sbi->s_itable, root_tii);
 	*out_ii = root_tii;
@@ -899,47 +806,54 @@ static int _prepare_pmem_first_time(struct multi_devices *md)
 	return 0;
 }
 
-int toyfs_sbi_init(struct zus_sb_info *zsbi, struct zufs_ioc_mount *zim)
+static int _sbi_init(struct toyfs_sb_info *sbi)
 {
 	int err;
 	void *mem = NULL;
 	size_t pmem_total_blocks, msz = 0;
 	uint32_t pmem_kernel_id;
-	bool using_pmem = false;
-	struct toyfs_sb_info *sbi = Z2SBI(zsbi);
 
 	INFO("sbi_init: sbi=%p\n", sbi);
-
 	pmem_kernel_id = sbi->s_zus_sbi.md.pmem_info.pmem_kern_id;
-	pmem_total_blocks = md_t1_blocks(&sbi->s_zus_sbi.md);
-	if ((pmem_kernel_id > 0) && (pmem_total_blocks > 2)) {
-		err = _prepare_pmem_first_time(&sbi->s_zus_sbi.md);
-		if (err)
-			return err;
-
-		msz = md_p2o(pmem_total_blocks - 2);
-		mem = md_baddr(&sbi->s_zus_sbi.md, 2);
-		using_pmem = true;
-	} else {
-		msz = (1ULL << 30) /* 1G */;
-		err = _mmap_memory(msz, &mem);
-		if (err)
-			return err;
+	if (!pmem_kernel_id) {
+		ERROR("pmem_kernel_id=%ld\n", (long)pmem_kernel_id);
+		return -EINVAL;
 	}
+	pmem_total_blocks = md_t1_blocks(&sbi->s_zus_sbi.md);
+	if (pmem_total_blocks < 1024) {
+		ERROR("pmem_total_blocks=%ld\n", (long)pmem_total_blocks);
+		return -EINVAL;
+	}
+	err = _prepare_pmem_first_time(&sbi->s_zus_sbi.md);
+	if (err)
+		return err;
 
-	_pool_setup(&sbi->s_pool, mem, msz, using_pmem);
+	msz = md_p2o(pmem_total_blocks - 2);
+	mem = md_baddr(&sbi->s_zus_sbi.md, 2);
+	_pool_setup(&sbi->s_pool, mem, msz);
 	_sbi_setup(sbi);
 
 	/* TODO: Take root inode from super */
-
 	err = _new_root_inode(sbi, &sbi->s_root);
 	if (err)
 		return err;
 
 	sbi->s_zus_sbi.z_root = &sbi->s_root->zii;
+	return 0;
+}
+
+int toyfs_sbi_init(struct zus_sb_info *zsbi, struct zufs_ioc_mount *zim)
+{
+	int err;
+	struct toyfs_sb_info *sbi = Z2SBI(zsbi);
+
+	err = _sbi_init(sbi);
+	if (err)
+		return err;
+
 	zim->zmi.zus_sbi = &sbi->s_zus_sbi;
 	zim->zmi.zus_ii = sbi->s_zus_sbi.z_root;
-	zim->zmi.s_blocksize_bits  = PAGE_SHIFT;
+	zim->zmi.s_blocksize_bits = PAGE_SHIFT;
 	zim->zmi.acl_on = 1;
 
 	return 0;
@@ -954,6 +868,7 @@ int toyfs_sbi_fini(struct zus_sb_info *zsbi)
 	_pool_destroy(&sbi->s_pool);
 	_itable_destroy(&sbi->s_itable);
 	toyfs_mutex_destroy(&sbi->s_mutex);
+	toyfs_mutex_destroy(&sbi->s_inodes_lock);
 	sbi->s_root = NULL;
 	return 0;
 }
@@ -999,11 +914,83 @@ int toyfs_sync(struct zus_inode_info *zii, struct zufs_ioc_range *ioc_range)
 }
 
 
+#define BUILD_BUG_ON_EQ(a, b) TOYFS_STATICASSERT_EQ(a, b)
+
+#define BUILD_BUG_ON_SIZEOFTYPE(t, n) \
+	BUILD_BUG_ON_EQ(sizeof(t), (n))
+
+#define BUILD_BUG_ON_SIZEOFPAGE(t) \
+	BUILD_BUG_ON_SIZEOFTYPE(t, PAGE_SIZE)
+
+#define BUILD_BUG_ON_OFFSET(a, b, mem) \
+	BUILD_BUG_ON_EQ(offsetof(typeof(*a), mem), offsetof(typeof(*b), mem))
+
+#define BUILD_BUG_ON_SIZE(a, b, mem) \
+	BUILD_BUG_ON_EQ(sizeof(a->mem), sizeof(b->mem))
+
 /* Compile time checks only */
+static void _check_inode(void)
+{
+	const struct toyfs_inode *ti = NULL;
+	const struct zus_inode *zi = NULL;
+
+	BUILD_BUG_ON_EQ(sizeof(*ti), sizeof(*zi));
+
+	BUILD_BUG_ON_SIZE(ti, zi, i_flags);
+	BUILD_BUG_ON_SIZE(ti, zi, i_mode);
+	BUILD_BUG_ON_SIZE(ti, zi, i_nlink);
+	BUILD_BUG_ON_SIZE(ti, zi, i_size);
+	BUILD_BUG_ON_SIZE(ti, zi, i_blocks);
+	BUILD_BUG_ON_SIZE(ti, zi, i_mtime);
+	BUILD_BUG_ON_SIZE(ti, zi, i_ctime);
+	BUILD_BUG_ON_SIZE(ti, zi, i_atime);
+	BUILD_BUG_ON_SIZE(ti, zi, i_ino);
+	BUILD_BUG_ON_SIZE(ti, zi, i_uid);
+	BUILD_BUG_ON_SIZE(ti, zi, i_gid);
+	BUILD_BUG_ON_SIZE(ti, zi, i_xattr);
+	BUILD_BUG_ON_SIZE(ti, zi, i_symlink);
+
+	BUILD_BUG_ON_OFFSET(ti, zi, i_flags);
+	BUILD_BUG_ON_OFFSET(ti, zi, i_mode);
+	BUILD_BUG_ON_OFFSET(ti, zi, i_nlink);
+	BUILD_BUG_ON_OFFSET(ti, zi, i_size);
+	BUILD_BUG_ON_OFFSET(ti, zi, i_mtime);
+	BUILD_BUG_ON_OFFSET(ti, zi, i_ctime);
+	BUILD_BUG_ON_OFFSET(ti, zi, i_atime);
+	BUILD_BUG_ON_OFFSET(ti, zi, i_ino);
+	BUILD_BUG_ON_OFFSET(ti, zi, i_uid);
+	BUILD_BUG_ON_OFFSET(ti, zi, i_gid);
+	BUILD_BUG_ON_OFFSET(ti, zi, i_xattr);
+	BUILD_BUG_ON_OFFSET(ti, zi, i_generation);
+	BUILD_BUG_ON_OFFSET(ti, zi, i_rdev);
+	BUILD_BUG_ON_OFFSET(ti, zi, i_symlink);
+}
+
+static void _check_typesizes(void)
+{
+	BUILD_BUG_ON_SIZEOFTYPE(struct toyfs_pmemb, PAGE_SIZE);
+	BUILD_BUG_ON_SIZEOFTYPE(struct toyfs_dirent, 32);
+
+	BUILD_BUG_ON_SIZEOFPAGE(union toyfs_pool_pmemb);
+	BUILD_BUG_ON_SIZEOFPAGE(union toyfs_inodes_pmemb);
+	BUILD_BUG_ON_SIZEOFPAGE(union toyfs_iblkrefs_pmemb);
+	BUILD_BUG_ON_SIZEOFPAGE(union toyfs_dirents_pmemb);
+	BUILD_BUG_ON_SIZEOFPAGE(struct toyfs_xattr);
+	BUILD_BUG_ON_SIZEOFPAGE(struct toyfs_dentries);
+}
+
 void toyfs_check_types(void)
 {
-	TOYFS_STATICASSERT_SIZEOFPAGE(union toyfs_pool_page);
-	TOYFS_STATICASSERT_SIZEOFPAGE(union toyfs_inodes_page);
-	TOYFS_STATICASSERT_SIZEOFPAGE(union toyfs_iblkrefs_page);
-	TOYFS_STATICASSERT_SIZEOFPAGE(union toyfs_dirents_page);
+	_check_inode();
+	_check_typesizes();
 }
+
+struct zus_inode *toyfs_ti2zi(struct toyfs_inode *ti)
+{
+	void *p = (void *)ti;
+	struct zus_inode *zi = p;
+
+	TOYFS_STATICASSERT_EQ(sizeof(*zi), sizeof(*ti));
+	return zi;
+}
+

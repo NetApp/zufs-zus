@@ -137,11 +137,9 @@ static void toyfs_fill_root_inode(struct toyfs_inode *rooti)
 {
 	memset(rooti, 0, sizeof(*rooti));
 
-	rooti->zi.i_ino = TOYFS_ROOT_INO;
-	rooti->zi.i_nlink = 2;
-	rooti->zi.i_size = 0;
-	rooti->i_parent_ino = TOYFS_ROOT_INO;
-	rooti->ti.dir.d_off_max = 2;
+	rooti->i_ino = TOYFS_ROOT_INO;
+	rooti->i_nlink = 2;
+	rooti->i_size = 0;
 }
 
 static void toyfs_write_root_inode(int fd, struct toyfs_inode *rooti)

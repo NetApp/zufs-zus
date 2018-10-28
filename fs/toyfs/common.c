@@ -91,7 +91,7 @@ void toyfs_mutex_init(pthread_mutex_t *mutex)
 	err = pthread_mutexattr_init(&attr);
 	toyfs_panic_if_err(err, "pthread_mutexattr_init");
 
-	kind = PTHREAD_MUTEX_RECURSIVE; /* TODO: PTHREAD_MUTEX_ERRORCHECK */
+	kind = PTHREAD_MUTEX_RECURSIVE; /* PTHREAD_MUTEX_ERRORCHECK; */
 	err = pthread_mutexattr_settype(&attr, kind);
 	toyfs_panic_if_err(err, "pthread_mutexattr_settype");
 
@@ -136,6 +136,7 @@ struct toyfs_inode_info *toyfs_zii_to_tii(struct zus_inode_info *zii)
 	struct toyfs_inode_info *tii = NULL;
 
 	if (zii) {
+		toyfs_assert(zii->op != NULL);
 		tii = container_of(zii, struct toyfs_inode_info, zii);
 		toyfs_assert(tii->valid);
 	}
@@ -147,6 +148,7 @@ struct toyfs_inode_info *toyfs_zii_to_tii(struct zus_inode_info *zii)
 const struct zus_zii_operations toyfs_zii_op = {
 	.evict = toyfs_evict,
 	.read = toyfs_read,
+	.pre_read = toyfs_pre_read,
 	.write = toyfs_write,
 	.setattr = toyfs_setattr,
 	.get_symlink = toyfs_get_symlink,
@@ -155,11 +157,15 @@ const struct zus_zii_operations toyfs_zii_op = {
 	.seek = toyfs_seek,
 	.get_block = toyfs_get_block,
 	.put_block = toyfs_put_block,
+	.mmap_close = toyfs_mmap_close,
+	.getxattr = toyfs_getxattr,
+	.setxattr = toyfs_setxattr,
+	.listxattr = toyfs_listxattr,
 };
 
 const struct zus_sbi_operations toyfs_sbi_op = {
 	.new_inode = toyfs_new_inode,
-	.free_inode = toyfs_free_inode,
+	.free_inode = toyfs_evict,
 	.add_dentry = toyfs_add_dentry,
 	.remove_dentry = toyfs_remove_dentry,
 	.lookup = toyfs_lookup,
@@ -170,7 +176,7 @@ const struct zus_sbi_operations toyfs_sbi_op = {
 	.statfs = toyfs_statfs,
 };
 
-const struct zus_zfi_operations toyfs_zfi_op = {
+static const struct zus_zfi_operations toyfs_zfi_op = {
 	.sbi_alloc = toyfs_sbi_alloc,
 	.sbi_free = toyfs_sbi_free,
 	.sbi_init = toyfs_sbi_init,
@@ -193,8 +199,14 @@ static struct zus_fs_info toyfs_zfi = {
 	.next_sb_id = 0,
 };
 
+static
 int toyfs_register_fs(int fd)
 {
 	return zus_register_one(fd, &toyfs_zfi);
+}
+
+int REGISTER_FS_FN(int fd)
+{
+	return toyfs_register_fs(fd);
 }
 
