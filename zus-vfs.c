@@ -183,20 +183,14 @@ static int _new_inode(void *app_ptr, struct zufs_ioc_hdr *hdr)
 	struct zus_inode_info *zii;
 	int err;
 
-	zii = sbi->op->zii_alloc(sbi);
-	if (!zii)
-		return -ENOMEM;
-
-	zii->sbi = sbi;
-
 	/* In ZUS protocol we start zero ref, add_dentry increments the refs
 	 * (Kernel gave us a 1 here expect for O_TMPFILE)
 	 */
 	ioc_new->zi.i_nlink = 0;
 
-	err = sbi->op->new_inode(sbi, zii, app_ptr, ioc_new);
-	if (unlikely(err))
-		goto _err_zii_free;
+	zii = sbi->op->new_inode(sbi, app_ptr, ioc_new);
+	if (unlikely(!zii))
+		return -EINVAL;
 
 	ioc_new->_zi = md_addr_to_offset(&sbi->md, zii->zi);
 	ioc_new->zus_ii = zii;
@@ -213,8 +207,6 @@ static int _new_inode(void *app_ptr, struct zufs_ioc_hdr *hdr)
 
 _err_free_inode:
 	zii->sbi->op->free_inode(zii);
-_err_zii_free:
-	zii->sbi->op->zii_free(zii);
 	return err;
 }
 
@@ -241,11 +233,9 @@ static int _evict(struct zufs_ioc_hdr *hdr)
 		 * (So it is possible at FS to see two fs->igets but one
 		 *  fs->evict)
 		 */
-		if (zii->op->evict && !(ziei->flags & ZI_LOOKUP_RACE))
+		if (zii->op->evict)
 			zii->op->evict(zii);
 	}
-
-	zii->sbi->op->zii_free(zii);
 	return 0;
 }
 

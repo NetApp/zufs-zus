@@ -148,12 +148,10 @@ struct zus_inode_info {
 };
 
 struct zus_sbi_operations {
-	struct zus_inode_info *(*zii_alloc)(struct zus_sb_info *sbi);
-	void (*zii_free)(struct zus_inode_info *zii);
-
-	int (*new_inode)(struct zus_sb_info *sbi, struct zus_inode_info *zii,
-			 void *app_ptr, struct zufs_ioc_new_inode *ioc_new);
-	int (*free_inode)(struct zus_inode_info *zii);
+	struct zus_inode_info* (*new_inode)(struct zus_sb_info *sbi,
+				void *app_ptr, struct
+				zufs_ioc_new_inode *ioc_new);
+	void (*free_inode)(struct zus_inode_info *zii);
 
 	ulong (*lookup)(struct zus_inode_info *dir_ii, struct zufs_str *str);
 	int (*add_dentry)(struct zus_inode_info *dir_ii,
