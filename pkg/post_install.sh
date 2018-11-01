@@ -2,7 +2,7 @@
 
 SERVICE_NAME=zusd
 
-echo "ZUFS_LIBFS_LIST=" > ${DESTDIR}/etc/zufs.conf
+echo "ZUFS_LIBFS_LIST=" > /etc/zufs.conf
 
 # add libzus to ld DB
 ldconfig
