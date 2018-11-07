@@ -23,7 +23,7 @@ fs/*
 !fs/toyfs
 
 # common ignores
-*.o
+objs/
 *.so
 *.rpm
 

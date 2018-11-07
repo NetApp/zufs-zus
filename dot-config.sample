@@ -8,35 +8,26 @@
 # Default: /usr/src/kernel/$(uname -r)/
 ZUF_KERN_DIR=../zuf/
 
+# Uncomment in case kernel is built with 'O=.build'
+#ZUF_KERN_BUILD_DIR = ../zuf/.build
+
 # Enable debugging info Master switch
 DEBUG=1
 
-CONFIG_C_INCLUDE =
-CONFIG_C_DEFINE =
-CONFIG_C_LIBS =
+# Enable/disable pedantic flags
+CONFIG_PEDANTIC = 0
 
-# Flags appended to CWARN for extra warnings
-CONFIG_CWARN =
+# Set optimization level (unset, will default to 2)
+CONFIG_OPTIMIZE_LEVEL = 2
 
-# Turn some warning off
-CONFIG_CNO_WARN =
-
-# Flags appended to CFLAGS for pedantic mode
-CONFIG_PEDANTIC_FLAGS =
-# CONFIG_PEDANTIC_FLAGS += -pedantic
-# CONFIG_PEDANTIC_FLAGS += -Wformat=2 -Wsign-conversion -Wconversion
-# CONFIG_PEDANTIC_FLAGS += -Wstrict-prototypes -Wold-style-definition
-# CONFIG_PEDANTIC_FLAGS += -Wpointer-arith
-
-# Flags appended to OPTIMIZE_FLAGS for optimization level
-# CONFIG_OPTIMIZE_FLAGS = -O0
-
-# Flags appended to CDEBUG_FLAGS if DEBUG=1
-CONFIG_CDEBUG_FLAGS =
-# CONFIG_CDEBUG_FLAGS += -D_FORTIFY_SOURCE=1
+# Fortify source
+CONFIG_FORTIFY_SORUCE = 0
 
 # Control path zus-zuf
 CONFIG_ZUF_DEF_PATH = /sys/fs/zuf
 
+# Verbose build output
+CONFIG_BUILD_VERBOSE = 0
+
 # List of filesystems to build
-#CONFIG_LIBFS_MODULES = foofs toyfs
+CONFIG_LIBFS_MODULES = foofs toyfs

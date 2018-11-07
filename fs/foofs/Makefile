@@ -7,21 +7,14 @@
 # See module.c for LICENSE details.
 #
 # Authors:
-#	Boaz Harrosh <boazh@netapp.com>
-#	Shachar Sharon <sshachar@netapp.com>
-#
+#	Omer Caspi <omerc@netapp.com>
 
-foofs_OBJ = foofs.o
+FOOFS_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
+ZDIR?=$(FOOFS_DIR)../..
+ZM_NAME := foofs
+ZM_OBJS := foofs.o
 
-foofs_lib = libfoofs.so
-
-all: $(foofs_lib)
-
+all:
+	$(MAKE) M=$(PWD) -C $(ZDIR) module
 clean:
-	@rm -vf *.o $(foofs_lib)
-
-CFLAGS += -Wno-missing-prototypes -Wno-missing-declarations
-CFLAGS += -I../..
-
-$(foofs_lib): $(foofs_OBJ)
-	$(CC) -shared $(LDFLAGS) $(CFLAGS) $(C_LIBS) -o $@ $^
+	$(MAKE) M=$(PWD) -C $(ZDIR) module_clean

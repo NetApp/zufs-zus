@@ -9,22 +9,27 @@
 # Authors:
 #	Shachar Sharon <sshachar@netapp.com>
 #
+TOYFS_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
+ZDIR?=$(TOYFS_DIR)../..
+TOYMKFS := $(TOYFS_DIR)mkfs.toyfs
+TOYMKFS_CLEAN := toymkfs_clean
+TOYMKFS_OBJS := $(TOYFS_DIR)objs/mkfs.o
+TOYMKFS_FLAGS := -I $(ZDIR) -L$(ZDIR) -luuid -lzus
 
-toyfs_OBJ = common.o super.o inode.o dir.o namei.o symlink.o file.o
+ZM_NAME := toyfs
+ZM_OBJS := common.o super.o inode.o dir.o namei.o symlink.o file.o
+ZM_LIBS := uuid
+ZM_PRE_BUILD := mkfs.toyfs
+ZM_PRE_CLEAN := mkfs.toyfs_clean
 
-toyfs_mkfs = mkfs.toyfs
-toyfs_lib = libtoyfs.so
-
-all: $(toyfs_mkfs) $(toyfs_lib)
+all:
+	@$(MAKE) M=$(PWD) -C $(ZDIR) module
 
 clean:
-	@rm -vf *.o $(toyfs_lib) $(toyfs_mkfs)
+	@$(MAKE) M=$(PWD) -C $(ZDIR) module_clean
 
-CFLAGS += -I../..
-LDFLAGS += -L../.. -luuid -lzus
+mkfs.toyfs:
+	$(CC) $(TOYMKFS_FLAGS) -o $@ $(TOYFS_DIR)mkfs.c
 
-$(toyfs_mkfs): mkfs.o
-	$(CC) $(LDFLAGS) $(CFLAGS) $(C_LIBS) -o $@ $^
-
-$(toyfs_lib): $(toyfs_OBJ)
-	$(CC) -shared $(LDFLAGS) $(CFLAGS) $(C_LIBS) -o $@ $^
+mkfs.toyfs_clean:
+	rm -vf $(TOYMKFS_OBJS) $(TOYMKFS)
