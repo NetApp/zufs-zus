@@ -427,6 +427,9 @@ static int _zus_start_chan_threads(struct zus_thread_params *tp, uint num_cpus,
 	return 0;
 }
 
+/* forward declaration */
+static void zus_stop_all_threads(void);
+
 static int zus_start_all_threads(struct zus_thread_params *tp, uint num_cpus,
 				 uint num_chans)
 {
@@ -440,12 +443,16 @@ static int zus_start_all_threads(struct zus_thread_params *tp, uint num_cpus,
 	for (c = 0; c < g_ztp.max_channels; ++c) {
 		err = _zus_start_chan_threads(tp, num_cpus, c);
 		if (unlikely(err))
-			return err;
+			goto fail;
 	}
 
 	wtz_wait(&g_ztp.wtz);
 	INFO("%u ZT threads ready\n", num_cpus);
 	return 0;
+
+fail:
+	zus_stop_all_threads();
+	return err;
 }
 
 static void _zus_stop_chan_threads(uint chan)
@@ -531,10 +538,13 @@ static void *zus_mount_thread(void *callback_info)
 			break;
 		}
 
-		if (!g_ztp.num_zts)
-			zus_start_all_threads(&g_mount.tp,
-					      g_zus_numa_map.online_cpus,
-					      zim->num_channels);
+		if (!g_ztp.num_zts) {
+			err = zus_start_all_threads(&g_mount.tp,
+						    g_zus_numa_map.online_cpus,
+						    zim->num_channels);
+			if (unlikely(err))
+				goto next;
+		}
 
 		if (zim->hdr.operation == ZUS_M_UMOUNT)
 			err = zus_umount(g_mount.fd, zim);
@@ -545,6 +555,7 @@ static void *zus_mount_thread(void *callback_info)
 		else
 			err = -EINVAL;
 
+next:
 		zim->hdr.err = _errno_UtoK(err);
 	}
 
