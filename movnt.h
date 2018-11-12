@@ -16,18 +16,14 @@
 #define CACHELINE_SHIFT	(6)
 #define CACHELINE_SIZE	(1UL << CACHELINE_SHIFT)
 
+#include <emmintrin.h>
+
 #include "zus.h"
-static inline void a_clflush(void *p)
-{
-	asm volatile("clflush %0" : "+m" (*(volatile char *)p));
-}
 
 static inline void a_clflushopt(void *p)
 {
 	asm volatile(".byte 0x66; clflush %0" : "+m" (*(volatile char *)p));
 }
-
-#define sfence() asm volatile("sfence" ::: "memory")
 
 static inline void cl_flush(void *buf, uint32_t len)
 {
@@ -35,7 +31,7 @@ static inline void cl_flush(void *buf, uint32_t len)
 
 	len = len + ((unsigned long)(buf) & (CACHELINE_SIZE - 1));
 	for (i = 0; i < len; i += CACHELINE_SIZE)
-		a_clflush(buf + i);
+		_mm_clflush(buf + i);
 }
 
 #ifdef CONFIG_CL_FLUSH_OPT
@@ -52,7 +48,7 @@ static inline void cl_flush_opt(void *buf, uint32_t len)
 	for (i = 0; i < len; i += CACHELINE_SIZE)
 		a_clflushopt(buf + i);
 
-	sfence();
+	_mm_sfence();
 }
 
 #else /* !CONFIG_CL_FLUSH_OPT */
