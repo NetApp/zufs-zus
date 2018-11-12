@@ -411,9 +411,15 @@ static inline int _zu_atomic_add_unless(int *v, int a, int u)
 	int c, old;
 
 	c = __atomic_load_n(v, __ATOMIC_SEQ_CST);
-	while (c != u &&
-	       (old = __atomic_exchange_n(v, c + a, __ATOMIC_SEQ_CST)) != c)
+	old = c;
+	while (c != u) {
+		if (__atomic_compare_exchange_n(v, &old, c + a, false,
+						__ATOMIC_SEQ_CST,
+						__ATOMIC_SEQ_CST))
+			break;
+
 		c = old;
+	}
 	return c;
 }
 
