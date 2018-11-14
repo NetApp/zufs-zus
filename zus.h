@@ -30,7 +30,7 @@
 #endif
 
 #include "zus_api.h"
-#include "_pr.h"
+#include "printz.h"
 #include "a_list.h"
 
 /* FIXME: Move to K_in_U include structure */
@@ -328,6 +328,12 @@ const char *zus_op_name(enum e_zufs_operation op);
 /* do not use, please use _zus_iom_submit() in iom_enc.h */
 int __zus_iom_exec(struct zus_sb_info *sbi, struct zufs_ioc_iomap_exec *ziome,
 		   bool sync);
+
+/* dyn_pr.c */
+int zus_add_module_ddbg(const char *fs_name, void *handle);
+void zus_free_ddbg_db(void);
+int zus_ddbg_read(struct zufs_ddbg_info *zdi);
+int zus_ddbg_write(struct zufs_ddbg_info *zdi);
 
 /* pa.c */
 

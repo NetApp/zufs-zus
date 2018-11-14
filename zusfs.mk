@@ -10,7 +10,7 @@ PROJ_INCLUDES := $(ZDIR) $(ZM_INCLUDES)
 PROJ_LIBS := zus $(ZM_LIBS) pthread
 PROJ_LIB_DIRS := $(ZDIR)
 PROJ_CFLAGS := -fpic $(ZM_CFLAGS)
-PROJ_LDFLAGS := -shared $(ZM_LDFLAGS)
+PROJ_LDFLAGS := -shared -Wl,-Tzus_ddbg.ld $(ZM_LDFLAGS)
 PROJ_OBJS_DEPS := $(M)/Makefile $(ZM_OBJS_DEPS) $(ZDIR)/zusfs.mk
 PROJ_TARGET_DEPS += $(ZDIR)/libzus.so $(ZM_TARGET_DEPS)
 

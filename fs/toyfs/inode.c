@@ -21,7 +21,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#include "_pr.h"
 #include "zus.h"
 #include "toyfs.h"
 

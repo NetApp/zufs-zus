@@ -105,6 +105,9 @@ found:
 		dlclose(dl_lib);
 		return err;
 	}
+	err = zus_add_module_ddbg(fs_name, dl_lib);
+	if (err)
+		ERROR("%s:: dynamic debug load failed=> %d\n", fs_name, err);
 
 	*handle = dl_lib;
 	return 0;
@@ -167,6 +170,7 @@ void zus_unregister_all(void)
 {
 	int i;
 
+	zus_free_ddbg_db();
 	for (i = 0; i < ZUS_LIBFS_MAX_NR; ++i) {
 		if (g_dl_list[i])
 			_unload_libfs(g_dl_list[i]);

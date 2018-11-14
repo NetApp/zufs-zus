@@ -18,7 +18,6 @@
 #include <limits.h>
 #include <errno.h>
 
-#include "_pr.h"
 #include "zus.h"
 #include "toyfs.h"
 

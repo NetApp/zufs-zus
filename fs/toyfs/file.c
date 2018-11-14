@@ -19,7 +19,6 @@
 #include <errno.h>
 #include <linux/falloc.h>
 
-#include "_pr.h"
 #include "zus.h"
 #include "toyfs.h"
 

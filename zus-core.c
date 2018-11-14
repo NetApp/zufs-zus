@@ -538,23 +538,32 @@ static void *zus_mount_thread(void *callback_info)
 			break;
 		}
 
-		if (!g_ztp.num_zts) {
+		if (zim->hdr.operation == ZUS_M_MOUNT && !g_ztp.num_zts) {
 			err = zus_start_all_threads(&g_mount.tp,
 						    g_zus_numa_map.online_cpus,
 						    zim->zmi.num_channels);
 			if (unlikely(err))
 				goto next;
 		}
-
-		if (zim->hdr.operation == ZUS_M_UMOUNT)
-			err = zus_umount(g_mount.fd, zim);
-		else if (zim->hdr.operation == ZUS_M_MOUNT)
+		switch (zim->hdr.operation) {
+		case ZUS_M_MOUNT:
 			err = zus_mount(g_mount.fd, zim);
-		else if (zim->hdr.operation == ZUS_M_REMOUNT)
+			break;
+		case ZUS_M_UMOUNT:
+			err = zus_umount(g_mount.fd, zim);
+			break;
+		case ZUS_M_REMOUNT:
 			err = zus_remount(g_mount.fd, zim);
-		else
+			break;
+		case ZUS_M_DDBG_RD:
+			err = zus_ddbg_read(&zim->zdi);
+			break;
+		case ZUS_M_DDBG_WR:
+			err = zus_ddbg_write(&zim->zdi);
+			break;
+		default:
 			err = -EINVAL;
-
+		}
 next:
 		zim->hdr.err = _errno_UtoK(err);
 	}
