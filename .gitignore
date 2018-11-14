@@ -29,3 +29,7 @@ fs/*
 
 # tags
 cscope.*
+# eclipse
+.cproject
+.project
+.settings/
