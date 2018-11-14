@@ -57,7 +57,7 @@ static int _dump_backtrace(FILE *fp)
 		if (err)
 			return err;
 
-		fprintf(fp, "<4>zus_warn:        [<%p>] 0x%lx %s+0x%lx\n",
+		fprintf(fp, LOG_STR(LOG_WARNING) "zus_warn:        [<%p>] 0x%lx %s+0x%lx\n",
 			(void *)ip, (long)sp, sym, (long)off);
 	}
 	return 0;
@@ -84,7 +84,7 @@ static void _dump_addr2line(FILE *fp)
 		s -= l; m += l;
 	}
 
-	fprintf(fp, "<4>zus_warn: addr2line -a -C -e %s -f -p -s %s\n",
+	fprintf(fp, LOG_STR(LOG_WARNING) "zus_warn: addr2line -a -C -e %s -f -p -s %s\n",
 		program_invocation_name, ptrS);
 }
 
@@ -106,14 +106,14 @@ void zus_dump_stack(FILE *fp, const char *fmt, ...)
 
 void zus_warn(const char *cond, const char *file, int line)
 {
-	zus_dump_stack(stderr, "<4>%s: %s (%s:%d)\n", __func__, cond, file,
-		       line);
+	zus_dump_stack(stderr, LOG_STR(LOG_WARNING) "%s: %s (%s:%d)\n", __func__,
+		       cond, file, line);
 }
 
 void zus_bug(const char *cond, const char *file, int line)
 {
-	zus_dump_stack(stderr, "<3>%s: %s (%s:%d)\n", __func__, cond, file,
-		       line);
+	zus_dump_stack(stderr, LOG_STR(LOG_ERR) "%s: %s (%s:%d)\n", __func__,
+		       cond, file, line);
 	abort();
 }
 
