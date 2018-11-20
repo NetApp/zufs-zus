@@ -20,9 +20,7 @@ signal_apps()
 	local mntdev=$2
 	local pids
 
-	pids=$(/sbin/lsof -t ${mntdev})
-
-	if [[ -n "${pids}" ]] ; then
+	if pids=$(/sbin/lsof -t ${mntdev}) ; then
 		kill -s ${signal} ${pids}
 	else
 		echo "No apps founds"
@@ -45,10 +43,35 @@ unload_libfs()
 	done
 }
 
+unload_zusd()
+{
+	local timeout=60
+	local pids
+
+	# send sigterm to zusd
+	if pids=$(pgrep -x zusd) ; then
+		kill -s SIGTERM ${pids}
+	fi
+
+	# wait for zusd to terminate
+	while pids=$(pgrep -x zusd) && [[ ${timeout} -gt 1 ]] ; do
+		# if 'let' returns falsy value => bash exits, so count till 1
+		let timeout-=1
+		sleep 1
+	done
+
+	if [[ -n ${pids} ]] ; then
+		echo "Warning: Failed to stop zusd, terminating forcibly"
+		kill -s SIGKILL ${pids}
+	fi
+}
+
 unload() {
 	for libfs in ${ZUFS_LIBFS_LIST/,/ } ; do
 		unload_libfs ${libfs}
 	done
+
+	unload_zusd
 
 	/bin/umount -v -t zuf ${ZUF_ROOT}
 	/sbin/rmmod -v zuf
@@ -56,18 +79,26 @@ unload() {
 
 load()
 {
-	if ! /sbin/modinfo zuf ; then
+	# cleanup previous loads
+	if /bin/grep -qw zuf /proc/self/mounts ; then
+		unload
+	fi
+
+	# in case we booted a new kernel that isn't familiar with zuf
+	# link it hoping the kernel ABI still matches
+	if ! /sbin/modinfo zuf >/dev/null ; then
 		/bin/ln -sf ${ZUF_MOD} /lib/modules/$(/bin/uname -r)/extra
 		/sbin/depmod
 	fi
 
 	/sbin/modprobe -v zuf
 	/bin/mount -v -t zuf nodev ${ZUF_ROOT}
+
+	exec /sbin/zusd ${ZUSD_ARGS}
 }
 
 case $1 in
 up)
-	/bin/grep -qw zuf /proc/self/mounts && unload || :
 	load
 	;;
 down)
