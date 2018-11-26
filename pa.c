@@ -227,7 +227,9 @@ int pa_init(struct zus_sb_info *sbi)
 	pa->size = 0;
 	a_list_init(&pa->head);
 
-	pthread_spin_init(&pa->lock, PTHREAD_PROCESS_SHARED);
+	err = pthread_spin_init(&pa->lock, PTHREAD_PROCESS_SHARED);
+	if (unlikely(err))
+		goto fail;
 
 	err = fba_alloc(&pa->data, PA_SIZE);
 	if (unlikely(err))
