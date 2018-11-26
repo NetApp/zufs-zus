@@ -195,11 +195,14 @@ enum E_zus_sbi_flags {
 	ZUS_SBIF_LAST,
 };
 
-static inline void _z_set_bit(uint flag, ulong *val) { *val |= (1 << flag); }
-static inline
-void zus_sbi_flag_set(struct zus_sb_info *sbi, int flag)
+static inline void zus_sbi_set_flag(struct zus_sb_info *sbi, int flag)
 {
-	_z_set_bit(flag, &sbi->flags);
+	sbi->flags |= (1 << flag);
+}
+
+static inline int zus_sbi_test_flag(struct zus_sb_info *sbi, int flag)
+{
+	return (sbi->flags & (1 << flag));
 }
 
 struct zus_zfi_operations {

@@ -147,7 +147,7 @@ int zus_mount(int fd, struct zufs_ioc_mount *zim)
 
 	return 0;
 err:
-	zus_sbi_flag_set(sbi, ZUS_SBIF_ERROR);
+	zus_sbi_set_flag(sbi, ZUS_SBIF_ERROR);
 	_zus_sbi_fini(sbi);
 	zim->hdr.err = err;
 	return err;
