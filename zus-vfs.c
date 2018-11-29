@@ -23,18 +23,21 @@
 
 static int _pmem_mmap(struct multi_devices *md)
 {
+	size_t size = md_p2o(md_t1_blocks(md));
 	int prot = PROT_WRITE | PROT_READ;
 	int flags = MAP_SHARED;
 	int err;
 
-	md->p_pmem_addr = mmap(NULL, md_p2o(md_t1_blocks(md)), prot, flags,
-			       md->fd, 0);
+	if (unlikely(md->pmem_info.mdt.s_flags & MDT_F_SHADOW))
+		size += size;
+
+	md->p_pmem_addr = mmap(NULL, size, prot, flags, md->fd, 0);
 	if (md->p_pmem_addr == MAP_FAILED) {
 		ERROR("mmap failed=> %d: %s\n", errno, strerror(errno));
 		return -(errno ?: ENOMEM);
 	}
 
-	err = madvise(md->p_pmem_addr, md_p2o(md_t1_blocks(md)), MADV_DONTDUMP);
+	err = madvise(md->p_pmem_addr, size, MADV_DONTDUMP);
 	if (err == -1)
 		ERROR("pmem madvise(DONTDUMP) failed=> %d: %s\n", errno,
 		      strerror(errno));
@@ -44,9 +47,13 @@ static int _pmem_mmap(struct multi_devices *md)
 
 static int _pmem_unmap(struct multi_devices *md)
 {
+	size_t size = md_p2o(md_t1_blocks(md));
 	int err;
 
-	err = munmap(md->p_pmem_addr, md_p2o(md_t1_blocks(md)));
+	if (unlikely(md->pmem_info.mdt.s_flags & MDT_F_SHADOW))
+		size += size;
+
+	err = munmap(md->p_pmem_addr, size);
 	if (err == -1) {
 		ERROR("munmap failed=> %d: %s\n", errno, strerror(errno));
 		return errno;

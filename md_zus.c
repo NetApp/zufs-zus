@@ -145,7 +145,7 @@ static int _map_setup(struct multi_devices *md, ulong blocks, int dev_start,
 
 int md_init_from_pmem_info(struct multi_devices *md)
 {
-	struct md_dev_list *dev_list = &md->pmem_info.dev_list;
+	struct md_dev_list *dev_list = &md->pmem_info.mdt.s_dev_list;
 	ulong offset = 0;
 	int i, err;
 
