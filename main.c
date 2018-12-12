@@ -16,6 +16,7 @@
 #include <getopt.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <malloc.h>
 
 #include "zus.h"
 #include "zusd.h"
@@ -74,15 +75,17 @@ int main(int argc, char *argv[])
 		{.name = "policyFIFO", .has_arg = 2, .flag = NULL, .val = 'f'} ,
 		{.name = "nice", .has_arg = 2, .flag = NULL, .val = 'n'} ,
 		{.name = "verbose", .has_arg = 2, .flag = NULL, .val = 'd'} ,
+		{.name = "mcheck", .has_arg = 0, .flag = NULL, .val = 'm'} ,
 		{.name = 0, .has_arg = 0, .flag = 0, .val = 0} ,
 	};
+	const char *shortopt = "r::f::n::d::m";
 	char op;
 	struct zus_thread_params tp;
 	const char *path = ZUF_DEF_PATH;
 	int err;
 
 	ZTP_INIT(&tp);
-	while ((op = getopt_long(argc, argv, "r::f::n::d::", opt, NULL)) != -1) {
+	while ((op = getopt_long(argc, argv, shortopt, opt, NULL)) != -1) {
 		switch (op) {
 		case 'r':
 			tp.policy = SCHED_RR;
@@ -105,6 +108,9 @@ int main(int argc, char *argv[])
 			} else {
 				g_DBGMASK = 0x1;
 			}
+			break;
+		case 'm':
+			mallopt(M_CHECK_ACTION, 3);
 			break;
 		default:;
 			/* Just ignore we are not the police */
