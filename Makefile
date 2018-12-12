@@ -49,5 +49,5 @@ cscope:
 .NOTPARALLEL:
 .DEFAULT_GOAL := all
 else
-include zusfs.mk
+include zusmodule.mk
 endif
