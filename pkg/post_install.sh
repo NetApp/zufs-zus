@@ -1,6 +1,5 @@
 #!/bin/bash
 
-SERVICE_NAME=zusd
 CONF=/etc/zufs.conf
 
 if [[ ! -f ${CONF} ]] ; then
@@ -10,6 +9,5 @@ fi
 # add libzus to ld DB
 ldconfig
 
-# configure and start daemon
-systemctl -q is-active ${SERVICE_NAME} && systemctl stop ${SERVICE_NAME}
 systemctl daemon-reload
+systemctl restart zusd
