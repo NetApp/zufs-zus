@@ -12,7 +12,7 @@ PROJ_LIB_DIRS := $(ZDIR)
 PROJ_CFLAGS := -fpic $(ZM_CFLAGS)
 PROJ_LDFLAGS := -shared $(ZM_LDFLAGS)
 PROJ_OBJS_DEPS := $(M)/Makefile $(ZM_OBJS_DEPS) $(ZDIR)/zusfs.mk
-PROJ_TARGET_DEPS += $(ZDIR)/libzus.so $(ZM_LIB_DEPS)
+PROJ_TARGET_DEPS += $(ZDIR)/libzus.so $(ZM_TARGET_DEPS)
 
 module:
 ifneq ($(ZM_PRE_BUILD),)
