@@ -937,10 +937,10 @@ int toyfs_sbi_init(struct zus_sb_info *zsbi, struct zufs_ioc_mount *zim)
 		return err;
 
 	sbi->s_zus_sbi.z_root = &sbi->s_root->zii;
-	zim->zus_sbi = &sbi->s_zus_sbi;
-	zim->zus_ii = sbi->s_zus_sbi.z_root;
-	zim->s_blocksize_bits  = PAGE_SHIFT;
-	zim->acl_on = 1;
+	zim->zmi.zus_sbi = &sbi->s_zus_sbi;
+	zim->zmi.zus_ii = sbi->s_zus_sbi.z_root;
+	zim->zmi.s_blocksize_bits  = PAGE_SHIFT;
+	zim->zmi.acl_on = 1;
 
 	return 0;
 }

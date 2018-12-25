@@ -541,7 +541,7 @@ static void *zus_mount_thread(void *callback_info)
 		if (!g_ztp.num_zts) {
 			err = zus_start_all_threads(&g_mount.tp,
 						    g_zus_numa_map.online_cpus,
-						    zim->num_channels);
+						    zim->zmi.num_channels);
 			if (unlikely(err))
 				goto next;
 		}

@@ -175,7 +175,7 @@ int foofs_sbi_init(struct zus_sb_info *sbi, struct zufs_ioc_mount *zim)
 	if (unlikely(!sbi->z_root))
 		return -ENOMEM;
 
-	zim->s_blocksize_bits = PAGE_SHIFT;
+	zim->zmi.s_blocksize_bits = PAGE_SHIFT;
 	return 0;
 }
 

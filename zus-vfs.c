@@ -118,7 +118,7 @@ static void _zus_sbi_fini(struct zus_sb_info *sbi)
 
 int zus_mount(int fd, struct zufs_ioc_mount *zim)
 {
-	struct zus_fs_info *zfi = zim->zus_zfi;
+	struct zus_fs_info *zfi = zim->zmi.zus_zfi;
 	struct zus_sb_info *sbi;
 	int err;
 
@@ -127,10 +127,10 @@ int zus_mount(int fd, struct zufs_ioc_mount *zim)
 		err = -ENOMEM;
 		goto err;
 	}
-	sbi->zfi = zim->zus_zfi;
-	sbi->kern_sb_id = zim->sb_id;
+	sbi->zfi = zim->zmi.zus_zfi;
+	sbi->kern_sb_id = zim->zmi.sb_id;
 
-	err = _pmem_grab(sbi, zim->pmem_kern_id);
+	err = _pmem_grab(sbi, zim->zmi.pmem_kern_id);
 	if (unlikely(err))
 		goto err;
 
@@ -138,12 +138,12 @@ int zus_mount(int fd, struct zufs_ioc_mount *zim)
 	if (unlikely(err))
 		goto err;
 
-	zim->zus_sbi = sbi;
-	zim->_zi = pmem_dpp_t(md_addr_to_offset(&sbi->md, sbi->z_root->zi));
-	zim->zus_ii = sbi->z_root;
+	zim->zmi.zus_sbi = sbi;
+	zim->zmi._zi = pmem_dpp_t(md_addr_to_offset(&sbi->md, sbi->z_root->zi));
+	zim->zmi.zus_ii = sbi->z_root;
 
 	DBG("[%lld] _zi 0x%lx zus_ii=%p\n",
-	    sbi->z_root->zi->i_ino, (ulong)zim->_zi, zim->zus_ii);
+	    sbi->z_root->zi->i_ino, (ulong)zim->zmi._zi, zim->zmi.zus_ii);
 
 	return 0;
 err:
@@ -155,13 +155,13 @@ err:
 
 int zus_umount(int fd, struct zufs_ioc_mount *zim)
 {
-	_zus_sbi_fini(zim->zus_sbi);
+	_zus_sbi_fini(zim->zmi.zus_sbi);
 	return 0;
 }
 
 int zus_remount(int fd, struct zufs_ioc_mount *zim)
 {
-	struct zus_sb_info *sbi = zim->zus_sbi;
+	struct zus_sb_info *sbi = zim->zmi.zus_sbi;
 
 	if (sbi->zfi->op->sbi_remount)
 		return sbi->zfi->op->sbi_remount(sbi, zim);
