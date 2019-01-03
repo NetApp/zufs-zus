@@ -149,15 +149,15 @@ static bool _pa_is_free(struct pa_page *page)
 	return (page->refcount == 0);
 }
 
-/* order - power of 2 of pages to allocate.
- * TODO: support order > 1
- */
+/* order - power of 2 of pages to allocate */
 struct pa_page *pa_alloc_order(struct zus_sb_info *sbi, int order)
 {
 	struct pa *pa = &sbi->pa[POOL_NUM];
 	struct pa_page *page;
+	ushort npages = 1 << order;
+	int i = 0;
 
-	if (ZUS_WARN_ON(1 < order))
+	if (ZUS_WARN_ON(PA_MAX_ORDER < order))
 		return NULL;
 
 	pthread_spin_lock(&pa->lock);
@@ -171,25 +171,23 @@ struct pa_page *pa_alloc_order(struct zus_sb_info *sbi, int order)
 		}
 	}
 
-	if (order == 1) {
-		a_list_for_each_entry(page, &pa->head, list) {
-			ulong bn = pa_page_to_bn(sbi, page);
+	a_list_for_each_entry(page, &pa->head, list) {
+		ulong bn = pa_page_to_bn(sbi, page);
 
-			if (bn % 2)
-				continue;
-			if (_pa_is_free(page + 1)) {
-				_alloc_one_page(page + 1);
-				goto found;
-			}
+		if (bn % npages)
+			continue;
+
+		for (i = 1; i < npages; ++i) {
+			if (!_pa_is_free(page + i))
+				break;
 		}
-		page = NULL;
-		goto out;
-	} else {
-		page = a_list_first_entry(&pa->head, struct pa_page, list);
+		if (i == npages) {
+			for (i = 0; i < npages; ++i)
+				_alloc_one_page(page + i);
+			goto out;
+		}
 	}
-found:
-	_alloc_one_page(page);
-
+	page = NULL;
 out:
 	pthread_spin_unlock(&pa->lock);
 
