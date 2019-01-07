@@ -155,7 +155,7 @@ struct pa_page *pa_alloc_order(struct zus_sb_info *sbi, int order)
 	struct pa *pa = &sbi->pa[POOL_NUM];
 	struct pa_page *page;
 	ushort npages = 1 << order;
-	int i = 0;
+	int err, i = 0;
 
 	if (ZUS_WARN_ON(PA_MAX_ORDER < order))
 		return NULL;
@@ -163,14 +163,14 @@ struct pa_page *pa_alloc_order(struct zus_sb_info *sbi, int order)
 	pthread_spin_lock(&pa->lock);
 
 	if (a_list_empty(&pa->head)) {
-		int err = _init_page_of_pages(sbi, pa);
-
+		err = _init_page_of_pages(sbi, pa);
 		if (unlikely(err)) {
 			page = NULL;
 			goto out;
 		}
 	}
 
+rescan:
 	a_list_for_each_entry(page, &pa->head, list) {
 		ulong bn = pa_page_to_bn(sbi, page);
 
@@ -188,6 +188,11 @@ struct pa_page *pa_alloc_order(struct zus_sb_info *sbi, int order)
 		}
 	}
 	page = NULL;
+	err = _init_page_of_pages(sbi, pa);
+	if (unlikely(err))
+		goto out;
+	goto rescan;
+
 out:
 	pthread_spin_unlock(&pa->lock);
 
