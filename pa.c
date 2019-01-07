@@ -114,7 +114,7 @@ static void _init_one_page(struct zus_sb_info *sbi, struct pa *pa,
 			   struct pa_page *page)
 {
 	a_list_init(&page->list);
-	a_list_add(&page->list, &pa->head);
+	a_list_add_tail(&page->list, &pa->head);
 	pa_set_page_zone(page, POOL_NUM);
 	page->owner = sbi;
 }
