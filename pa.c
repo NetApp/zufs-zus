@@ -174,7 +174,7 @@ struct pa_page *pa_alloc_order(struct zus_sb_info *sbi, int order)
 	a_list_for_each_entry(page, &pa->head, list) {
 		ulong bn = pa_page_to_bn(sbi, page);
 
-		if (bn % npages)
+		if ((bn % npages) || (bn + npages - 1 > pa->size))
 			continue;
 
 		for (i = 1; i < npages; ++i) {
