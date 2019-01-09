@@ -23,13 +23,15 @@
 
 #define BACKTRACE_MAX 128
 
-static int _dump_backtrace(FILE *fp)
+static int _dump_backtrace(FILE *fp, bool warn)
 {
 	int err, lim = BACKTRACE_MAX;
 	char sym[256] = "";
 	unw_word_t ip, sp, off;
 	unw_context_t context;
 	unw_cursor_t cursor;
+	const char *prefix = warn ? LOG_STR(LOG_WARNING) "zus_warn:         " :
+				   LOG_STR(LOG_NOTICE) "  ";
 
 	err = unw_getcontext(&context);
 	if (err != UNW_ESUCCESS)
@@ -57,8 +59,8 @@ static int _dump_backtrace(FILE *fp)
 		if (err)
 			return err;
 
-		fprintf(fp, LOG_STR(LOG_WARNING) "zus_warn:        [<%p>] 0x%lx %s+0x%lx\n",
-			(void *)ip, (long)sp, sym, (long)off);
+		fprintf(fp, "%s[<%p>] 0x%lx %s+0x%lx\n",
+			prefix, (void *)ip, (long)sp, sym, (long)off);
 	}
 	return 0;
 }
@@ -88,7 +90,7 @@ static void _dump_addr2line(FILE *fp)
 		program_invocation_name, ptrS);
 }
 
-void zus_dump_stack(FILE *fp, const char *fmt, ...)
+void zus_dump_stack(FILE *fp, bool warn, const char *fmt, ...)
 {
 	va_list args;
 
@@ -98,22 +100,22 @@ void zus_dump_stack(FILE *fp, const char *fmt, ...)
 	vfprintf(fp, fmt, args);
 	va_end(args);
 
-	_dump_backtrace(fp);
-	_dump_addr2line(fp);
-
+	_dump_backtrace(fp, warn);
+	if (warn)
+		_dump_addr2line(fp);
 	funlockfile(fp);
 }
 
 void zus_warn(const char *cond, const char *file, int line)
 {
-	zus_dump_stack(stderr, LOG_STR(LOG_WARNING) "%s: %s (%s:%d)\n", __func__,
-		       cond, file, line);
+	zus_dump_stack(stderr, true, LOG_STR(LOG_WARNING) "%s: %s (%s:%d)\n",
+			__func__, cond, file, line);
 }
 
 void zus_bug(const char *cond, const char *file, int line)
 {
-	zus_dump_stack(stderr, LOG_STR(LOG_ERR) "%s: %s (%s:%d)\n", __func__,
-		       cond, file, line);
+	zus_dump_stack(stderr, true, LOG_STR(LOG_ERR) "%s: %s (%s:%d)\n",
+			__func__, cond, file, line);
 	abort();
 }
 

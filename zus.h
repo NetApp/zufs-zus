@@ -51,10 +51,14 @@
 #endif
 
 /* utils.c */
-void zus_dump_stack(FILE *fp, const char *fmt, ...);
+void zus_dump_stack(FILE *fp, bool warn, const char *fmt, ...);
 void zus_warn(const char *cond, const char *file, int line);
 void zus_bug(const char *cond, const char *file, int line);
 int zus_increase_max_files(void);
+
+#define dump_stack() \
+	zus_dump_stack(stderr, false, "<5>%s: (%s:%d)\n", \
+			__func__, __FILE__, __LINE__)
 
 #define ZUS_WARN_ON(x_) ({ \
 	int __ret_warn_on = !!(x_); \
