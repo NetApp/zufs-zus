@@ -14,7 +14,7 @@
 [Unit]
 Description=Zero-copy User-mode FileSystem
 ConditionPathExists=|/lib/modules/%v/kernel/fs/zuf/zuf.ko
-ConditionPathExists=|/usr/lib/zufs/extra/zuf.ko
+ConditionPathExistsGlob=|/usr/lib/zufs/extra/zuf*.ko
 After=local-fs.target
 
 [Service]

@@ -11,7 +11,6 @@
 # Authors:
 #	Yigal Korman <yigalk@netapp.com>
 
-ZUF_MOD=/usr/lib/zufs/extra/zuf.ko
 ZUF_ROOT=/sys/fs/zuf
 
 signal_apps()
@@ -79,6 +78,10 @@ unload() {
 
 load()
 {
+	local zuf_mod=/usr/lib/zufs/extra/zuf.ko
+	local kver=$(/bin/uname -r)
+	local kabi=$(echo ${kver} | /bin/sed -e 's|\([0-9.]*-[0-9]*\).*|\1|')
+
 	# cleanup previous loads
 	if /bin/grep -qw zuf /proc/self/mounts ; then
 		unload
@@ -87,7 +90,7 @@ load()
 	# in case we booted a new kernel that isn't familiar with zuf
 	# link it hoping the kernel ABI still matches
 	if ! /sbin/modinfo zuf >/dev/null ; then
-		/bin/ln -sf ${ZUF_MOD} /lib/modules/$(/bin/uname -r)/extra
+		/bin/ln -sf ${zuf_mod%.ko}.*${kabi}*.ko /lib/modules/${kver}/extra/zuf.ko
 		/sbin/depmod
 	fi
 
