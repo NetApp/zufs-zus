@@ -355,7 +355,7 @@ int zus_ddbg_write(struct zufs_ddbg_info *zdi);
  * The size is round up to 4K alignment.
  */
 int  fba_alloc(struct fba *fba, size_t size);
-int  fba_alloc_align(struct fba *fba, size_t size);
+int  fba_alloc_align(struct fba *fba, size_t size, bool huge);
 void fba_free(struct fba *fba);
 int fba_punch_hole(struct fba *fba, ulong index, uint nump);
 

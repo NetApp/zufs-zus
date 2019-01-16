@@ -28,7 +28,7 @@
  */
 #define FBA_ALIGNSIZE	(ZUFS_ALLOC_MASK + 1)
 
-int  fba_alloc(struct fba *fba, size_t size)
+static int _fba_alloc(struct fba *fba, size_t size, int flags)
 {
 	int err;
 
@@ -36,28 +36,32 @@ int  fba_alloc(struct fba *fba, size_t size)
 	 */
 	fba->fd = open("/dev/shm/", O_RDWR | O_TMPFILE | O_EXCL, 0666);
 	if (fba->fd < 0) {
-		ERROR("Error opening <%s>: %s\n", "/tmp/", strerror(errno));
+		if (!(flags & MAP_HUGETLB))
+			ERROR("Error opening <%s>: %s\n","/tmp/",
+			      strerror(errno));
 		return errno;
 	}
 
 	err = ftruncate(fba->fd, size);
 	if (unlikely(err)) {
 		err = -errno;
-		ERROR("ftruncate failed size=0x%lx => %d\n", size, err);
+		if (!(flags & MAP_HUGETLB))
+			ERROR("ftruncate failed size=0x%lx => %d\n", size, err);
 		close(fba->fd);
 		return err;
 	}
 
-	fba->ptr = mmap(NULL, size, PROT_WRITE | PROT_READ, MAP_SHARED,
+	fba->ptr = mmap(NULL, size, PROT_WRITE | PROT_READ, flags,
 			fba->fd, 0);
 	if (fba->ptr == MAP_FAILED) {
-		ERROR("mmap failed=> %d: %s\n", errno, strerror(errno));
+		if (!(flags & MAP_HUGETLB))
+			ERROR("mmap failed=> %d: %s\n", errno, strerror(errno));
 		fba_free(fba);
 		return errno ?: ENOMEM;
 	}
 
 	err = madvise(fba->ptr, size, MADV_DONTDUMP);
-	if (err == -1)
+	if (err == -1 && !(flags & MAP_HUGETLB))
 		ERROR("madvise(DONTDUMP) failed=> %d: %s\n", errno,
 		      strerror(errno));
 
@@ -66,13 +70,38 @@ int  fba_alloc(struct fba *fba, size_t size)
 
 	return 0;
 }
-int  fba_alloc_align(struct fba *fba, size_t size)
+
+int fba_alloc(struct fba *fba, size_t size)
+{
+	return _fba_alloc(fba, size, MAP_SHARED);
+}
+
+static int _fba_alloc_huge(struct fba *fba, size_t size)
+{
+	int err;
+
+	err = _fba_alloc(fba, size, MAP_ANONYMOUS | MAP_SHARED | MAP_HUGETLB);
+	if (unlikely(err)) {
+		/* fallback to 4k pages */
+		INFO("mmap failed huge=> %d: %s\n", errno, strerror(errno));
+		return fba_alloc(fba, size);
+	}
+
+	return 0;
+}
+
+int fba_alloc_align(struct fba *fba, size_t size, bool huge)
 {
 	ulong addr;
 	int err;
 
 	size = ALIGN(size + FBA_ALIGNSIZE, FBA_ALIGNSIZE);
-	err = fba_alloc(fba, size);
+
+	if (huge)
+		err = _fba_alloc_huge(fba, size);
+	else
+		err = fba_alloc(fba, size);
+
 	if (unlikely(err))
 		return err;
 
