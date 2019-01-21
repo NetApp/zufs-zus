@@ -43,6 +43,11 @@ int zus_add_module_ddbg(const char *fs_name, void *handle)
 	int n_dbg;
 	struct module_ddbg *modd;
 
+	if (strlen(fs_name) >= sizeof(modd->name)) {
+		printf("Name too-long fs_name=%s\n", fs_name);
+		return -EINVAL;
+	}
+
 	iter = dlsym(handle, "__start_zus_ddbg");
 	if (!iter) {
 		printf("Unable to get library start symbol\n");
@@ -50,7 +55,7 @@ int zus_add_module_ddbg(const char *fs_name, void *handle)
 	}
 
 	stop = dlsym(handle, "__stop_zus_ddbg");
-	if (!iter) {
+	if (!stop) {
 		printf("Unable to get library start symbol\n");
 		return -EINVAL;
 	}
@@ -62,7 +67,7 @@ int zus_add_module_ddbg(const char *fs_name, void *handle)
 		return -ENOMEM;
 	modd = ddbg_db.modules[ddbg_db.mod_count];
 
-	strncpy(modd->name, fs_name, ZUS_LIBFS_MAX_PATH);
+	strncpy(modd->name, fs_name, sizeof(modd->name) - 1);
 
 	modd->n_dbg_entries = n_dbg;
 	for (i = 0; i < n_dbg; ++i, ++iter) {
