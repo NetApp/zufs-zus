@@ -203,6 +203,8 @@ static int _token_type(const char *token)
 		return DDBG_CRIT_FUNC;
 	if (strcmp(token, "file") == 0)
 		return DDBG_CRIT_FILE;
+	if (strcmp(token, "line") == 0)
+		return DDBG_CRIT_LINENO;
 	if (strcmp(token, "format") == 0)
 		return DDBG_CRIT_FMT;
 	if (strcmp(token, "+p") == 0)
@@ -235,11 +237,11 @@ static int _parse(struct ddbg_ctl *ddc)
 			ddc->filename = ddc->tokens[i];
 			break;
 		case DDBG_CRIT_LINENO: {
-			char *leftover;
+			char *leftover = NULL;
 
 			REQUIRE_ADDITIONAL_TOKEN;
 			ddc->lineno = strtoul(ddc->tokens[i], &leftover, 10);
-			if (leftover) /* Someone is having fun */
+			if (*leftover) /* Someone is having fun */
 				return -EINVAL;
 			break;
 		}
