@@ -29,7 +29,7 @@ typedef unsigned int uint;
 
 /* ~~~ zuf-root files ~~~ */
 char g_zus_root_path_stor[PATH_MAX];
-const char const *g_zus_root_path = g_zus_root_path_stor;
+const char *g_zus_root_path = g_zus_root_path_stor;
 
 ulong g_DBGMASK = 0;
 
