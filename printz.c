@@ -44,19 +44,19 @@ int zus_add_module_ddbg(const char *fs_name, void *handle)
 	struct module_ddbg *modd;
 
 	if (strlen(fs_name) >= sizeof(modd->name)) {
-		printf("Name too-long fs_name=%s\n", fs_name);
+		ERROR("Name too-long fs_name=%s\n", fs_name);
 		return -EINVAL;
 	}
 
 	iter = dlsym(handle, "__start_zus_ddbg");
 	if (!iter) {
-		printf("Unable to get library start symbol\n");
+		ERROR("Unable to get library start symbol\n");
 		return -EINVAL;
 	}
 
 	stop = dlsym(handle, "__stop_zus_ddbg");
 	if (!stop) {
-		printf("Unable to get library start symbol\n");
+		ERROR("Unable to get library start symbol\n");
 		return -EINVAL;
 	}
 	n_dbg = stop - iter;
