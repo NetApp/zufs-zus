@@ -12,13 +12,21 @@
 #ifndef __ZUS_H__
 #define __ZUS_H__
 
-#include <sys/types.h>
+/* sys/stat.h must be included the very first */
 #include <sys/stat.h>
+
+#include <sys/types.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <sched.h>
 
+/* On old GCC systems we do not yet have STATX stuff in sys/stat.h
+ * so in this case include also the kernel header.
+ */
+#ifndef STATX_MODE
 #include <linux/stat.h>
+#endif
+
 /* This is a nasty hack for getting O_TMPFILE into centos 7.4
  * it already exists on centos7.4 but with a diffrent name
  * the value is the same
