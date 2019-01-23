@@ -121,7 +121,7 @@ void zus_bug(const char *cond, const char *file, int line)
 	abort();
 }
 
-#define ZUS_MAX_FILES 16384
+#define ZUS_MAX_FILES 65536
 
 int zus_increase_max_files(void)
 {
