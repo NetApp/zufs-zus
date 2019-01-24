@@ -52,7 +52,7 @@ do {									\
 
 /* FIXME: move to dynamic print as well */
 #define ERROR(fmt, a...) fprintf(stderr, LOG_STR(LOG_ERR) "zus: [%s:%d]: " fmt, __func__, __LINE__, ##a)
-#define INFO(fmt, a...) fprintf(stderr, LOG_STR(LOG_INFO) "zus: " fmt, ##a)
+#define INFO(fmt, a...) fprintf(stderr, LOG_STR(LOG_INFO) "~info~ zus: " fmt, ##a)
 
 extern ulong g_DBGMASK;
 #define ZUS_DBGPRNT  (g_DBGMASK & 1)
