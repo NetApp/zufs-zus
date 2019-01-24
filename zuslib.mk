@@ -12,7 +12,7 @@
 -include $(CURDIR)/.config
 PROJ_TARGET := libzus.so
 PROJ_OBJS := zus-core.o zus-vfs.o module.o md_zus.o nvml_movnt.o utils.o fs-loader.o pa.o
-PROJ_OBJS += printz.o
+PROJ_OBJS += _pr.o
 PROJ_INCLUDES := .
 PROJ_CFLAGS := -fpic
 PROJ_LIBS := rt uuid unwind dl pthread

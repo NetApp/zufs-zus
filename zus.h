@@ -38,7 +38,7 @@
 #endif
 
 #include "zus_api.h"
-#include "printz.h"
+#include "_pr.h"
 #include "a_list.h"
 
 /* FIXME: Move to K_in_U include structure */

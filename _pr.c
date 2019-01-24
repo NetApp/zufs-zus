@@ -1,4 +1,4 @@
-#include "printz.h"
+#include "_pr.h"
 #include "zus.h"
 
 #include <sys/types.h>
