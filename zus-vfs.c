@@ -489,6 +489,17 @@ static int _statfs(struct zufs_ioc_hdr *hdr)
 	return sbi->op->statfs(sbi, ioc_statfs);
 }
 
+static int _fiemap(void *app_ptr, struct zufs_ioc_hdr *hdr)
+{
+	struct zufs_ioc_fiemap *zif = (void *)hdr;
+	struct zus_inode_info *zii = zif->zus_ii;
+
+	if (!zii->op->fiemap)
+		return -ENOTSUP;
+
+	return zii->op->fiemap(app_ptr, zif);
+}
+
 const char *ZUFS_OP_name(enum e_zufs_operation op)
 {
 #define CASE_ENUM_NAME(e) case e: return #e
@@ -520,6 +531,7 @@ const char *ZUFS_OP_name(enum e_zufs_operation op)
 		CASE_ENUM_NAME(ZUFS_OP_XATTR_GET);
 		CASE_ENUM_NAME(ZUFS_OP_XATTR_SET);
 		CASE_ENUM_NAME(ZUFS_OP_XATTR_LIST);
+		CASE_ENUM_NAME(ZUFS_OP_FIEMAP);
 		CASE_ENUM_NAME(ZUFS_OP_BREAK);
 		CASE_ENUM_NAME(ZUFS_OP_MAX_OPT);
 	default:
@@ -579,6 +591,8 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 		return _ioc_xattr(hdr);
 	case ZUFS_OP_STATFS:
 		return _statfs(hdr);
+	case ZUFS_OP_FIEMAP:
+		return _fiemap(app_ptr, hdr);
 	case ZUFS_OP_BREAK:
 		break;
 	default:

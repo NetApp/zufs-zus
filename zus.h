@@ -151,6 +151,7 @@ struct zus_zii_operations {
 			struct zufs_ioc_xattr *ioc_xattr);
 	int (*listxattr)(struct zus_inode_info *zii,
 			 struct zufs_ioc_xattr *ioc_xattr);
+	int (*fiemap)(void *app_ptr, struct zufs_ioc_fiemap *zif);
 };
 
 struct zus_inode_info {
