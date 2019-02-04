@@ -329,24 +329,45 @@ static void _submit(struct zus_iomap_build *iomb, bool last, bool sync)
 	ERROR("\n");
 }
 
+static struct fba g_io_fba;
+
+static int _init_g_fba(void)
+{
+	if (g_io_fba.fd)
+		return 0;
+
+	return zus_alloc_exec_buff(NULL, PAGE_SIZE, 0, &g_io_fba);
+}
+
+static int _iomb_start(struct zus_iomap_build *iomb, struct multi_devices *md)
+{
+	struct zufs_ioc_iomap_exec *ziome;
+	uint iom_max;
+
+	iomb->err = _init_g_fba();
+	if (iomb->err)
+		return iomb->err;
+
+	iomb->fd = g_io_fba.fd;
+	ziome = g_io_fba.ptr;
+
+	iomb->ziom = &ziome->ziom;
+	iom_max =  PAGE_SIZE / 2;
+	_zus_ioc_ziom_init(iomb->ziom, iom_max);
+	_zus_ioc_iom_start(iomb, md->sbi, _done, _submit, md, iomb->ziom);
+	return 0;
+}
+
 int md_t2_mdt_read(struct multi_devices *md, int dev_index,
 		   struct md_dev_table *mdt)
 {
 	struct zus_iomap_build iomb = {};
-	struct {
-		struct zufs_ioc_iomap_exec ziome;
-		struct zufs_iom_t2_zusmem_io space;
-		__u64 null_term;
-	} a;
-	uint iom_max;
 
-	iomb.ziom = &a.ziome.ziom;
-	iom_max = sizeof(a) - offsetof(typeof(a.ziome), ziom);
-	_zus_ioc_ziom_init(iomb.ziom, iom_max);
-	_zus_ioc_iom_start(&iomb, md->sbi, _done, _submit, md, &a.ziome.ziom);
+	iomb.err = _iomb_start(&iomb, md);
+	if (unlikely(iomb.err))
+		return iomb.err;
 
 	_zus_iom_enc_t2_zusmem_read(&iomb, 0, mdt, PAGE_SIZE);
-
 	_zus_ioc_iom_exec_submit(&iomb, true, true);
 
 	return iomb.err;
@@ -355,23 +376,15 @@ int md_t2_mdt_read(struct multi_devices *md, int dev_index,
 int md_t2_mdt_write(struct multi_devices *md, struct md_dev_table *mdt)
 {
 	struct zus_iomap_build iomb = {};
-	struct {
-		struct zufs_ioc_iomap_exec ziome;
-		struct zufs_iom_t2_zusmem_io space[md->t2_count];
-		__u64 null_term;
-	} a;
 	int i;
-	uint iom_max;
-
-	iomb.ziom = &a.ziome.ziom;
-	iom_max = sizeof(a) - offsetof(typeof(a.ziome), ziom);
 
 	/* FIXME: must make copies and execute at end. one by one for now */
 	for (i = 0; i < md->t2_count; ++i) {
 		ulong bn = md_o2p(md_t2_dev(md, i)->offset);
 
-		_zus_ioc_ziom_init(iomb.ziom, iom_max);
-		_zus_ioc_iom_start(&iomb, md->sbi, NULL, NULL, NULL, &a.ziome.ziom);
+		iomb.err = _iomb_start(&iomb, md);
+		if (unlikely(iomb.err))
+			return iomb.err;
 
 		mdt->s_dev_list.id_index = mdt->s_dev_list.t1_count + i;
 		mdt->s_sum = cpu_to_le16(md_calc_csum(mdt));
@@ -398,7 +411,7 @@ void _zus_ioc_iom_exec_submit(struct zus_iomap_build *iomb, bool done,
 	if (ZUS_WARN_ON(!iomb->ziom))
 		return;
 
-	err = __zus_iom_exec(iomb->sbi, ziome, sync);
+	err = __zus_iom_exec(iomb->fd, iomb->sbi, ziome, sync);
 	iomb->err = ziome->hdr.err;
 	if (unlikely(err && !iomb->err))
 		iomb->err = -errno;

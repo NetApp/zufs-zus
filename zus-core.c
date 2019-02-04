@@ -330,7 +330,6 @@ struct _zu_thread {
 
 struct zt_pool {
 	struct wait_til_zero wtz;
-	struct fba wait_fba[ZUFS_MAX_ZT_CHANNELS];
 	struct _zu_thread *zts[ZUFS_MAX_ZT_CHANNELS];
 	int num_zts;
 	uint max_channels;
@@ -358,6 +357,33 @@ static int _zu_mmap(struct _zu_thread *zt)
 	return 0;
 }
 
+static void _zu_unmap(struct _zu_thread *zt)
+{
+	munmap(zt->api_mem, ZUS_API_MAP_MAX_SIZE);
+	zt->api_mem = NULL;
+}
+
+static int _zu_ioc_buff_mmap(struct _zu_thread *zt, void **op_buff)
+{
+	int prot = PROT_WRITE | PROT_READ;
+	int flags = MAP_SHARED;
+
+	*op_buff = mmap(NULL, ZUS_MAX_OP_SIZE, prot, flags, zt->fd,
+			ZUS_API_MAP_MAX_SIZE);
+	if (*op_buff == MAP_FAILED) {
+		ERROR("mmap failed=> %d: %s\n", errno, strerror(errno));
+		*op_buff = NULL;
+		return -(errno ?: ENOMEM);
+	}
+
+	return 0;
+}
+
+static void _zu_ioc_buff_unmap(void *op)
+{
+	munmap(op, ZUS_MAX_OP_SIZE);
+}
+
 static
 int _do_op(struct _zu_thread *zt, struct zufs_ioc_wait_operation *op)
 {
@@ -378,9 +404,7 @@ static __s32 _errno_UtoK(__s32 err)
 static void *_zu_thread(void *callback_info)
 {
 	struct _zu_thread *zt = callback_info;
-	struct zufs_ioc_wait_operation *op =
-				g_ztp.wait_fba[zt->chan].ptr +
-						zt->no * ZUS_MAX_OP_SIZE;
+	struct zufs_ioc_wait_operation *op;
 
 	zt->zbt.err = zuf_root_open_tmp(&zt->fd);
 	if (zt->zbt.err)
@@ -393,6 +417,10 @@ static void *_zu_thread(void *callback_info)
 	zt->zbt.err = _zu_mmap(zt);
 	if (zt->zbt.err)
 		return NULL; /* leak the file it is fine */
+
+	zt->zbt.err = _zu_ioc_buff_mmap(zt, (void **)&op);
+	if (zt->zbt.err)
+		return NULL;
 
 	DBG("[%u] thread Init fd=%d api_mem=%p\n",
 	     zt->no, zt->fd, zt->api_mem);
@@ -412,6 +440,8 @@ static void *_zu_thread(void *callback_info)
 		op->hdr.err = _errno_UtoK(_do_op(zt, op));
 	}
 
+	_zu_ioc_buff_unmap(op);
+	_zu_unmap (zt);
 	zuf_root_close(&zt->fd);
 
 	DBG("[%u] thread Exit\n", zt->no);
@@ -426,12 +456,6 @@ static int _zus_start_chan_threads(struct zus_thread_params *tp, uint num_cpus,
 	g_ztp.zts[chan] = calloc(num_cpus, sizeof(*g_ztp.zts[0]));
 	if (!g_ztp.zts[chan])
 		return -ENOMEM;
-
-	err = fba_alloc(&g_ztp.wait_fba[chan], num_cpus * ZUS_MAX_OP_SIZE);
-	if (unlikely(err)) {
-		ERROR("fba_alloc => %u\n", err);
-		return err;
-	}
 
 	wtz_arm(&g_ztp.wtz, num_cpus);
 
@@ -501,7 +525,6 @@ static void _zus_stop_chan_threads(uint chan)
 		}
 	}
 
-	fba_free(&g_ztp.wait_fba[chan]);
 	free (g_ztp.zts[chan]);
 	g_ztp.zts[chan] = NULL;
 }
@@ -654,7 +677,51 @@ void zus_join(void)
 
 /* ~~~ callbacks from FS code into kernel ~~~ */
 
-int __zus_iom_exec(struct zus_sb_info *sbi, struct zufs_ioc_iomap_exec *ziome,
+static int _alloc_buff_mmap(struct fba *fba)
+{
+	int prot = PROT_WRITE | PROT_READ;
+	int flags = MAP_SHARED;
+
+	fba->ptr = mmap(NULL, fba->size, prot, flags, fba->fd, 0);
+	if (fba->ptr == MAP_FAILED) {
+		ERROR("mmap failed=> %d: %s\n", errno, strerror(errno));
+		return -(errno ?: ENOMEM);
+	}
+
+	return 0;
+}
+
+int zus_alloc_exec_buff(struct zus_sb_info *sbi, uint max_bytes, uint pool_num,
+			struct fba *fba)
+{
+	struct zufs_ioc_alloc_buffer ab = {};
+	int err;
+
+	ab.max_size = ab.init_size = max_bytes;
+
+	err = zuf_root_open_tmp(&fba->fd);
+	if (unlikely(err))
+		return err;
+
+	err = _ioctl(fba->fd, ZU_IOC_ALLOC_BUFFER, &ab.hdr,
+		      "ZU_IOC_ALLOC_BUFFER");
+	if (unlikely(err))
+		goto error;
+
+	fba->size = max_bytes;
+	err = _alloc_buff_mmap(fba);
+	if (unlikely(err))
+		goto error;
+
+	fba->orig_ptr = fba->ptr;
+	return 0;
+
+error:
+	zuf_root_close(&fba->fd);
+	return err;
+}
+
+int __zus_iom_exec(int fd, struct zus_sb_info *sbi, struct zufs_ioc_iomap_exec *ziome,
 		   bool sync)
 {
 	if (ZUS_WARN_ON(!ziome))
@@ -668,5 +735,5 @@ int __zus_iom_exec(struct zus_sb_info *sbi, struct zufs_ioc_iomap_exec *ziome,
 	    ziome->sb_id, ziome->ziom.iom_n, ziome->ziom.iom_e[0],
 	    ziome->ziom.iom_e[1], ziome->ziom.iom_e[2], ziome->ziom.iom_e[3]);
 
-	return zuf_iomap_exec(g_mount.fd, ziome);
+	return zuf_iomap_exec(fd, ziome);
 }

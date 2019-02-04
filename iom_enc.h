@@ -26,6 +26,7 @@ struct zus_iomap_build {
 	iomb_done_fn		done;
 	iomb_submit_fn		submit;
 	void			*priv;
+	int			fd;
 	int			err;
 
 	__u64 			*start_iom_e;

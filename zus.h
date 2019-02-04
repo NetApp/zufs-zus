@@ -339,9 +339,11 @@ struct zus_inode_info *zus_iget(struct zus_sb_info *sbi, ulong ino);
 int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr);
 const char *zus_op_name(enum e_zufs_operation op);
 
+int zus_alloc_exec_buff(struct zus_sb_info *sbi, uint max_bytes, uint pool_num,
+			struct fba *fba);
 /* do not use, please use _zus_iom_submit() in iom_enc.h */
-int __zus_iom_exec(struct zus_sb_info *sbi, struct zufs_ioc_iomap_exec *ziome,
-		   bool sync);
+int __zus_iom_exec(int fd, struct zus_sb_info *sbi,
+		   struct zufs_ioc_iomap_exec *ziome, bool sync);
 
 /* dyn_pr.c */
 int zus_add_module_ddbg(const char *fs_name, void *handle);
