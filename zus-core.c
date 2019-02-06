@@ -22,7 +22,6 @@
 #include "zusd.h"
 #include "zuf_call.h"
 #include "wtz.h"
-#include "iom_enc.h"
 
 /* TODO: Where to put */
 typedef unsigned int uint;
@@ -718,27 +717,5 @@ int zus_alloc_exec_buff(struct zus_sb_info *sbi, uint max_bytes, uint pool_num,
 
 error:
 	zuf_root_close(&fba->fd);
-	return err;
-}
-
-int __zus_iom_exec(int fd, struct zus_sb_info *sbi,
-		   struct zufs_ioc_iomap_exec *ziome, bool sync)
-{
-	int err;
-
-	if (ZUS_WARN_ON(!ziome))
-		return -EFAULT;
-
-	ziome->sb_id = sbi->kern_sb_id;
-	ziome->zus_sbi = sbi;
-	ziome->wait_for_done = sync;
-
-	DBG("ziome->sb_id=%lld, iom_n=0x%x [0x%llx, 0x%llx, 0x%llx, 0x%llx]\n",
-	    ziome->sb_id, ziome->ziom.iom_n, ziome->ziom.iom_e[0],
-	    ziome->ziom.iom_e[1], ziome->ziom.iom_e[2], ziome->ziom.iom_e[3]);
-
-	err = zuf_iomap_exec(fd, ziome);
-
-	ZUS_WARN_ON_ONCE(err);
 	return err;
 }

@@ -17,6 +17,7 @@
 #include "movnt.h"
 #include "md.h"
 #include "iom_enc.h"
+#include "zuf_call.h"
 
 /*
  * python pycrc.py --model crc-16 --algorithm table-driven --generate c
@@ -387,6 +388,28 @@ int md_t2_mdt_write(struct multi_devices *md, struct md_dev_table *mdt)
 }
 
 /* ~~~  _zus_iom facility (imp of iom_enc.h) ~~~ */
+static int __zus_iom_exec(int fd, struct zus_sb_info *sbi,
+		   struct zufs_ioc_iomap_exec *ziome, bool sync)
+{
+	int err;
+
+	if (ZUS_WARN_ON(!ziome))
+		return -EFAULT;
+
+	ziome->sb_id = sbi->kern_sb_id;
+	ziome->zus_sbi = sbi;
+	ziome->wait_for_done = sync;
+
+	DBG("ziome->sb_id=%lld, iom_n=0x%x [0x%llx, 0x%llx, 0x%llx, 0x%llx]\n",
+	    ziome->sb_id, ziome->ziom.iom_n, ziome->ziom.iom_e[0],
+	    ziome->ziom.iom_e[1], ziome->ziom.iom_e[2], ziome->ziom.iom_e[3]);
+
+	err = zuf_iomap_exec(fd, ziome);
+
+	ZUS_WARN_ON_ONCE(err);
+	return err;
+}
+
 void _zus_iom_ioc_exec_submit(struct zus_iomap_build *iomb, bool sync)
 {
 	int err;
