@@ -324,11 +324,6 @@ static void _done(struct zus_iomap_build *iomb)
 {
 }
 
-static void _submit(struct zus_iomap_build *iomb, bool last, bool sync)
-{
-	ERROR("\n");
-}
-
 static struct fba g_io_fba;
 
 static int _init_g_fba(void)
@@ -341,20 +336,13 @@ static int _init_g_fba(void)
 
 static int _iomb_start(struct zus_iomap_build *iomb, struct multi_devices *md)
 {
-	struct zufs_ioc_iomap_exec *ziome;
-	uint iom_max;
-
 	iomb->err = _init_g_fba();
 	if (iomb->err)
 		return iomb->err;
 
-	iomb->fd = g_io_fba.fd;
-	ziome = g_io_fba.ptr;
-
-	iomb->ziom = &ziome->ziom;
-	iom_max =  PAGE_SIZE / 2;
-	_zus_ioc_ziom_init(iomb->ziom, iom_max);
-	_zus_ioc_iom_start(iomb, md->sbi, _done, _submit, md, iomb->ziom);
+	_zus_iom_init_4_ioc_exec(iomb, md->sbi, g_io_fba.fd, g_io_fba.ptr,
+				 PAGE_SIZE);
+	_zus_iom_start(iomb, md, _done);
 	return 0;
 }
 
@@ -368,7 +356,7 @@ int md_t2_mdt_read(struct multi_devices *md, int dev_index,
 		return iomb.err;
 
 	_zus_iom_enc_t2_zusmem_read(&iomb, 0, mdt, PAGE_SIZE);
-	_zus_ioc_iom_exec_submit(&iomb, true, true);
+	_zus_iom_ioc_exec_submit(&iomb, true);
 
 	return iomb.err;
 }
@@ -390,7 +378,7 @@ int md_t2_mdt_write(struct multi_devices *md, struct md_dev_table *mdt)
 		mdt->s_sum = cpu_to_le16(md_calc_csum(mdt));
 
 		_zus_iom_enc_t2_zusmem_write(&iomb, bn, mdt, PAGE_SIZE);
-		_zus_ioc_iom_exec_submit(&iomb, true, true);
+		_zus_iom_ioc_exec_submit(&iomb, true);
 		if (iomb.err)
 			break;
 	}
@@ -399,11 +387,8 @@ int md_t2_mdt_write(struct multi_devices *md, struct md_dev_table *mdt)
 }
 
 /* ~~~  _zus_iom facility (imp of iom_enc.h) ~~~ */
-void _zus_ioc_iom_exec_submit(struct zus_iomap_build *iomb, bool done,
-			      bool sync)
+void _zus_iom_ioc_exec_submit(struct zus_iomap_build *iomb, bool sync)
 {
-	struct zufs_ioc_iomap_exec *ziome =
-			container_of(iomb->ziom, typeof(*ziome), ziom);
 	int err;
 
 	_zus_iom_end(iomb);
@@ -411,8 +396,8 @@ void _zus_ioc_iom_exec_submit(struct zus_iomap_build *iomb, bool done,
 	if (ZUS_WARN_ON(!iomb->ziom))
 		return;
 
-	err = __zus_iom_exec(iomb->fd, iomb->sbi, ziome, sync);
-	iomb->err = ziome->hdr.err;
+	err = __zus_iom_exec(iomb->fd, iomb->sbi, iomb->ioc_exec, sync);
+	iomb->err = iomb->ioc_exec->hdr.err;
 	if (unlikely(err && !iomb->err))
 		iomb->err = -errno;
 

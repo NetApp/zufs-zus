@@ -721,9 +721,11 @@ error:
 	return err;
 }
 
-int __zus_iom_exec(int fd, struct zus_sb_info *sbi, struct zufs_ioc_iomap_exec *ziome,
-		   bool sync)
+int __zus_iom_exec(int fd, struct zus_sb_info *sbi,
+		   struct zufs_ioc_iomap_exec *ziome, bool sync)
 {
+	int err;
+
 	if (ZUS_WARN_ON(!ziome))
 		return -EFAULT;
 
@@ -735,5 +737,8 @@ int __zus_iom_exec(int fd, struct zus_sb_info *sbi, struct zufs_ioc_iomap_exec *
 	    ziome->sb_id, ziome->ziom.iom_n, ziome->ziom.iom_e[0],
 	    ziome->ziom.iom_e[1], ziome->ziom.iom_e[2], ziome->ziom.iom_e[3]);
 
-	return zuf_iomap_exec(fd, ziome);
+	err = zuf_iomap_exec(fd, ziome);
+
+	ZUS_WARN_ON_ONCE(err);
+	return err;
 }
