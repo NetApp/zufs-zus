@@ -25,14 +25,11 @@ static struct ddbg_db {
 static void _init_ddbg(struct _ddebug *dd, const char *modname)
 {
 	char *no_path_name = strrchr(dd->filename, '/');
-	char *fmt_nl = strrchr(dd->format, '\n');
 
 	dd->id = ++ddbg_db.next_id;
 	dd->modname = modname;
 	if (no_path_name)
 		dd->filename = no_path_name + 1;
-	if (fmt_nl)
-		*fmt_nl = 0;
 }
 
 int zus_add_module_ddbg(const char *fs_name, void *handle)
@@ -87,6 +84,32 @@ void zus_free_ddbg_db(void)
 		free(ddbg_db.modules[i]);
 }
 
+static void _copy_format(const char *fmt, char *buff, size_t sz)
+{
+	size_t len = strlen(fmt);
+	size_t i;
+	size_t buff_i = 0;
+
+	for (i = 0; i < len && buff_i < sz; ++i) {
+		switch (fmt[i]) {
+		case '\n':
+		case '\t':
+			if (buff_i + 2 > sz)
+				return;
+			*buff++ = '\\';
+			*buff++ = fmt[i] == '\n' ? 'n' : 't';
+			buff_i += 2;
+			break;
+		default:
+			*buff++ = fmt[i];
+			++buff_i;
+		}
+	}
+	*buff = 0;
+}
+
+#define MAX_FORMAT_SIZE 512
+
 int zus_ddbg_read(struct zufs_ddbg_info *zdi)
 {
 	char *buff = zdi->msg;
@@ -95,6 +118,7 @@ int zus_ddbg_read(struct zufs_ddbg_info *zdi)
 	struct _ddebug *ddbg;
 	int mod_i, i;
 	size_t buff_jmp;
+	char format[MAX_FORMAT_SIZE + 1];
 
 	for (mod_i = 0; mod_i < ddbg_db.mod_count; ++mod_i) {
 		modd = ddbg_db.modules[mod_i];
@@ -102,13 +126,15 @@ int zus_ddbg_read(struct zufs_ddbg_info *zdi)
 			ddbg = modd->dbg_entries[i];
 			if (ddbg->id <= zdi->id)
 				continue;
+
+			_copy_format(ddbg->format, format, MAX_FORMAT_SIZE);
 			buff_jmp =
 				snprintf(buff, buff_sz,
 					"%s:%d [%s] %s =%s \"%s\"\n",
 					 ddbg->filename, ddbg->lineno,
 					 ddbg->modname, ddbg->function,
 					 ddbg->active ? "p" : "_",
-					 ddbg->format);
+					 format);
 			if (buff_jmp > buff_sz) {
 				*buff = 0;
 				goto out;
