@@ -227,10 +227,10 @@ static int _evict(struct zufs_ioc_hdr *hdr)
 		return 0;
 	}
 
-	if (hdr->operation == ZUS_OP_FREE_INODE) {
+	if (hdr->operation == ZUFS_OP_FREE_INODE) {
 		if (likely(zii->sbi->op->free_inode))
 			zii->sbi->op->free_inode(zii);
-	} else { /* ZUS_OP_EVICT_INODE */
+	} else { /* ZUFS_OP_EVICT_INODE */
 		/* NOTE: On lookup Kernel ask's zus to allocate a new zii &&
 		 * retrieve the zi, before it inserts it to inode cache, it is
 		 * possible to race, and have two threads do a lookup. The
@@ -286,7 +286,7 @@ static int _dentry(struct zufs_ioc_hdr *hdr)
 	struct zus_inode_info *dir_ii = zid->zus_dir_ii;
 	struct zus_inode_info *zii = zid->zus_ii;
 
-	if (hdr->operation == ZUS_OP_REMOVE_DENTRY)
+	if (hdr->operation == ZUFS_OP_REMOVE_DENTRY)
 		return dir_ii->sbi->op->remove_dentry(dir_ii, zii, &zid->str);
 
 	return dir_ii->sbi->op->add_dentry(dir_ii, zid->zus_ii, &zid->str);
@@ -357,7 +357,7 @@ static int _get_put_block(struct zufs_ioc_hdr *hdr)
 	struct zufs_ioc_IO *get_block = (void *)hdr;
 	struct zus_inode_info *zii = get_block->zus_ii;
 
-	if (hdr->operation == ZUS_OP_PUT_BLOCK) {
+	if (hdr->operation == ZUFS_OP_PUT_BLOCK) {
 		if (unlikely(!zii->op->put_block))
 			return 0; /* Cool put is optional */
 		return zii->op->put_block(zii, get_block);
@@ -459,15 +459,15 @@ static int _ioc_xattr(struct zufs_ioc_hdr *hdr)
 	struct zufs_ioc_xattr *ioc_xattr = (void *)hdr;
 	struct zus_inode_info *zii = ioc_xattr->zus_ii;
 
-	if (hdr->operation == ZUS_OP_XATTR_GET) {
+	if (hdr->operation == ZUFS_OP_XATTR_GET) {
 		if (!zii->op->getxattr)
 			return -ENOTSUP;
 		return zii->op->getxattr(zii, ioc_xattr);
-	} else if (hdr->operation == ZUS_OP_XATTR_SET) {
+	} else if (hdr->operation == ZUFS_OP_XATTR_SET) {
 		if (!zii->op->setxattr)
 			return -ENOTSUP;
 		return zii->op->setxattr(zii, ioc_xattr);
-	} else if (hdr->operation == ZUS_OP_XATTR_LIST) {
+	} else if (hdr->operation == ZUFS_OP_XATTR_LIST) {
 		if (!zii->op->listxattr)
 			return -ENOTSUP;
 		return zii->op->listxattr(zii, ioc_xattr);
@@ -487,40 +487,40 @@ static int _statfs(struct zufs_ioc_hdr *hdr)
 	return sbi->op->statfs(sbi, ioc_statfs);
 }
 
-const char *zus_op_name(enum e_zufs_operation op)
+const char *ZUFS_OP_name(enum e_zufs_operation op)
 {
 #define CASE_ENUM_NAME(e) case e: return #e
 	switch  (op) {
-		CASE_ENUM_NAME(ZUS_OP_NULL		);
-		CASE_ENUM_NAME(ZUS_OP_STATFS		);
-		CASE_ENUM_NAME(ZUS_OP_NEW_INODE		);
-		CASE_ENUM_NAME(ZUS_OP_FREE_INODE	);
-		CASE_ENUM_NAME(ZUS_OP_EVICT_INODE	);
-		CASE_ENUM_NAME(ZUS_OP_LOOKUP		);
-		CASE_ENUM_NAME(ZUS_OP_ADD_DENTRY	);
-		CASE_ENUM_NAME(ZUS_OP_REMOVE_DENTRY	);
-		CASE_ENUM_NAME(ZUS_OP_RENAME		);
-		CASE_ENUM_NAME(ZUS_OP_READDIR		);
-		CASE_ENUM_NAME(ZUS_OP_CLONE		);
-		CASE_ENUM_NAME(ZUS_OP_COPY		);
-		CASE_ENUM_NAME(ZUS_OP_READ		);
-		CASE_ENUM_NAME(ZUS_OP_PRE_READ		);
-		CASE_ENUM_NAME(ZUS_OP_WRITE		);
-		CASE_ENUM_NAME(ZUS_OP_GET_BLOCK		);
-		CASE_ENUM_NAME(ZUS_OP_PUT_BLOCK		);
-		CASE_ENUM_NAME(ZUS_OP_MMAP_CLOSE	);
-		CASE_ENUM_NAME(ZUS_OP_GET_SYMLINK	);
-		CASE_ENUM_NAME(ZUS_OP_SETATTR		);
-		CASE_ENUM_NAME(ZUS_OP_SYNC		);
-		CASE_ENUM_NAME(ZUS_OP_FALLOCATE		);
-		CASE_ENUM_NAME(ZUS_OP_LLSEEK		);
-		CASE_ENUM_NAME(ZUS_OP_IOM_DONE		);
-		CASE_ENUM_NAME(ZUS_OP_IOCTL		);
-		CASE_ENUM_NAME(ZUS_OP_XATTR_GET		);
-		CASE_ENUM_NAME(ZUS_OP_XATTR_SET		);
-		CASE_ENUM_NAME(ZUS_OP_XATTR_LIST	);
-		CASE_ENUM_NAME(ZUS_OP_BREAK		);
-		CASE_ENUM_NAME(ZUS_OP_MAX_OPT		);
+		CASE_ENUM_NAME(ZUFS_OP_NULL		);
+		CASE_ENUM_NAME(ZUFS_OP_STATFS		);
+		CASE_ENUM_NAME(ZUFS_OP_NEW_INODE		);
+		CASE_ENUM_NAME(ZUFS_OP_FREE_INODE	);
+		CASE_ENUM_NAME(ZUFS_OP_EVICT_INODE	);
+		CASE_ENUM_NAME(ZUFS_OP_LOOKUP		);
+		CASE_ENUM_NAME(ZUFS_OP_ADD_DENTRY	);
+		CASE_ENUM_NAME(ZUFS_OP_REMOVE_DENTRY	);
+		CASE_ENUM_NAME(ZUFS_OP_RENAME		);
+		CASE_ENUM_NAME(ZUFS_OP_READDIR		);
+		CASE_ENUM_NAME(ZUFS_OP_CLONE		);
+		CASE_ENUM_NAME(ZUFS_OP_COPY		);
+		CASE_ENUM_NAME(ZUFS_OP_READ		);
+		CASE_ENUM_NAME(ZUFS_OP_PRE_READ		);
+		CASE_ENUM_NAME(ZUFS_OP_WRITE		);
+		CASE_ENUM_NAME(ZUFS_OP_GET_BLOCK		);
+		CASE_ENUM_NAME(ZUFS_OP_PUT_BLOCK		);
+		CASE_ENUM_NAME(ZUFS_OP_MMAP_CLOSE	);
+		CASE_ENUM_NAME(ZUFS_OP_GET_SYMLINK	);
+		CASE_ENUM_NAME(ZUFS_OP_SETATTR		);
+		CASE_ENUM_NAME(ZUFS_OP_SYNC		);
+		CASE_ENUM_NAME(ZUFS_OP_FALLOCATE		);
+		CASE_ENUM_NAME(ZUFS_OP_LLSEEK		);
+		CASE_ENUM_NAME(ZUFS_OP_IOM_DONE		);
+		CASE_ENUM_NAME(ZUFS_OP_IOCTL		);
+		CASE_ENUM_NAME(ZUFS_OP_XATTR_GET		);
+		CASE_ENUM_NAME(ZUFS_OP_XATTR_SET		);
+		CASE_ENUM_NAME(ZUFS_OP_XATTR_LIST	);
+		CASE_ENUM_NAME(ZUFS_OP_BREAK		);
+		CASE_ENUM_NAME(ZUFS_OP_MAX_OPT		);
 	default:
 		return "UNKNOWN";
 	}
@@ -529,59 +529,59 @@ const char *zus_op_name(enum e_zufs_operation op)
 int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 {
 	DBG("[%s] OP=%d off=0x%x len=0x%x\n",
-	    zus_op_name(hdr->operation), hdr->operation, hdr->offset, hdr->len);
+	    ZUFS_OP_name(hdr->operation), hdr->operation, hdr->offset, hdr->len);
 
 	switch(hdr->operation) {
-	case ZUS_OP_NEW_INODE:
+	case ZUFS_OP_NEW_INODE:
 		return _new_inode(app_ptr, hdr);
-	case ZUS_OP_FREE_INODE:
-	case ZUS_OP_EVICT_INODE:
+	case ZUFS_OP_FREE_INODE:
+	case ZUFS_OP_EVICT_INODE:
 		return _evict(hdr);
 
-	case ZUS_OP_LOOKUP:
+	case ZUFS_OP_LOOKUP:
 		return _lookup(hdr);
-	case ZUS_OP_ADD_DENTRY:
-	case ZUS_OP_REMOVE_DENTRY:
+	case ZUFS_OP_ADD_DENTRY:
+	case ZUFS_OP_REMOVE_DENTRY:
 		return _dentry(hdr);
-	case ZUS_OP_RENAME:
+	case ZUFS_OP_RENAME:
 		return _rename(hdr);
-	case ZUS_OP_READDIR:
+	case ZUFS_OP_READDIR:
 		return _readdir(app_ptr, hdr);
-	case ZUS_OP_CLONE:
-	case ZUS_OP_COPY:
+	case ZUFS_OP_CLONE:
+	case ZUFS_OP_COPY:
 		return _clone(hdr);
 
-	case ZUS_OP_READ:
+	case ZUFS_OP_READ:
 		return _io_read(app_ptr, hdr);
-	case ZUS_OP_PRE_READ:
+	case ZUFS_OP_PRE_READ:
 		return _io_pre_read(app_ptr, hdr);
-	case ZUS_OP_WRITE:
+	case ZUFS_OP_WRITE:
 		return _io_write(app_ptr, hdr);
-	case ZUS_OP_GET_BLOCK:
-	case ZUS_OP_PUT_BLOCK:
+	case ZUFS_OP_GET_BLOCK:
+	case ZUFS_OP_PUT_BLOCK:
 		return _get_put_block(hdr);
-	case ZUS_OP_MMAP_CLOSE:
+	case ZUFS_OP_MMAP_CLOSE:
 		return _mmap_close(hdr);
-	case ZUS_OP_GET_SYMLINK:
+	case ZUFS_OP_GET_SYMLINK:
 		return _symlink(hdr);
-	case ZUS_OP_SETATTR:
+	case ZUFS_OP_SETATTR:
 		return _setattr(hdr);
-	case ZUS_OP_SYNC:
+	case ZUFS_OP_SYNC:
 		return _sync(hdr);
-	case ZUS_OP_FALLOCATE:
+	case ZUFS_OP_FALLOCATE:
 		return _fallocate(hdr);
-	case ZUS_OP_LLSEEK:
+	case ZUFS_OP_LLSEEK:
 		return _seek(hdr);
-	case ZUS_OP_IOCTL:
+	case ZUFS_OP_IOCTL:
 		return _ioc_ioctl(hdr);
-	case ZUS_OP_XATTR_GET:
-	case ZUS_OP_XATTR_SET:
-	case ZUS_OP_XATTR_LIST:
+	case ZUFS_OP_XATTR_GET:
+	case ZUFS_OP_XATTR_SET:
+	case ZUFS_OP_XATTR_LIST:
 		return _ioc_xattr(hdr);
-	case ZUS_OP_STATFS:
+	case ZUFS_OP_STATFS:
 		return _statfs(hdr);
 
-	case ZUS_OP_BREAK:
+	case ZUFS_OP_BREAK:
 		break;
 	default:
 		ERROR("Unknown OP=%d\n", hdr->operation);

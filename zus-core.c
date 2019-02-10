@@ -584,7 +584,7 @@ static void *zus_mount_thread(void *callback_info)
 			break;
 		}
 
-		if (zim->hdr.operation == ZUS_M_MOUNT && !g_ztp.num_zts) {
+		if (zim->hdr.operation == ZUFS_M_MOUNT && !g_ztp.num_zts) {
 			err = zus_start_all_threads(&g_mount.tp,
 						    g_zus_numa_map.online_cpus,
 						    zim->zmi.num_channels);
@@ -592,19 +592,19 @@ static void *zus_mount_thread(void *callback_info)
 				goto next;
 		}
 		switch (zim->hdr.operation) {
-		case ZUS_M_MOUNT:
+		case ZUFS_M_MOUNT:
 			err = zus_mount(g_mount.fd, zim);
 			break;
-		case ZUS_M_UMOUNT:
+		case ZUFS_M_UMOUNT:
 			err = zus_umount(g_mount.fd, zim);
 			break;
-		case ZUS_M_REMOUNT:
+		case ZUFS_M_REMOUNT:
 			err = zus_remount(g_mount.fd, zim);
 			break;
-		case ZUS_M_DDBG_RD:
+		case ZUFS_M_DDBG_RD:
 			err = zus_ddbg_read(&zim->zdi);
 			break;
-		case ZUS_M_DDBG_WR:
+		case ZUFS_M_DDBG_WR:
 			err = zus_ddbg_write(&zim->zdi);
 			break;
 		default:

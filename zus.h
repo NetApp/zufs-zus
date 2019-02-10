@@ -337,7 +337,7 @@ int zus_umount(int fd, struct zufs_ioc_mount *zim);
 int zus_remount(int fd, struct zufs_ioc_mount *zim);
 struct zus_inode_info *zus_iget(struct zus_sb_info *sbi, ulong ino);
 int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr);
-const char *zus_op_name(enum e_zufs_operation op);
+const char *ZUFS_OP_name(enum e_zufs_operation op);
 
 int zus_alloc_exec_buff(struct zus_sb_info *sbi, uint max_bytes, uint pool_num,
 			struct fba *fba);
