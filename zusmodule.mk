@@ -24,23 +24,16 @@ PROJ_CFLAGS := -fpic $(PROJ_CFLAGS)
 PROJ_LDFLAGS := -shared -Wl,-Tzus_ddbg.ld $(PROJ_LDFLAGS)
 endif
 
+
 module:
-ifneq ($(ZM_PRE_BUILD),)
-	@$(MAKE) -C $(M) $(ZM_PRE_BUILD)
-endif
+	@$(foreach t,$(ZM_PRE_BUILD),$(MAKE) -C $(M) $(t);)
 	@$(MAKE) M=$(M) -C .
-ifneq ($(ZM_POST_BUILD),)
-	@$(MAKE) -C $(M) $(ZM_POST_BUILD)
-endif
+	@$(foreach t,$(ZM_POST_BUILD),$(MAKE) -C $(M) $(t);)
 
 module_clean:
-ifneq ($(ZM_PRE_CLEAN),)
-	@$(MAKE) -C $(M) $(ZM_PRE_CLEAN)
-endif
+	@$(foreach t,$(ZM_PRE_CLEAN),$(MAKE) -C $(M) $(t);)
 	@$(MAKE) M=$(M) -C .  __clean
-ifneq ($(ZM_POST_CLEAN),)
-	@$(MAKE) -C $(M) $(ZM_POST_CLEAN)
-endif
+	@$(foreach t,$(ZM_POST_CLEAN),$(MAKE) -C $(M) $(t);)
 
 .PHONY: module module_clean
 
