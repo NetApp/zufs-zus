@@ -280,6 +280,7 @@ int toyfs_fallocate(struct zus_inode_info *zii,
 int toyfs_seek(struct zus_inode_info *zii, struct zufs_ioc_seek *zis);
 int toyfs_truncate(struct toyfs_inode_info *tii, size_t size);
 int toyfs_clone(struct zufs_ioc_clone *ioc_clone);
+int toyfs_fiemap(void *app_ptr, struct zufs_ioc_fiemap *zif);
 struct toyfs_list_head *toyfs_iblkrefs_list_of(struct toyfs_inode_info *tii);
 struct toyfs_pmemb *toyfs_resolve_pmemb(struct toyfs_inode_info *tii,
 					loff_t off);

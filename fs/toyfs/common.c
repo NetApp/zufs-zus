@@ -161,6 +161,7 @@ const struct zus_zii_operations toyfs_zii_op = {
 	.getxattr = toyfs_getxattr,
 	.setxattr = toyfs_setxattr,
 	.listxattr = toyfs_listxattr,
+	.fiemap = toyfs_fiemap,
 };
 
 const struct zus_sbi_operations toyfs_sbi_op = {
