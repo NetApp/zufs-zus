@@ -86,6 +86,7 @@ static int _pmem_grab(struct zus_sb_info *sbi, uint pmem_kern_id)
 		    pmem_kern_id, err);
 		return err;
 	}
+	md->dev_index = md->pmem_info.dev_index;
 
 	md->user_page_size = sbi->zfi->user_page_size;
 	if (!md->user_page_size)
