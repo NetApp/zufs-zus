@@ -1,0 +1,35 @@
+.dependencies
+*.kdev4
+.config
+.nfs*
+.*.swp
+
+# Headers lineked (ln -s) from Kernel
+md_def.h
+md.h
+zus_api.h
+linux/stat.h
+
+# targets
+b_io
+zusd
+libzus.so
+
+# ignore external FS(s) linked under fs/ (except local ones)
+!fs/
+fs/*
+!fs/Makefile
+!fs/foofs
+!fs/toyfs
+
+# common ignores
+objs/
+*.so
+*.rpm
+
+# tags
+cscope.*
+# eclipse
+.cproject
+.project
+.settings/
