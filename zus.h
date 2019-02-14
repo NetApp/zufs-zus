@@ -179,6 +179,8 @@ struct zus_sbi_operations {
 	int (*clone)(struct zufs_ioc_clone *ioc_clone);
 	int (*statfs)(struct zus_sb_info *sbi,
 		      struct zufs_ioc_statfs *ioc_statfs);
+	int (*show_options)(struct zus_sb_info *sbi,
+			    struct zufs_ioc_mount_options *zim);
 };
 
 #define ZUS_MAX_POOLS	7
@@ -215,6 +217,20 @@ static inline void zus_sbi_set_flag(struct zus_sb_info *sbi, int flag)
 static inline int zus_sbi_test_flag(struct zus_sb_info *sbi, int flag)
 {
 	return (sbi->flags & (1 << flag));
+}
+
+static inline int _buf_puts(char **buffer, ssize_t *size, const char *option)
+{
+	ssize_t len = strlen(option);
+
+	if (*size + len > ZUFS_MO_MAX)
+		return 0;
+
+	*size += len;
+	memcpy(*buffer, option, len);
+	*buffer += len;
+
+	return len;
 }
 
 struct zus_zfi_operations {

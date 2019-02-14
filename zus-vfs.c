@@ -504,12 +504,24 @@ static int _fiemap(void *app_ptr, struct zufs_ioc_hdr *hdr)
 	return zii->op->fiemap(app_ptr, zif);
 }
 
+static int _show_options(struct zufs_ioc_hdr *hdr)
+{
+	struct zufs_ioc_mount_options *ioc_mount_options = (void *)hdr;
+	struct zus_sb_info *sbi = ioc_mount_options->zus_sbi;
+
+	if (!sbi->op->show_options)
+		return 0;
+
+	return sbi->op->show_options(sbi, ioc_mount_options);
+}
+
 const char *ZUFS_OP_name(enum e_zufs_operation op)
 {
 #define CASE_ENUM_NAME(e) case e: return #e
 	switch (op) {
 		CASE_ENUM_NAME(ZUFS_OP_NULL);
 		CASE_ENUM_NAME(ZUFS_OP_STATFS);
+		CASE_ENUM_NAME(ZUFS_OP_SHOW_OPTIONS);
 		CASE_ENUM_NAME(ZUFS_OP_NEW_INODE);
 		CASE_ENUM_NAME(ZUFS_OP_FREE_INODE);
 		CASE_ENUM_NAME(ZUFS_OP_EVICT_INODE);
@@ -596,6 +608,8 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 		return _statfs(hdr);
 	case ZUFS_OP_FIEMAP:
 		return _fiemap(app_ptr, hdr);
+	case ZUFS_OP_SHOW_OPTIONS:
+		return _show_options(hdr);
 	case ZUFS_OP_BREAK:
 		break;
 	default:
