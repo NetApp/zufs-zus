@@ -21,6 +21,8 @@
 #define unlikely(x_)	__builtin_expect(!!(x_), 0)
 #endif
 
+#include "movnt.h"
+
 /* utils.c */
 void zus_dump_stack(FILE *, bool warn, const char *fmt, ...);
 void zus_warn(const char *cond, const char *file, int line);

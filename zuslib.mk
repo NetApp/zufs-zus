@@ -11,7 +11,7 @@
 #
 -include $(CURDIR)/.config
 PROJ_TARGET := libzus.so
-PROJ_OBJS := module.o utils.o printz.o
+PROJ_OBJS := module.o utils.o printz.o nvml_movnt.o
 PROJ_INCLUDES := .
 PROJ_CFLAGS := -fpic
 PROJ_LIBS := rt uuid unwind dl pthread
