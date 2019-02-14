@@ -53,7 +53,7 @@
 void zus_dump_stack(FILE *, bool warn, const char *fmt, ...);
 void zus_warn(const char *cond, const char *file, int line);
 void zus_bug(const char *cond, const char *file, int line);
-
+int zus_increase_max_files(void);
 
 #define dump_stack() \
 	zus_dump_stack(stderr, false, "<5>%s: (%s:%d)\n", \
@@ -70,7 +70,7 @@ void zus_bug(const char *cond, const char *file, int line);
 	int __ret_warn_on = !!(x_);			\
 	static bool __once;				\
 	if (unlikely(__ret_warn_on && !__once))	{	\
-		zus_warn(#x_, __FILE__, __LINE__); 	\
+		zus_warn(#x_, __FILE__, __LINE__);	\
 		__once = true;				\
 	}						\
 	unlikely(__ret_warn_on);			\
@@ -135,6 +135,23 @@ struct zus_fs_info {
 	uint			user_page_size;
 	uint			next_sb_id;
 };
+
+/* zus-core */
+
+struct zus_thread_params {
+	const char *name; /* only used for the duration of the call */
+	int policy;
+	int rr_priority;
+	uint one_cpu;	/* either set this one. Else ZUS_CPU_ALL */
+	uint nid;	/* Or set this one. Else ZUS_NUMA_NO_NID */
+	ulong __flags; /* warnings on/off */
+};
+
+#define ZTP_INIT(ztp)				\
+{						\
+	memset((ztp), 0, sizeof(*(ztp)));	\
+	(ztp)->nid = (ztp)->one_cpu = (-1);	\
+}
 
 /* printz.c */
 int zus_add_module_ddbg(const char *fs_name, void *handle);
