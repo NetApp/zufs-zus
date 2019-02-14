@@ -14,6 +14,12 @@
 
 #include "zus_api.h"
 #include "_pr.h"
+#include "a_list.h"
+
+#ifndef likely
+#define likely(x_)	__builtin_expect(!!(x_), 1)
+#define unlikely(x_)	__builtin_expect(!!(x_), 0)
+#endif
 
 /* utils.c */
 void zus_dump_stack(FILE *, bool warn, const char *fmt, ...);
