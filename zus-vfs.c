@@ -286,6 +286,17 @@ static int _readdir(void *app_ptr, struct zufs_ioc_hdr *hdr)
 	return sbi->op->readdir(app_ptr, zir);
 }
 
+static int _statfs(struct zufs_ioc_hdr *hdr)
+{
+	struct zufs_ioc_statfs *ioc_statfs = (void *)hdr;
+	struct zus_sb_info *sbi = ioc_statfs->zus_sbi;
+
+	if (!sbi->op->statfs)
+		return -ENOTSUP;
+
+	return sbi->op->statfs(sbi, ioc_statfs);
+}
+
 const char *ZUFS_OP_name(enum e_zufs_operation op)
 {
 #define CASE_ENUM_NAME(e) case e: return #e
@@ -361,8 +372,9 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 	case ZUFS_OP_XATTR_GET:
 	case ZUFS_OP_XATTR_SET:
 	case ZUFS_OP_XATTR_LIST:
-	case ZUFS_OP_STATFS:
 		return -ENOTSUP;
+	case ZUFS_OP_STATFS:
+		return _statfs(hdr);
 	case ZUFS_OP_BREAK:
 		break;
 	default:
