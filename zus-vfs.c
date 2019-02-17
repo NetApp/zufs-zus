@@ -171,6 +171,19 @@ int zus_remount(int fd, struct zufs_ioc_mount *zim)
 
 /* ~~~ FS operations ~~~~ */
 
+struct zus_inode_info *zus_iget(struct zus_sb_info *sbi, ulong ino)
+{
+	struct zus_inode_info *zii;
+	int err;
+
+	err =  sbi->op->iget(sbi, ino, &zii);
+	if (err)
+		return NULL;
+
+	zii->sbi = sbi;
+	return zii;
+}
+
 static int _new_inode(void *app_ptr, struct zufs_ioc_hdr *hdr)
 {
 	struct zufs_ioc_new_inode *ioc_new = (void *)hdr;
@@ -203,6 +216,40 @@ static int _new_inode(void *app_ptr, struct zufs_ioc_hdr *hdr)
 _err_free_inode:
 	zii->sbi->op->free_inode(zii);
 	return err;
+}
+
+static int _lookup(struct zufs_ioc_hdr *hdr)
+{
+	struct zufs_ioc_lookup *lookup = (void *)hdr;
+	struct zufs_str *str = &lookup->str;
+	struct zus_inode_info *zii;
+	ulong ino;
+
+	if (!str->len || !str->name[0]) {
+		ERROR("lookup NULL string\n");
+		return  0;
+	}
+
+	if (0 == strncmp(".", str->name, str->len))
+		ino = lookup->dir_ii->zi->i_ino;
+	else if (0 == strncmp("..", str->name, str->len))
+		ino = lookup->dir_ii->zi->i_dir.parent;
+	else
+		ino  = lookup->dir_ii->sbi->op->lookup(lookup->dir_ii, str);
+
+	if (!ino) {
+		DBG("[%.*s] NOT FOUND\n", lookup->str.len, lookup->str.name);
+		return -ENOENT;
+	}
+
+	DBG("[%.*s] ino=%ld\n", lookup->str.len, lookup->str.name, ino);
+	zii = zus_iget(lookup->dir_ii->sbi, ino);
+	if (unlikely(!zii))
+		return -ENOENT;
+
+	lookup->_zi = md_addr_to_offset(&zii->sbi->md, zii->zi);
+	lookup->zus_ii = zii;
+	return 0;
 }
 
 const char *ZUFS_OP_name(enum e_zufs_operation op)
@@ -253,7 +300,9 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 		return _new_inode(app_ptr, hdr);
 	case ZUFS_OP_FREE_INODE:
 	case ZUFS_OP_EVICT_INODE:
+		return -ENOTSUP;
 	case ZUFS_OP_LOOKUP:
+		return _lookup(hdr);
 	case ZUFS_OP_ADD_DENTRY:
 	case ZUFS_OP_REMOVE_DENTRY:
 	case ZUFS_OP_RENAME:
