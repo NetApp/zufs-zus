@@ -326,6 +326,33 @@ static int _clone(struct zufs_ioc_hdr *hdr)
 	return sbi->op->clone(ioc_clone);
 }
 
+static int _io_read(ulong *app_ptr, struct zufs_ioc_hdr *hdr)
+{
+	struct zufs_ioc_IO *io = (void *)hdr;
+	struct zus_inode_info *zii = io->zus_ii;
+
+	return zii->op->read(app_ptr, io);
+}
+
+static int _io_pre_read(ulong *app_ptr, struct zufs_ioc_hdr *hdr)
+{
+	struct zufs_ioc_IO *io = (void *)hdr;
+	struct zus_inode_info *zii = io->zus_ii;
+
+	if (!zii->op->pre_read)
+		return -ENOTSUP;
+
+	return zii->op->pre_read(app_ptr, io);
+}
+
+static int _io_write(ulong *app_ptr, struct zufs_ioc_hdr *hdr)
+{
+	struct zufs_ioc_IO *io = (void *)hdr;
+	struct zus_inode_info *zii = io->zus_ii;
+
+	return zii->op->write(app_ptr, io);
+}
+
 static int _statfs(struct zufs_ioc_hdr *hdr)
 {
 	struct zufs_ioc_statfs *ioc_statfs = (void *)hdr;
@@ -399,8 +426,11 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 	case ZUFS_OP_COPY:
 		return _clone(hdr);
 	case ZUFS_OP_READ:
+		return _io_read(app_ptr, hdr);
 	case ZUFS_OP_PRE_READ:
+		return _io_pre_read(app_ptr, hdr);
 	case ZUFS_OP_WRITE:
+		return _io_write(app_ptr, hdr);
 	case ZUFS_OP_GET_BLOCK:
 	case ZUFS_OP_PUT_BLOCK:
 	case ZUFS_OP_MMAP_CLOSE:

@@ -125,6 +125,9 @@ struct zus_sb_info;
 
 struct zus_zii_operations {
 	void (*evict)(struct zus_inode_info *zii);
+	int (*read)(void *app_ptr, struct zufs_ioc_IO *io);
+	int (*pre_read)(void *app_ptr, struct zufs_ioc_IO *io);
+	int (*write)(void *app_ptr, struct zufs_ioc_IO *io);
 };
 
 struct zus_inode_info {
