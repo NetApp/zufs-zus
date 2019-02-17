@@ -252,6 +252,18 @@ static int _lookup(struct zufs_ioc_hdr *hdr)
 	return 0;
 }
 
+static int _dentry(struct zufs_ioc_hdr *hdr)
+{
+	struct zufs_ioc_dentry *zid = (void *)hdr;
+	struct zus_inode_info *dir_ii = zid->zus_dir_ii;
+	struct zus_inode_info *zii = zid->zus_ii;
+
+	if (hdr->operation == ZUFS_OP_REMOVE_DENTRY)
+		return dir_ii->sbi->op->remove_dentry(dir_ii, zii, &zid->str);
+
+	return dir_ii->sbi->op->add_dentry(dir_ii, zid->zus_ii, &zid->str);
+}
+
 const char *ZUFS_OP_name(enum e_zufs_operation op)
 {
 #define CASE_ENUM_NAME(e) case e: return #e
@@ -305,6 +317,7 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 		return _lookup(hdr);
 	case ZUFS_OP_ADD_DENTRY:
 	case ZUFS_OP_REMOVE_DENTRY:
+		return _dentry(hdr);
 	case ZUFS_OP_RENAME:
 	case ZUFS_OP_READDIR:
 	case ZUFS_OP_CLONE:

@@ -51,6 +51,11 @@
 
 #define ZUS_MAX_OP_SIZE		(PAGE_SIZE * 8)
 
+/* Time-stamps in zufs at inode and device-table are of this format */
+#ifndef NSEC_PER_SEC
+	#define NSEC_PER_SEC 1000000000UL
+#endif
+
 /* utils.c */
 void zus_dump_stack(FILE *fp, bool warn, const char *fmt, ...);
 void zus_warn(const char *cond, const char *file, int line);
@@ -85,6 +90,30 @@ int zus_increase_max_files(void);
 	unlikely(__ret_bug_on); \
 })
 
+static inline __le32 le32_add(__le32 *val, __s16 add)
+{
+	return *val = cpu_to_le32(le32_to_cpu(*val) + add);
+}
+
+static inline __s64 _z_div_s64_rem(__s64 X, __s32 y, __u32 *rem)
+{
+	*rem = X % y;
+	return X / y;
+}
+
+static inline void timespec_to_zt(__le64 *mt, struct timespec *t)
+{
+	*mt = cpu_to_le64(t->tv_sec * NSEC_PER_SEC + t->tv_nsec);
+}
+
+static inline void zt_to_timespec(struct timespec *t, __le64 *mt)
+{
+	__u32 nsec;
+
+	t->tv_sec = _z_div_s64_rem(le64_to_cpu(*mt), NSEC_PER_SEC, &nsec);
+	t->tv_nsec = nsec;
+}
+
 static inline
 zu_dpp_t pmem_dpp_t(ulong offset) { return (zu_dpp_t)offset; }
 
@@ -113,6 +142,8 @@ struct zus_sbi_operations {
 	ulong (*lookup)(struct zus_inode_info *dir_ii, struct zufs_str *str);
 	int (*add_dentry)(struct zus_inode_info *dir_ii,
 			  struct zus_inode_info *zii, struct zufs_str *str);
+	int (*remove_dentry)(struct zus_inode_info *dir_ii,
+			struct zus_inode_info *zii, struct zufs_str *str);
 	int (*iget)(struct zus_sb_info *sbi, ulong ino,
 		    struct zus_inode_info **zii);
 };
@@ -170,6 +201,53 @@ struct zus_fs_info {
 	uint			user_page_size;
 	uint			next_sb_id;
 };
+
+/* POSIX protocol helpers every one must use */
+
+static inline bool zi_isdir(const struct zus_inode *zi)
+{
+	return S_ISDIR(le16_to_cpu(zi->i_mode));
+}
+static inline bool zi_isreg(const struct zus_inode *zi)
+{
+	return S_ISREG(le16_to_cpu(zi->i_mode));
+}
+static inline bool zi_islnk(const struct zus_inode *zi)
+{
+	return S_ISLNK(le16_to_cpu(zi->i_mode));
+}
+static inline ulong zi_ino(const struct zus_inode *zi)
+{
+	return le64_to_cpu(zi->i_ino);
+}
+
+/* Caller checks if (zi_isdir(zi)) */
+static inline void zus_std_new_dir(struct zus_inode *dir_zi, struct zus_inode *zi)
+{
+	/* Directory points to itself (POSIX for you) */
+	zi->i_dir.parent = dir_zi->i_ino;
+	zi->i_nlink = cpu_to_le32(1);
+}
+
+static inline void zus_std_add_dentry(struct zus_inode *dir_zi,
+				     struct zus_inode *zi)
+{
+	zi->i_nlink = le32_add(&zi->i_nlink, 1);
+
+	if (zi_isdir(zi))
+		le32_add(&dir_zi->i_nlink, 1);
+}
+
+static inline void zus_std_remove_dentry(struct zus_inode *dir_zi,
+					struct zus_inode *zi)
+{
+	if (zi_isdir(zi)) {
+		le32_add(&zi->i_nlink, -1);
+		le32_add(&dir_zi->i_nlink, -1);
+	}
+
+	le32_add(&zi->i_nlink, -1);
+}
 
 /* zus-core */
 
