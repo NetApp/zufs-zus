@@ -35,6 +35,7 @@ static void _sigaction_info_handler(int signum, siginfo_t *si, void *p)
 static void _sigaction_exit_handler(int signum, siginfo_t *si, void *p)
 {
 	_sigaction_info_handler(signum, si, p);
+	zus_mount_thread_stop();
 	exit(1);
 }
 

@@ -49,8 +49,10 @@
 #include "md.h"
 #include "movnt.h"
 
+#define ZUS_MAX_OP_SIZE		(PAGE_SIZE * 8)
+
 /* utils.c */
-void zus_dump_stack(FILE *, bool warn, const char *fmt, ...);
+void zus_dump_stack(FILE *fp, bool warn, const char *fmt, ...);
 void zus_warn(const char *cond, const char *file, int line);
 void zus_bug(const char *cond, const char *file, int line);
 int zus_increase_max_files(void);
@@ -83,10 +85,24 @@ int zus_increase_max_files(void);
 	unlikely(__ret_bug_on); \
 })
 
+static inline
+zu_dpp_t pmem_dpp_t(ulong offset) { return (zu_dpp_t)offset; }
+
+
 /* ~~~~ zus fs_info super_blocks inodes ~~~~ */
 
 struct zus_fs_info;
 struct zus_sb_info;
+
+struct zus_zii_operations {
+};
+
+struct zus_inode_info {
+	const struct zus_zii_operations *op;
+
+	struct zus_sb_info *sbi;
+	struct zus_inode *zi;
+};
 
 #define ZUS_MAX_POOLS	7
 struct pa {
@@ -98,7 +114,13 @@ struct pa {
 };
 
 struct zus_sb_info {
+	struct multi_devices	md;
+	struct zus_fs_info	*zfi;
+	const struct zus_sbi_operations *op;
+
+	struct zus_inode_info	*z_root;
 	ulong			flags;
+	__u64			kern_sb_id;
 	struct pa		pa[ZUS_MAX_POOLS];
 };
 
@@ -138,6 +160,22 @@ struct zus_fs_info {
 
 /* zus-core */
 
+/* Open an O_TMPFILE on the zuf-root we belong to */
+int zuf_root_open_tmp(int *fd);
+void zuf_root_close(int *fd);
+
+/* ~~~ CPU & NUMA topology by zus ~~~ */
+
+/* For all these to work user must create
+ * his threads with zus_create_thread() below
+ * Or from ZTs, or from mount-thread
+ */
+#define ZUS_NUMA_NO_NID	(~0U)
+#define ZUS_CPU_ALL	(~0U)
+
+extern struct zufs_ioc_numa_map g_zus_numa_map;
+int zus_cpu_to_node(int cpu);
+
 struct zus_thread_params {
 	const char *name; /* only used for the duration of the call */
 	int policy;
@@ -153,7 +191,26 @@ struct zus_thread_params {
 	(ztp)->nid = (ztp)->one_cpu = (-1);	\
 }
 
-/* printz.c */
+typedef void *(*__start_routine) (void *); /* pthread programming style NOT */
+int zus_thread_create(pthread_t *new_tread, struct zus_thread_params *params,
+		      __start_routine fn, void *user_arg);
+int zus_alloc_exec_buff(struct zus_sb_info *sbi, uint max_bytes, uint pool_num,
+			struct fba *fba);
+
+/* zus-vfs.c */
+int zus_register_all(int fd);
+void zus_unregister_all(void);
+int zus_register_one(int fd, struct zus_fs_info *p_zfi);
+
+int zus_mount(int fd, struct zufs_ioc_mount *zim);
+int zus_umount(int fd, struct zufs_ioc_mount *zim);
+int zus_remount(int fd, struct zufs_ioc_mount *zim);
+struct zus_inode_info *zus_iget(struct zus_sb_info *sbi, ulong ino);
+int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr);
+const char *ZUFS_OP_name(enum e_zufs_operation op);
+
+
+/* dyn_pr.c */
 int zus_add_module_ddbg(const char *fs_name, void *handle);
 void zus_free_ddbg_db(void);
 int zus_ddbg_read(struct zufs_ddbg_info *zdi);
@@ -356,5 +413,13 @@ static inline void *pa_addr(struct zus_sb_info *sbi, ulong offset)
 
 #define ZUS_LIBFS_MAX_NR	16	/* see also MAX_LOCKDEP_FSs in zuf */
 #define ZUS_LIBFS_MAX_PATH	256
+#define ZUS_LIBFS_DIR		"/usr/lib/zufs"
+#define ZUFS_LIBFS_LIST		"ZUFS_LIBFS_LIST"
+
+/* declare so compiler will not complain */
+extern int register_fs(int fd);
+/* below two need to match. C is not bash */
+#define REGISTER_FS_FN		 register_fs
+#define REGISTER_FS_NAME	"register_fs"
 
 #endif /* define __ZUS_H__ */

@@ -133,7 +133,14 @@ int main(int argc, char *argv[])
 	if (unlikely(err))
 		return err;
 
-	(void)path;
+	err = zus_mount_thread_start(&tp, path);
+	if (unlikely(err))
+		goto stop;
 
-	return 0;
+	INFO("waiting for sigint ...\n");
+	zus_join();
+
+stop:
+	zus_mount_thread_stop();
+	return err;
 }
