@@ -146,6 +146,7 @@ struct zus_sbi_operations {
 			struct zus_inode_info *zii, struct zufs_str *str);
 	int (*iget)(struct zus_sb_info *sbi, ulong ino,
 		    struct zus_inode_info **zii);
+	int (*readdir)(void *app_ptr, struct zufs_ioc_readdir *zir);
 };
 
 #define ZUS_MAX_POOLS	7
