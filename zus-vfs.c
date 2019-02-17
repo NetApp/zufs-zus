@@ -286,6 +286,17 @@ static int _readdir(void *app_ptr, struct zufs_ioc_hdr *hdr)
 	return sbi->op->readdir(app_ptr, zir);
 }
 
+static int _clone(struct zufs_ioc_hdr *hdr)
+{
+	struct zufs_ioc_clone *ioc_clone = (void *)hdr;
+	struct zus_sb_info *sbi = ioc_clone->src_zus_ii->sbi;
+
+	if (!sbi->op->clone)
+		return -ENOTSUP;
+
+	return sbi->op->clone(ioc_clone);
+}
+
 static int _statfs(struct zufs_ioc_hdr *hdr)
 {
 	struct zufs_ioc_statfs *ioc_statfs = (void *)hdr;
@@ -357,6 +368,7 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 		return _readdir(app_ptr, hdr);
 	case ZUFS_OP_CLONE:
 	case ZUFS_OP_COPY:
+		return _clone(hdr);
 	case ZUFS_OP_READ:
 	case ZUFS_OP_PRE_READ:
 	case ZUFS_OP_WRITE:

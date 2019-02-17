@@ -148,6 +148,7 @@ struct zus_sbi_operations {
 		    struct zus_inode_info **zii);
 	int (*rename)(struct zufs_ioc_rename *zir);
 	int (*readdir)(void *app_ptr, struct zufs_ioc_readdir *zir);
+	int (*clone)(struct zufs_ioc_clone *ioc_clone);
 	int (*statfs)(struct zus_sb_info *sbi,
 		      struct zufs_ioc_statfs *ioc_statfs);
 };
