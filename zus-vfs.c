@@ -264,6 +264,17 @@ static int _dentry(struct zufs_ioc_hdr *hdr)
 	return dir_ii->sbi->op->add_dentry(dir_ii, zid->zus_ii, &zid->str);
 }
 
+static int _rename(struct zufs_ioc_hdr *hdr)
+{
+	struct zufs_ioc_rename *zir = (void *)hdr;
+	struct zus_sb_info *sbi = zir->old_dir_ii->sbi;
+
+	if (!sbi->op->rename)
+		return -ENOTSUP;
+
+	return sbi->op->rename(zir);
+}
+
 static int _readdir(void *app_ptr, struct zufs_ioc_hdr *hdr)
 {
 	struct zufs_ioc_readdir *zir = (void *)hdr;
@@ -330,7 +341,7 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 	case ZUFS_OP_REMOVE_DENTRY:
 		return _dentry(hdr);
 	case ZUFS_OP_RENAME:
-		return -ENOTSUP;
+		return _rename(hdr);
 	case ZUFS_OP_READDIR:
 		return _readdir(app_ptr, hdr);
 	case ZUFS_OP_CLONE:
