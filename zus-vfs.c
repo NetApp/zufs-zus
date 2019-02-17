@@ -218,6 +218,35 @@ _err_free_inode:
 	return err;
 }
 
+static int _evict(struct zufs_ioc_hdr *hdr)
+{
+	struct zufs_ioc_evict_inode *ziei = (void *)hdr;
+	struct zus_inode_info *zii = ziei->zus_ii;
+
+	if (unlikely(!zii)) {
+		ERROR("!ziei->zus_ii\n");
+		return 0;
+	}
+
+	if (hdr->operation == ZUFS_OP_FREE_INODE) {
+		if (likely(zii->sbi->op->free_inode))
+			zii->sbi->op->free_inode(zii);
+	} else { /* ZUFS_OP_EVICT_INODE */
+		/* NOTE: On lookup Kernel ask's zus to allocate a new zii &&
+		 * retrieve the zi, before it inserts it to inode cache, it is
+		 * possible to race, and have two threads do a lookup. The
+		 * loosing thread calls _evict(ZI_LOOKUP_RACE) to de-allocate
+		 * the extra zii. But fs->evict need not be called. Only
+		 * zii_free.
+		 * (So it is possible at FS to see two fs->igets but one
+		 *  fs->evict)
+		 */
+		if (zii->op->evict)
+			zii->op->evict(zii);
+	}
+	return 0;
+}
+
 static int _lookup(struct zufs_ioc_hdr *hdr)
 {
 	struct zufs_ioc_lookup *lookup = (void *)hdr;
@@ -356,7 +385,7 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 		return _new_inode(app_ptr, hdr);
 	case ZUFS_OP_FREE_INODE:
 	case ZUFS_OP_EVICT_INODE:
-		return -ENOTSUP;
+		return _evict(hdr);
 	case ZUFS_OP_LOOKUP:
 		return _lookup(hdr);
 	case ZUFS_OP_ADD_DENTRY:

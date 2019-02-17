@@ -124,6 +124,7 @@ struct zus_fs_info;
 struct zus_sb_info;
 
 struct zus_zii_operations {
+	void (*evict)(struct zus_inode_info *zii);
 };
 
 struct zus_inode_info {
