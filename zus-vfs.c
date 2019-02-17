@@ -169,6 +169,42 @@ int zus_remount(int fd, struct zufs_ioc_mount *zim)
 	return 0;
 }
 
+/* ~~~ FS operations ~~~~ */
+
+static int _new_inode(void *app_ptr, struct zufs_ioc_hdr *hdr)
+{
+	struct zufs_ioc_new_inode *ioc_new = (void *)hdr;
+	struct zus_sb_info *sbi = ioc_new->dir_ii->sbi;
+	struct zus_inode_info *zii;
+	int err;
+
+	/* In ZUS protocol we start zero ref, add_dentry increments the refs
+	 * (Kernel gave us a 1 here expect for O_TMPFILE)
+	 */
+	ioc_new->zi.i_nlink = 0;
+
+	zii = sbi->op->new_inode(sbi, app_ptr, ioc_new);
+	if (unlikely(!zii))
+		return -EINVAL;
+
+	ioc_new->_zi = md_addr_to_offset(&sbi->md, zii->zi);
+	ioc_new->zus_ii = zii;
+
+	if (ioc_new->flags & ZI_TMPFILE)
+		return 0;
+
+	err = ioc_new->dir_ii->sbi->op->add_dentry(ioc_new->dir_ii, zii,
+						   &ioc_new->str);
+	if (unlikely(err))
+		goto _err_free_inode;
+
+	return 0;
+
+_err_free_inode:
+	zii->sbi->op->free_inode(zii);
+	return err;
+}
+
 const char *ZUFS_OP_name(enum e_zufs_operation op)
 {
 #define CASE_ENUM_NAME(e) case e: return #e
@@ -214,6 +250,7 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 
 	switch (hdr->operation) {
 	case ZUFS_OP_NEW_INODE:
+		return _new_inode(app_ptr, hdr);
 	case ZUFS_OP_FREE_INODE:
 	case ZUFS_OP_EVICT_INODE:
 	case ZUFS_OP_LOOKUP:

@@ -162,7 +162,7 @@ int md_init_from_pmem_info(struct multi_devices *md)
 	}
 
 	offset = 0;
-	for ( ;i < md->t1_count + md->t2_count; ++i) {
+	for (; i < md->t1_count + md->t2_count; ++i) {
 		struct md_dev_info *mdi = &md->devs[i];
 
 		_init_dev_info(mdi, &dev_list->dev_ids[i], i, offset, NULL);
