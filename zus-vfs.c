@@ -444,6 +444,17 @@ static int _seek(struct zufs_ioc_hdr *hdr)
 	return zii->op->seek(zii, ioc_seek);
 }
 
+static int _ioc_ioctl(struct zufs_ioc_hdr *hdr)
+{
+	struct zufs_ioc_ioctl *ioc_ioctl = (void *)hdr;
+	struct zus_inode_info *zii = ioc_ioctl->zus_ii;
+
+	if (!zii->op->ioctl)
+		return -ENOTTY;
+
+	return zii->op->ioctl(zii, ioc_ioctl);
+}
+
 static int _ioc_xattr(struct zufs_ioc_hdr *hdr)
 {
 	struct zufs_ioc_xattr *ioc_xattr = (void *)hdr;
@@ -560,7 +571,7 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 	case ZUFS_OP_LLSEEK:
 		return _seek(hdr);
 	case ZUFS_OP_IOCTL:
-		return -ENOTSUP;
+		return _ioc_ioctl(hdr);
 	case ZUFS_OP_XATTR_GET:
 	case ZUFS_OP_XATTR_SET:
 	case ZUFS_OP_XATTR_LIST:
