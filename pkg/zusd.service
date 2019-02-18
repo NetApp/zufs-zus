@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# Service unit file for the ZUFS
+#
+# Copyright (C) 2018 NetApp, Inc.  All rights reserved.
+#
+# See module.c for LICENSE details.
+#
+# Authors:
+#	Boaz Harrosh <boazh@netapp.com>
+#	Shachar Sharon <sshachar@netapp.com>
+#
+
+[Unit]
+Description=Zero-copy User-mode FileSystem
+ConditionPathExists=|/lib/modules/%v/kernel/fs/zuf/zuf.ko
+ConditionPathExistsGlob=|/usr/lib/zufs/extra/zuf*.ko
+After=local-fs.target
+
+[Service]
+Type=simple
+SyslogIdentifier=zusd
+EnvironmentFile=-/etc/zufs.conf
+LimitCORE=100M
+ExecStart=/usr/lib/zufs/zusd.helper up
+ExecStop=/usr/lib/zufs/zusd.helper down
+WorkingDirectory=/var/log/zufs
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
