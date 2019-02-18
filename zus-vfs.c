@@ -353,6 +353,22 @@ static int _io_write(ulong *app_ptr, struct zufs_ioc_hdr *hdr)
 	return zii->op->write(app_ptr, io);
 }
 
+static int _symlink(struct zufs_ioc_hdr *hdr)
+{
+	struct zufs_ioc_get_link *ioc_sym = (void *)hdr;
+	struct zus_inode_info *zii = ioc_sym->zus_ii;
+	void *sym;
+	int err;
+
+	err = zii->op->get_symlink(zii, &sym);
+	if (unlikely(err))
+		return err;
+
+	if (sym)
+		ioc_sym->_link = md_addr_to_offset(&zii->sbi->md, sym);
+	return 0;
+}
+
 static int _setattr(struct zufs_ioc_hdr *hdr)
 {
 	struct zufs_ioc_attr *ioc_attr = (void *)hdr;
@@ -446,8 +462,9 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 	case ZUFS_OP_GET_BLOCK:
 	case ZUFS_OP_PUT_BLOCK:
 	case ZUFS_OP_MMAP_CLOSE:
-	case ZUFS_OP_GET_SYMLINK:
 		return -ENOTSUP;
+	case ZUFS_OP_GET_SYMLINK:
+		return _symlink(hdr);
 	case ZUFS_OP_SETATTR:
 		return _setattr(hdr);
 	case ZUFS_OP_SYNC:

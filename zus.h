@@ -128,6 +128,7 @@ struct zus_zii_operations {
 	int (*read)(void *app_ptr, struct zufs_ioc_IO *io);
 	int (*pre_read)(void *app_ptr, struct zufs_ioc_IO *io);
 	int (*write)(void *app_ptr, struct zufs_ioc_IO *io);
+	int (*get_symlink)(struct zus_inode_info *zii, void **symlink);
 	int (*setattr)(struct zus_inode_info *zii,
 		       uint enable_bits, ulong truncate_size);
 };
