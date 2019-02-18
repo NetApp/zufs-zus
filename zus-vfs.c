@@ -444,6 +444,28 @@ static int _seek(struct zufs_ioc_hdr *hdr)
 	return zii->op->seek(zii, ioc_seek);
 }
 
+static int _ioc_xattr(struct zufs_ioc_hdr *hdr)
+{
+	struct zufs_ioc_xattr *ioc_xattr = (void *)hdr;
+	struct zus_inode_info *zii = ioc_xattr->zus_ii;
+
+	if (hdr->operation == ZUFS_OP_XATTR_GET) {
+		if (!zii->op->getxattr)
+			return -ENOTSUP;
+		return zii->op->getxattr(zii, ioc_xattr);
+	} else if (hdr->operation == ZUFS_OP_XATTR_SET) {
+		if (!zii->op->setxattr)
+			return -ENOTSUP;
+		return zii->op->setxattr(zii, ioc_xattr);
+	} else if (hdr->operation == ZUFS_OP_XATTR_LIST) {
+		if (!zii->op->listxattr)
+			return -ENOTSUP;
+		return zii->op->listxattr(zii, ioc_xattr);
+	}
+	ERROR("Unknown xattr operation!\n");
+	return -EFAULT;
+}
+
 static int _statfs(struct zufs_ioc_hdr *hdr)
 {
 	struct zufs_ioc_statfs *ioc_statfs = (void *)hdr;
@@ -538,10 +560,11 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 	case ZUFS_OP_LLSEEK:
 		return _seek(hdr);
 	case ZUFS_OP_IOCTL:
+		return -ENOTSUP;
 	case ZUFS_OP_XATTR_GET:
 	case ZUFS_OP_XATTR_SET:
 	case ZUFS_OP_XATTR_LIST:
-		return -ENOTSUP;
+		return _ioc_xattr(hdr);
 	case ZUFS_OP_STATFS:
 		return _statfs(hdr);
 	case ZUFS_OP_BREAK:

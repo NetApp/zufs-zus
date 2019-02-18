@@ -65,7 +65,7 @@ static inline void _zus_iom_common_init(struct zus_iomap_build *iomb,
 					struct zufs_iomap *ziom, void *end_ptr)
 {
 	memset(ziom, 0, sizeof(*ziom));
-	ziom->iom_max = (end_ptr - (void*)ziom->iom_e) / sizeof(__u64);
+	ziom->iom_max = (end_ptr - (void *)ziom->iom_e) / sizeof(__u64);
 
 	iomb->sbi = sbi;
 	iomb->ziom = ziom;
