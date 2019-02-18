@@ -297,6 +297,14 @@ void zuf_root_close(int *fd);
 
 extern struct zufs_ioc_numa_map g_zus_numa_map;
 int zus_cpu_to_node(int cpu);
+int zus_current_onecpu(void);
+int zus_current_cpu(void);
+int zus_current_nid(void);
+void *zus_private_get(void);
+void zus_private_set(void*);
+
+int zus_get_cpu(void);
+void zus_put_cpu(int cpu);
 
 struct zus_thread_params {
 	const char *name; /* only used for the duration of the call */

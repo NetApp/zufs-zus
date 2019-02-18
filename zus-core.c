@@ -98,6 +98,65 @@ int zus_cpu_to_node(int cpu)
 	return g_zus_numa_map.cpu_to_node[cpu];
 }
 
+int zus_current_onecpu(void)
+{
+	struct zus_base_thread *zbt = pthread_getspecific(g_zts_id_key);
+
+	if (!zbt)
+		return ZUS_CPU_ALL;
+	return  zbt->one_cpu;
+}
+
+void *zus_private_get(void)
+{
+	struct zus_base_thread *zbt = pthread_getspecific(g_zts_id_key);
+
+	if (!zbt)
+		return NULL;
+	return zbt->private;
+}
+
+void zus_private_set(void *p)
+{
+	struct zus_base_thread *zbt = pthread_getspecific(g_zts_id_key);
+
+	if (zbt)
+		zbt->private = p;
+}
+
+static int __zus_current_cpu(bool warn)
+{
+	struct zus_base_thread *zbt = pthread_getspecific(g_zts_id_key);
+
+	if (ZUS_WARN_ON(!zbt)) /* not created by us */
+		return sched_getcpu();
+
+	ZUS_WARN_ON_ONCE(warn && (zbt->one_cpu == ZUS_CPU_ALL));
+	if (zbt->one_cpu == ZUS_CPU_ALL)
+		return sched_getcpu();
+
+	return zbt->one_cpu;
+}
+
+int zus_current_cpu(void)
+{
+	return __zus_current_cpu(true);
+}
+
+int zus_current_nid(void)
+{
+	struct zus_base_thread *zbt = pthread_getspecific(g_zts_id_key);
+
+	if (ZUS_WARN_ON(!zbt)) /* not created by us */
+		return zus_cpu_to_node(sched_getcpu());
+
+	if (ZUS_WARN_ON_ONCE(zbt->nid == ZUS_NUMA_NO_NID))
+		return zus_cpu_to_node(sched_getcpu());
+
+	return zbt->nid;
+}
+
+
 static int zus_set_numa_affinity(cpu_set_t *affinity, int nid)
 {
 	uint i;
