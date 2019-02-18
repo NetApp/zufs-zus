@@ -433,6 +433,17 @@ static int _fallocate(struct zufs_ioc_hdr *hdr)
 	return zii->op->fallocate(zii, ioc_range);
 }
 
+static int _seek(struct zufs_ioc_hdr *hdr)
+{
+	struct zufs_ioc_seek *ioc_seek = (void *)hdr;
+	struct zus_inode_info *zii = ioc_seek->zus_ii;
+
+	if (!zii->op->seek)
+		return -ENOTSUP;
+
+	return zii->op->seek(zii, ioc_seek);
+}
+
 static int _statfs(struct zufs_ioc_hdr *hdr)
 {
 	struct zufs_ioc_statfs *ioc_statfs = (void *)hdr;
@@ -525,6 +536,7 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 	case ZUFS_OP_FALLOCATE:
 		return _fallocate(hdr);
 	case ZUFS_OP_LLSEEK:
+		return _seek(hdr);
 	case ZUFS_OP_IOCTL:
 	case ZUFS_OP_XATTR_GET:
 	case ZUFS_OP_XATTR_SET:

@@ -141,6 +141,7 @@ struct zus_zii_operations {
 		    struct zufs_ioc_range *ioc_range);
 	int (*fallocate)(struct zus_inode_info *zii,
 			 struct zufs_ioc_range *ioc_range);
+	int (*seek)(struct zus_inode_info *zii, struct zufs_ioc_seek *ioc_seek);
 };
 
 struct zus_inode_info {
