@@ -30,4 +30,4 @@ CONFIG_ZUF_DEF_PATH = /sys/fs/zuf
 CONFIG_BUILD_VERBOSE = 0
 
 # List of filesystems to build
-CONFIG_LIBFS_MODULES = 
+CONFIG_LIBFS_MODULES = foofs
