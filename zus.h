@@ -131,6 +131,8 @@ struct zus_zii_operations {
 	int (*get_symlink)(struct zus_inode_info *zii, void **symlink);
 	int (*setattr)(struct zus_inode_info *zii,
 		       uint enable_bits, ulong truncate_size);
+	int (*fallocate)(struct zus_inode_info *zii,
+			 struct zufs_ioc_range *ioc_range);
 };
 
 struct zus_inode_info {

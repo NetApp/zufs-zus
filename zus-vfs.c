@@ -381,6 +381,17 @@ static int _setattr(struct zufs_ioc_hdr *hdr)
 				 ioc_attr->truncate_size);
 }
 
+static int _fallocate(struct zufs_ioc_hdr *hdr)
+{
+	struct zufs_ioc_range *ioc_range = (void *)hdr;
+	struct zus_inode_info *zii = ioc_range->zus_ii;
+
+	if (!zii->op->fallocate)
+		return -ENOTSUP;
+
+	return zii->op->fallocate(zii, ioc_range);
+}
+
 static int _statfs(struct zufs_ioc_hdr *hdr)
 {
 	struct zufs_ioc_statfs *ioc_statfs = (void *)hdr;
@@ -468,7 +479,9 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 	case ZUFS_OP_SETATTR:
 		return _setattr(hdr);
 	case ZUFS_OP_SYNC:
+		return -ENOTSUP;
 	case ZUFS_OP_FALLOCATE:
+		return _fallocate(hdr);
 	case ZUFS_OP_LLSEEK:
 	case ZUFS_OP_IOCTL:
 	case ZUFS_OP_XATTR_GET:
