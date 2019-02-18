@@ -16,6 +16,7 @@
 #include "zus.h"
 #include "movnt.h"
 #include "md.h"
+#include "iom_enc.h"
 #include "zuf_call.h"
 
 /*
@@ -318,4 +319,111 @@ bool md_mdt_check(struct md_dev_table *mdt,
 	}
 
 	return true;
+}
+
+static void _done(struct zus_iomap_build *iomb)
+{
+}
+
+static struct fba g_io_fba;
+
+static int _init_g_fba(void)
+{
+	if (g_io_fba.fd)
+		return 0;
+
+	return zus_alloc_exec_buff(NULL, PAGE_SIZE, 0, &g_io_fba);
+}
+
+static int _iomb_start(struct zus_iomap_build *iomb, struct multi_devices *md)
+{
+	iomb->err = _init_g_fba();
+	if (iomb->err)
+		return iomb->err;
+
+	_zus_iom_init_4_ioc_exec(iomb, md->sbi, g_io_fba.fd, g_io_fba.ptr,
+				 PAGE_SIZE);
+	_zus_iom_start(iomb, md, _done);
+	return 0;
+}
+
+int md_t2_mdt_read(struct multi_devices *md, int dev_index,
+		   struct md_dev_table *mdt)
+{
+	struct zus_iomap_build iomb = {};
+
+	iomb.err = _iomb_start(&iomb, md);
+	if (unlikely(iomb.err))
+		return iomb.err;
+
+	_zus_iom_enc_t2_zusmem_read(&iomb, 0, mdt, PAGE_SIZE);
+	_zus_iom_ioc_exec_submit(&iomb, true);
+
+	return iomb.err;
+}
+
+int md_t2_mdt_write(struct multi_devices *md, struct md_dev_table *mdt)
+{
+	struct zus_iomap_build iomb = {};
+	int i;
+
+	/* FIXME: must make copies and execute at end. one by one for now */
+	for (i = 0; i < md->t2_count; ++i) {
+		ulong bn = md_o2p(md_t2_dev(md, i)->offset);
+
+		iomb.err = _iomb_start(&iomb, md);
+		if (unlikely(iomb.err))
+			return iomb.err;
+
+		mdt->s_dev_list.id_index = mdt->s_dev_list.t1_count + i;
+		mdt->s_sum = cpu_to_le16(md_calc_csum(mdt));
+
+		_zus_iom_enc_t2_zusmem_write(&iomb, bn, mdt, PAGE_SIZE);
+		_zus_iom_ioc_exec_submit(&iomb, true);
+		if (iomb.err)
+			break;
+	}
+
+	return iomb.err;
+}
+
+/* ~~~  _zus_iom facility (imp of iom_enc.h) ~~~ */
+static int __zus_iom_exec(int fd, struct zus_sb_info *sbi,
+		   struct zufs_ioc_iomap_exec *ziome, bool sync)
+{
+	int err;
+
+	if (ZUS_WARN_ON(!ziome))
+		return -EFAULT;
+
+	ziome->sb_id = sbi->kern_sb_id;
+	ziome->zus_sbi = sbi;
+	ziome->wait_for_done = sync;
+
+	DBG("ziome->sb_id=%lld, iom_n=0x%x [0x%llx, 0x%llx, 0x%llx, 0x%llx]\n",
+	    ziome->sb_id, ziome->ziom.iom_n, ziome->ziom.iom_e[0],
+	    ziome->ziom.iom_e[1], ziome->ziom.iom_e[2], ziome->ziom.iom_e[3]);
+
+	err = zuf_iomap_exec(fd, ziome);
+
+	ZUS_WARN_ON_ONCE(err);
+	return err;
+}
+
+void _zus_iom_ioc_exec_submit(struct zus_iomap_build *iomb, bool sync)
+{
+	int err;
+
+	_zus_iom_end(iomb);
+
+	if (ZUS_WARN_ON(!iomb->ziom))
+		return;
+
+	err = __zus_iom_exec(iomb->fd, iomb->sbi, iomb->ioc_exec, sync);
+	iomb->err = iomb->ioc_exec->hdr.err;
+	if (unlikely(err && !iomb->err))
+		iomb->err = -errno;
+
+	if (sync && iomb->done)
+		iomb->done(iomb);
 }

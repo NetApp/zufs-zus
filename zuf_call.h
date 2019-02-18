@@ -88,3 +88,9 @@ int zuf_break_all(int fd)
 
 	return _ioctl(fd, ZU_IOC_BREAK_ALL, &zba.hdr, "ZU_IOC_BREAK_ALL");
 }
+
+static inline
+int zuf_iomap_exec(int fd, struct zufs_ioc_iomap_exec *ziome)
+{
+	return _ioctl(fd, ZU_IOC_IOMAP_EXEC, &ziome->hdr, "ZU_IOC_IOMAP_EXEC");
+}
