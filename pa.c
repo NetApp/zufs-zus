@@ -250,6 +250,14 @@ fail:
 void pa_fini(struct zus_sb_info *sbi)
 {
 	struct pa *pa = &sbi->pa[POOL_NUM];
+	struct pa_page *page;
+	ulong free_p = 0;
+
+	a_list_for_each_entry(page, &pa->head, list) {
+		++free_p;
+	}
+	if (unlikely(free_p != pa->size))
+		ERROR("pa leaks %lu pages\n", pa->size - free_p);
 
 	fba_free(&pa->pages);
 	fba_free(&pa->data);
