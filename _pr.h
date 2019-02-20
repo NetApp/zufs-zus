@@ -22,7 +22,7 @@
 	fprintf(stderr, LOG_STR(LOG_ERR) \
 		"zus: [%s:%d]: " fmt, __func__, __LINE__, ##a)
 #define INFO(fmt, a...) \
-	fprintf(stderr, LOG_STR(LOG_INFO) "~info~ zus: " fmt, ##a)
+	fprintf(stderr, LOG_STR(LOG_INFO) "zus: ~info~ " fmt, ##a)
 
 extern ulong g_DBGMASK;
 #define ZUS_DBGPRNT  (g_DBGMASK & 1)
