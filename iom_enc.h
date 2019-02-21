@@ -112,6 +112,18 @@ static inline void _zus_iom_end(struct zus_iomap_build *iomb)
 		iomb->ziom->iom_n = _zus_iom_len(iomb);
 }
 
+static inline int _zus_iom_enc_wbinv(struct zus_iomap_build *iomb)
+{
+	void *next_iom_e = iomb->cur_iom_e + 1;
+
+	if (unlikely(iomb->end_iom_e < next_iom_e))
+		return -ENOSPC;
+
+	_zus_iom_enc_type_val(iomb->cur_iom_e, IOM_WBINV, 0);
+	iomb->cur_iom_e = next_iom_e;
+	return 0;
+}
+
 static inline int _zus_iom_enc_unmap(struct zus_iomap_build *iomb, ulong index,
 				     ulong n, ulong ino)
 {
