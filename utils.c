@@ -148,4 +148,3 @@ int zus_increase_max_files(void)
 
 	return 0;
 }
-

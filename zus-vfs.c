@@ -56,7 +56,7 @@ static int _pmem_unmap(struct multi_devices *md)
 	err = munmap(md->p_pmem_addr, size);
 	if (err == -1) {
 		ERROR("munmap failed=> %d: %s\n", errno, strerror(errno));
-		return errno;
+		return -errno;
 	}
 
 	return 0;

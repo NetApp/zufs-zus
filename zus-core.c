@@ -41,7 +41,7 @@ int zuf_root_open_tmp(int *fd)
 	if (*fd < 0) {
 		ERROR("Error opening <%s>: flags=0x%x, %s\n",
 		      g_zus_root_path, o_flags, strerror(errno));
-		return errno;
+		return -errno;
 	}
 
 	return 0;

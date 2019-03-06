@@ -39,7 +39,7 @@ static int _fba_alloc(struct fba *fba, size_t size, int flags)
 		if (!(flags & MAP_HUGETLB))
 			ERROR("Error opening <%s>: %s\n","/tmp/",
 			      strerror(errno));
-		return errno;
+		return errno ? -errno : -EPERM;
 	}
 
 	err = ftruncate(fba->fd, size);
@@ -57,7 +57,7 @@ static int _fba_alloc(struct fba *fba, size_t size, int flags)
 		if (!(flags & MAP_HUGETLB))
 			ERROR("mmap failed=> %d: %s\n", errno, strerror(errno));
 		fba_free(fba);
-		return errno ?: ENOMEM;
+		return errno ? -errno: -ENOMEM;
 	}
 
 	err = madvise(fba->ptr, size, MADV_DONTDUMP);
