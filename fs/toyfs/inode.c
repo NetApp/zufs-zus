@@ -48,7 +48,7 @@ toyfs_new_inode(struct zus_sb_info *zsbi,
 	size_t symlen;
 	struct toyfs_inode *ti;
 	struct toyfs_sb_info *sbi = Z2SBI(zsbi);
-	struct toyfs_inode_info *tii;
+	struct toyfs_inode_info *tii = NULL;
 	struct zus_inode *zi = &ioc_new->zi;
 	struct toyfs_inode_info *dir_tii = Z2II(ioc_new->dir_ii);
 	struct toyfs_pmemb *pmemb;
@@ -65,13 +65,13 @@ toyfs_new_inode(struct zus_sb_info *zsbi,
 	DBG("new_inode:sbi=%p tii=%p mode=%o\n", sbi, tii, mode);
 
 	if (!issupported(zi))
-		return NULL;
+		goto out_err;
 	if (zi->i_size >= PAGE_SIZE)
-		return NULL;
+		goto out_err;
 
 	ti = toyfs_acquire_inode(sbi);
 	if (!ti)
-		return NULL;
+		goto out_err;
 
 	ino = _next_ino(tii->sbi);
 	memset(ti, 0, sizeof(*ti));
@@ -117,6 +117,11 @@ toyfs_new_inode(struct zus_sb_info *zsbi,
 	toyfs_unlock_inodes(sbi);
 
 	return zii;
+
+out_err:
+	if (tii)
+		toyfs_tii_free(tii);
+	return NULL;
 }
 
 void toyfs_free_inode(struct toyfs_inode_info *tii)

@@ -366,11 +366,10 @@ static bool _iterate_dir(struct toyfs_inode_info *dir_tii,
 	}
 	childs = toyfs_childs_list_of(dir_tii);
 	itr = childs->next;
-	while (itr != childs) {
+	while (ok && (itr != childs)) {
 		ok = _iterate_dentries(_dentries_of(itr), ctx);
-		if (!ok)
-			break;
-		itr = itr->next;
+		if (ok)
+			itr = itr->next;
 	}
 	return (itr != childs);
 }

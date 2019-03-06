@@ -158,6 +158,9 @@ void toyfs_tii_free(struct toyfs_inode_info *tii)
 	struct toyfs_sb_info *sbi = tii->sbi;
 
 	toyfs_assert(tii->sbi != NULL);
+	DBG("free_ii tii=%p files=%lu ffree=%lu\n", tii,
+	    sbi->s_statvfs.f_files, sbi->s_statvfs.f_ffree);
+
 	memset(tii, 0xAB, sizeof(*tii));
 	tii->zii.op = NULL;
 	tii->ti = NULL;
@@ -166,8 +169,6 @@ void toyfs_tii_free(struct toyfs_inode_info *tii)
 	free(tii);
 	sbi->s_statvfs.f_ffree++;
 	sbi->s_statvfs.f_favail++;
-	DBG("free_ii tii=%p files=%lu ffree=%lu\n", tii,
-	    sbi->s_statvfs.f_files, sbi->s_statvfs.f_ffree);
 }
 
 static void _pool_init(struct toyfs_pool *pool)
@@ -703,8 +704,10 @@ static int _new_root_inode(struct toyfs_sb_info *sbi,
 		return -ENOMEM;
 
 	root_ti = _pool_pop_inode(&sbi->s_pool);
-	if (!root_ti)
+	if (!root_ti) {
+		toyfs_tii_free(root_tii);
 		return -ENOSPC;
+	}
 
 	memset(root_ti, 0, sizeof(*root_ti));
 	root_tii->ti = root_ti;
