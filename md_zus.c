@@ -405,8 +405,9 @@ static int __zus_iom_exec(int fd, struct zus_sb_info *sbi,
 	    ziome->ziom.iom_e[1], ziome->ziom.iom_e[2], ziome->ziom.iom_e[3]);
 
 	err = zuf_iomap_exec(fd, ziome);
+	if (unlikely(err && err != -EIO))
+		ZUS_WARN_ON_ONCE(err);
 
-	ZUS_WARN_ON_ONCE(err);
 	return err;
 }
 
