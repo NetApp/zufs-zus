@@ -14,6 +14,7 @@ linux/stat.h
 b_io
 zusd
 libzus.so
+libzus.a
 
 # ignore external FS(s) linked under fs/ (except local ones)
 !fs/
