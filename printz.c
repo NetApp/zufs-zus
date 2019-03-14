@@ -240,7 +240,8 @@ static int _token_type(const char *token)
 	return -EINVAL;
 }
 
-#define REQUIRE_ADDITIONAL_TOKEN if (++i >= ddc->ntokens) return -EINVAL
+#define REQUIRE_ADDITIONAL_TOKEN \
+	do { if (++i >= ddc->ntokens) return -EINVAL; } while (0)
 
 static int _parse(struct ddbg_ctl *ddc)
 {

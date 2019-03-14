@@ -71,12 +71,12 @@ static void usage(int argc, char *argv[])
 int main(int argc, char *argv[])
 {
 	struct option opt[] = {
-		{.name = "policyRR", .has_arg = 2, .flag = NULL, .val = 'r'} ,
-		{.name = "policyFIFO", .has_arg = 2, .flag = NULL, .val = 'f'} ,
-		{.name = "nice", .has_arg = 2, .flag = NULL, .val = 'n'} ,
-		{.name = "verbose", .has_arg = 2, .flag = NULL, .val = 'd'} ,
-		{.name = "mcheck", .has_arg = 0, .flag = NULL, .val = 'm'} ,
-		{.name = 0, .has_arg = 0, .flag = 0, .val = 0} ,
+		{.name = "policyRR", .has_arg = 2, .flag = NULL, .val = 'r'},
+		{.name = "policyFIFO", .has_arg = 2, .flag = NULL, .val = 'f'},
+		{.name = "nice", .has_arg = 2, .flag = NULL, .val = 'n'},
+		{.name = "verbose", .has_arg = 2, .flag = NULL, .val = 'd'},
+		{.name = "mcheck", .has_arg = 0, .flag = NULL, .val = 'm'},
+		{.name = 0, .has_arg = 0, .flag = 0, .val = 0},
 	};
 	const char *shortopt = "r::f::n::d::m";
 	char op;
@@ -103,17 +103,17 @@ int main(int argc, char *argv[])
 				tp.rr_priority = atoi(optarg);
 			break;
 		case 'd':
-			if (optarg) {
+			if (optarg)
 				g_DBGMASK = strtol(optarg, NULL, 0);
-			} else {
+			else
 				g_DBGMASK = 0x1;
-			}
 			break;
 		case 'm':
 			mallopt(M_CHECK_ACTION, 3);
 			break;
-		default:;
+		default:
 			/* Just ignore we are not the police */
+			break;
 		}
 	}
 

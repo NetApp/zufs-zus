@@ -30,7 +30,7 @@ typedef unsigned int uint;
 char g_zus_root_path_stor[PATH_MAX];
 const char *g_zus_root_path = g_zus_root_path_stor;
 
-ulong g_DBGMASK = 0;
+ulong g_DBGMASK;
 
 int zuf_root_open_tmp(int *fd)
 {
@@ -205,8 +205,9 @@ static void *zus_glue_thread(void *__zt)
 
 /* @zbt comes ZERO(ed), Safe zbt->flags maybe set and are untouched */
 static
-int __zus_thread_create(struct zus_base_thread *zbt, struct zus_thread_params *tp,
-		        __start_routine fn, void *user_arg)
+int __zus_thread_create(struct zus_base_thread *zbt,
+			struct zus_thread_params *tp,
+			__start_routine fn, void *user_arg)
 {
 	pthread_attr_t attr;
 	int err;
@@ -266,7 +267,8 @@ int __zus_thread_create(struct zus_base_thread *zbt, struct zus_thread_params *t
 		err = pthread_attr_setaffinity_np(&attr, sizeof(affinity),
 						  &affinity);
 		if (unlikely(err)) {
-			ERROR("pthread_attr_setaffinity => %d: %s\n", err, strerror(err));
+			ERROR("pthread_attr_setaffinity => %d: %s\n",
+				err, strerror(err));
 			goto error;
 		}
 	}
@@ -282,6 +284,7 @@ int __zus_thread_create(struct zus_base_thread *zbt, struct zus_thread_params *t
 		err = pthread_setname_np(zbt->thread, tp->name);
 		if (err) {
 			char tname[32];
+
 			pthread_getname_np(zbt->thread, tname, 32);
 			ERROR("pthread_setname_np(%s) => %d\n", tname, err);
 		}
@@ -306,7 +309,7 @@ int zus_thread_create(pthread_t *new_tread, struct zus_thread_params *tp,
 	zbt->flags = __ZT_PLEASE_FREE;
 	err = __zus_thread_create(zbt, tp, fn, user_arg);
 	if (unlikely(err)) {
-		free (zbt);
+		free(zbt);
 		return err;
 	}
 
@@ -319,7 +322,6 @@ int zus_thread_create(pthread_t *new_tread, struct zus_thread_params *tp,
 
 struct _zu_thread {
 	struct zus_base_thread zbt;
-
 	uint no;	/* TODO: just the zbt->one_cpu above, please rename */
 	uint chan;
 	int fd;
@@ -426,7 +428,7 @@ static void *_zu_thread(void *callback_info)
 
 	wtz_release(&g_ztp.wtz);
 
-	while(!zt->stop) {
+	while (!zt->stop) {
 		zt->zbt.err = zuf_wait_opt(zt->fd, op);
 
 		if (zt->zbt.err) {
@@ -440,7 +442,7 @@ static void *_zu_thread(void *callback_info)
 	}
 
 	_zu_ioc_buff_unmap(op);
-	_zu_unmap (zt);
+	_zu_unmap(zt);
 	zuf_root_close(&zt->fd);
 
 	DBG("[%u] thread Exit\n", zt->no);
@@ -524,7 +526,7 @@ static void _zus_stop_chan_threads(uint chan)
 		}
 	}
 
-	free (g_ztp.zts[chan]);
+	free(g_ztp.zts[chan]);
 	g_ztp.zts[chan] = NULL;
 }
 
@@ -578,11 +580,10 @@ static void *zus_mount_thread(void *callback_info)
 		goto out;
 	}
 
-	while(!g_mount.stop) {
+	while (!g_mount.stop) {
 		g_mount.zbt.err = zuf_recieve_mount(g_mount.fd, zim);
-		if (g_mount.zbt.err || g_mount.stop) {
+		if (g_mount.zbt.err || g_mount.stop)
 			break;
-		}
 
 		if (zim->hdr.operation == ZUFS_M_MOUNT && !g_ztp.num_zts) {
 			err = zus_start_all_threads(&g_mount.tp,
@@ -622,7 +623,7 @@ out:
 	return (void *)((long)g_mount.zbt.err);
 }
 
-int zus_mount_thread_start(struct zus_thread_params *tp, const char* zuf_path)
+int zus_mount_thread_start(struct zus_thread_params *tp, const char *zuf_path)
 {
 	struct zus_thread_params mnttp = {};
 	int err;

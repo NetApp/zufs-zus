@@ -28,7 +28,7 @@
 
 #define TOYFS_IMAGIC			(0x11E11F5)
 
-#define TOYFS_INODES_PER_PAGE 	(PAGE_SIZE / sizeof(struct toyfs_inode))
+#define TOYFS_INODES_PER_PAGE	(PAGE_SIZE / sizeof(struct toyfs_inode))
 #define TOYFS_DBLKREFS_PER_PAGE	(PAGE_SIZE / sizeof(struct toyfs_dblkref))
 #define TOYFS_IBLKREFS_PER_PAGE	(PAGE_SIZE / sizeof(struct toyfs_iblkref))
 #define TOYFS_DIRENTS_PER_PAGE	(PAGE_SIZE / sizeof(struct toyfs_dirent))

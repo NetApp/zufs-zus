@@ -326,7 +326,7 @@ static int foofs_add_dentry(struct zus_inode_info *dir_ii,
 	}
 
 	memcpy(de->name, str->name, nl);
-	de->name[nl]=0; /* C string for prints */
+	de->name[nl] = 0; /* C string for prints */
 	de->ino = zii->zi->i_ino;
 	zus_std_add_dentry(dir_ii->zi, zii->zi);
 
@@ -415,7 +415,7 @@ static int foofs_read(void *ptr, struct zufs_ioc_IO *op)
 		return 0;
 	}
 
-	while(app_ptr < app_end)
+	while (app_ptr < app_end)
 		*app_ptr++ = start++;
 
 	return 0;
@@ -431,7 +431,7 @@ static int foofs_write(void *ptr, struct zufs_ioc_IO *op)
 
 	zii->zi->i_on_disk.a[0] = 0;
 
-	for(;app_ptr < app_end; ++app_ptr, ++start) {
+	for (; app_ptr < app_end; ++app_ptr, ++start) {
 		if (*app_ptr != start) {
 			if (g_DBGMASK & 0x10)
 				ERROR("*app_ptr(0x%lx) != start(0x%lx) offset=0x%x len=0x%x\n",

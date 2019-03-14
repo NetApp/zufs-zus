@@ -18,19 +18,29 @@
 #include "printz.h"
 
 /* FIXME*/
-#define ERROR(fmt, a...) fprintf(stderr, LOG_STR(LOG_ERR) "zus: [%s:%d]: " fmt, __func__, __LINE__, ##a)
-#define INFO(fmt, a...) fprintf(stderr, LOG_STR(LOG_INFO) "~info~ zus: " fmt, ##a)
+#define ERROR(fmt, a...) \
+	fprintf(stderr, LOG_STR(LOG_ERR) \
+		"zus: [%s:%d]: " fmt, __func__, __LINE__, ##a)
+#define INFO(fmt, a...) \
+	fprintf(stderr, LOG_STR(LOG_INFO) "~info~ zus: " fmt, ##a)
 
 extern ulong g_DBGMASK;
 #define ZUS_DBGPRNT  (g_DBGMASK & 1)
 
-#define DBG(fmt, a...) if (ZUS_DBGPRNT) fprintf(stderr, LOG_STR(LOG_INFO) "zus: [%s:%d]: " fmt, __func__, __LINE__, ##a)
-#define DBGCONT(fmt, a...) do { if (ZUS_DBGPRNT) fprintf(stderr, fmt, ##a); } while(0)
+#define DBG(fmt, a...) \
+	do { if (ZUS_DBGPRNT) \
+		fprintf(stderr, LOG_STR(LOG_INFO) \
+			"zus: [%s:%d]: " fmt, __func__, __LINE__, ##a); \
+	} while (0)
+
+#define DBGCONT(fmt, a...) \
+	do { if (ZUS_DBGPRNT) fprintf(stderr, fmt, ##a); } while (0)
 
 #define md_dbg_err DBG
 #define md_warn_cnd(silent, s, args ...) \
 	do {if (!silent) \
-		fprintf(stderr, LOG_STR(LOG_WARNING) "md-zus: [%s:%d] " s, __func__, __LINE__, ## args); \
+		fprintf(stderr, LOG_STR(LOG_WARNING) \
+			"md-zus: [%s:%d] " s, __func__, __LINE__, ## args); \
 	} while (0)
 
 #endif /* define ___PR_H__ */

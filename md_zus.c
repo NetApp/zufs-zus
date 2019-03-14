@@ -96,16 +96,16 @@ short md_calc_csum(struct md_dev_table *mdt)
 {
 	uint n = MDT_STATIC_SIZE(mdt) - sizeof(mdt->s_sum);
 	/* FIXME: We should skip s_version so we can change it after
-	*        mount, once we start using the new structures
-	*   So below should be &mdt->s_version => &mdt->s_magic
-	*   PXS-240.
-	*/
+	 *        mount, once we start using the new structures
+	 *   So below should be &mdt->s_version => &mdt->s_magic
+	 *   PXS-240.
+	 */
 	return crc16(~0, (__u8 *)&mdt->s_version, n);
 	return 0;
 }
 
 static void _init_dev_info(struct md_dev_info *mdi, struct md_dev_id *id,
-			  int index, __u64 offset, void* pmem_addr)
+			  int index, __u64 offset, void *pmem_addr)
 {
 	mdi->offset = offset;
 	mdi->index = index;
@@ -117,8 +117,8 @@ static void _init_dev_info(struct md_dev_info *mdi, struct md_dev_id *id,
 	}
 
 	DBG("[%d] mdi(offset=0x%lx, size=0x%lx, nid=%d) @%p\n",
-	    mdi->index, mdi->offset, mdi->size, mdi->nid,
-            pmem_addr ? pmem_addr + offset : 0);
+		mdi->index, mdi->offset, mdi->size, mdi->nid,
+		pmem_addr ? pmem_addr + offset : 0);
 }
 
 static int _map_setup(struct multi_devices *md, ulong blocks, int dev_start,
@@ -163,7 +163,7 @@ int md_init_from_pmem_info(struct multi_devices *md)
 	}
 
 	offset = 0;
-	for (;i < md->t1_count + md->t2_count; ++i) {
+	for (; i < md->t1_count + md->t2_count; ++i) {
 		struct md_dev_info *mdi = &md->devs[i];
 
 		_init_dev_info(mdi, &dev_list->dev_ids[i], i, offset, NULL);

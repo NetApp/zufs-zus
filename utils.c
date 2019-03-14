@@ -79,14 +79,16 @@ static void _dump_addr2line(FILE *fp)
 		int l;
 
 		if (!(i % 5)) {
-			l = snprintf(m, s, "\\\n				");
+			l = snprintf(m, s,
+					"\\\n				");
 			s -= l; m += l;
 		}
 		l = snprintf(m, s, "%p ", arr[i + 1]);
 		s -= l; m += l;
 	}
 
-	fprintf(fp, LOG_STR(LOG_WARNING) "zus_warn: addr2line -a -C -e %s -f -p -s %s\n",
+	fprintf(fp, LOG_STR(LOG_WARNING)
+		"zus_warn: addr2line -a -C -e %s -f -p -s %s\n",
 		program_invocation_name, ptrS);
 }
 

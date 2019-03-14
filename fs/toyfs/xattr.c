@@ -194,7 +194,7 @@ static int _append_xattr(const struct toyfs_inode_info *tii,
 
 static int _do_setxattr(const struct toyfs_inode_info *tii,
 			const char *name, size_t name_len,
-			const void *value, size_t size, unsigned flags)
+			const void *value, size_t size, unsigned int flags)
 {
 	struct toyfs_xattr_entry *xe = _find_xe(tii, name, name_len);
 
@@ -221,7 +221,7 @@ int toyfs_setxattr(struct zus_inode_info *zii,
 		return err;
 
 	if (ioc_xattr->user_buf_size ||
-	    (ioc_xattr->ioc_flags & ZUS_XATTR_SET_EMPTY))
+	    (ioc_xattr->ioc_flags & ZUFS_XATTR_SET_EMPTY))
 		value = ioc_xattr->buf + ioc_xattr->name_len;
 
 	if (!value)

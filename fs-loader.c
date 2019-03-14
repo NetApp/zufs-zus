@@ -58,10 +58,10 @@ static int _try_load_from(void **handle, const char namefmt[], ...)
 	return 0;
 }
 
-static int _load_one_fs(int fd, const char* fs_name, void **handle)
+static int _load_one_fs(int fd, const char *fs_name, void **handle)
 {
 	void *dl_lib;
-	int (*register_fn)(int);
+	int (*register_fn)(int fd);
 	char *dl_err;
 	int err;
 

@@ -91,7 +91,8 @@ static int _pmem_grab(struct zus_sb_info *sbi, uint pmem_kern_id)
 	if (!md->user_page_size)
 		return 0; /* User does not want pages */
 
-	err = fba_alloc_align(&md->pages, md_t1_blocks(md) * md->user_page_size);
+	err = fba_alloc_align(&md->pages,
+				md_t1_blocks(md) * md->user_page_size);
 	return err;
 }
 
@@ -490,37 +491,36 @@ static int _statfs(struct zufs_ioc_hdr *hdr)
 const char *ZUFS_OP_name(enum e_zufs_operation op)
 {
 #define CASE_ENUM_NAME(e) case e: return #e
-	switch  (op) {
-		CASE_ENUM_NAME(ZUFS_OP_NULL		);
-		CASE_ENUM_NAME(ZUFS_OP_STATFS		);
-		CASE_ENUM_NAME(ZUFS_OP_NEW_INODE		);
-		CASE_ENUM_NAME(ZUFS_OP_FREE_INODE	);
-		CASE_ENUM_NAME(ZUFS_OP_EVICT_INODE	);
-		CASE_ENUM_NAME(ZUFS_OP_LOOKUP		);
-		CASE_ENUM_NAME(ZUFS_OP_ADD_DENTRY	);
-		CASE_ENUM_NAME(ZUFS_OP_REMOVE_DENTRY	);
-		CASE_ENUM_NAME(ZUFS_OP_RENAME		);
-		CASE_ENUM_NAME(ZUFS_OP_READDIR		);
-		CASE_ENUM_NAME(ZUFS_OP_CLONE		);
-		CASE_ENUM_NAME(ZUFS_OP_COPY		);
-		CASE_ENUM_NAME(ZUFS_OP_READ		);
-		CASE_ENUM_NAME(ZUFS_OP_PRE_READ		);
-		CASE_ENUM_NAME(ZUFS_OP_WRITE		);
-		CASE_ENUM_NAME(ZUFS_OP_GET_BLOCK		);
-		CASE_ENUM_NAME(ZUFS_OP_PUT_BLOCK		);
-		CASE_ENUM_NAME(ZUFS_OP_MMAP_CLOSE	);
-		CASE_ENUM_NAME(ZUFS_OP_GET_SYMLINK	);
-		CASE_ENUM_NAME(ZUFS_OP_SETATTR		);
-		CASE_ENUM_NAME(ZUFS_OP_SYNC		);
-		CASE_ENUM_NAME(ZUFS_OP_FALLOCATE		);
-		CASE_ENUM_NAME(ZUFS_OP_LLSEEK		);
-		CASE_ENUM_NAME(ZUFS_OP_IOM_DONE		);
-		CASE_ENUM_NAME(ZUFS_OP_IOCTL		);
-		CASE_ENUM_NAME(ZUFS_OP_XATTR_GET		);
-		CASE_ENUM_NAME(ZUFS_OP_XATTR_SET		);
-		CASE_ENUM_NAME(ZUFS_OP_XATTR_LIST	);
-		CASE_ENUM_NAME(ZUFS_OP_BREAK		);
-		CASE_ENUM_NAME(ZUFS_OP_MAX_OPT		);
+	switch (op) {
+		CASE_ENUM_NAME(ZUFS_OP_NULL);
+		CASE_ENUM_NAME(ZUFS_OP_STATFS);
+		CASE_ENUM_NAME(ZUFS_OP_NEW_INODE);
+		CASE_ENUM_NAME(ZUFS_OP_FREE_INODE);
+		CASE_ENUM_NAME(ZUFS_OP_EVICT_INODE);
+		CASE_ENUM_NAME(ZUFS_OP_LOOKUP);
+		CASE_ENUM_NAME(ZUFS_OP_ADD_DENTRY);
+		CASE_ENUM_NAME(ZUFS_OP_REMOVE_DENTRY);
+		CASE_ENUM_NAME(ZUFS_OP_RENAME);
+		CASE_ENUM_NAME(ZUFS_OP_READDIR);
+		CASE_ENUM_NAME(ZUFS_OP_CLONE);
+		CASE_ENUM_NAME(ZUFS_OP_COPY);
+		CASE_ENUM_NAME(ZUFS_OP_READ);
+		CASE_ENUM_NAME(ZUFS_OP_PRE_READ);
+		CASE_ENUM_NAME(ZUFS_OP_WRITE);
+		CASE_ENUM_NAME(ZUFS_OP_GET_BLOCK);
+		CASE_ENUM_NAME(ZUFS_OP_PUT_BLOCK);
+		CASE_ENUM_NAME(ZUFS_OP_MMAP_CLOSE);
+		CASE_ENUM_NAME(ZUFS_OP_GET_SYMLINK);
+		CASE_ENUM_NAME(ZUFS_OP_SETATTR);
+		CASE_ENUM_NAME(ZUFS_OP_SYNC);
+		CASE_ENUM_NAME(ZUFS_OP_FALLOCATE);
+		CASE_ENUM_NAME(ZUFS_OP_LLSEEK);
+		CASE_ENUM_NAME(ZUFS_OP_IOCTL);
+		CASE_ENUM_NAME(ZUFS_OP_XATTR_GET);
+		CASE_ENUM_NAME(ZUFS_OP_XATTR_SET);
+		CASE_ENUM_NAME(ZUFS_OP_XATTR_LIST);
+		CASE_ENUM_NAME(ZUFS_OP_BREAK);
+		CASE_ENUM_NAME(ZUFS_OP_MAX_OPT);
 	default:
 		return "UNKNOWN";
 	}
@@ -528,16 +528,15 @@ const char *ZUFS_OP_name(enum e_zufs_operation op)
 
 int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 {
-	DBG("[%s] OP=%d off=0x%x len=0x%x\n",
-	    ZUFS_OP_name(hdr->operation), hdr->operation, hdr->offset, hdr->len);
+	DBG("[%s] OP=%d off=0x%x len=0x%x\n", ZUFS_OP_name(hdr->operation),
+		hdr->operation, hdr->offset, hdr->len);
 
-	switch(hdr->operation) {
+	switch (hdr->operation) {
 	case ZUFS_OP_NEW_INODE:
 		return _new_inode(app_ptr, hdr);
 	case ZUFS_OP_FREE_INODE:
 	case ZUFS_OP_EVICT_INODE:
 		return _evict(hdr);
-
 	case ZUFS_OP_LOOKUP:
 		return _lookup(hdr);
 	case ZUFS_OP_ADD_DENTRY:
@@ -550,7 +549,6 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 	case ZUFS_OP_CLONE:
 	case ZUFS_OP_COPY:
 		return _clone(hdr);
-
 	case ZUFS_OP_READ:
 		return _io_read(app_ptr, hdr);
 	case ZUFS_OP_PRE_READ:
@@ -580,7 +578,6 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 		return _ioc_xattr(hdr);
 	case ZUFS_OP_STATFS:
 		return _statfs(hdr);
-
 	case ZUFS_OP_BREAK:
 		break;
 	default:

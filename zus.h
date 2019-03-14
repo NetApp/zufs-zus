@@ -41,7 +41,6 @@
 #include "_pr.h"
 #include "a_list.h"
 
-/* FIXME: Move to K_in_U include structure */
 #ifndef likely
 #define likely(x_)	__builtin_expect(!!(x_), 1)
 #define unlikely(x_)	__builtin_expect(!!(x_), 0)
@@ -77,9 +76,9 @@ int zus_increase_max_files(void);
 
 #define ZUS_WARN_ON_ONCE(x_) ({				\
 	int __ret_warn_on = !!(x_);			\
-	static bool __once = false;			\
+	static bool __once;				\
 	if (unlikely(__ret_warn_on && !__once))	{	\
-		zus_warn(#x_, __FILE__, __LINE__); 	\
+		zus_warn(#x_, __FILE__, __LINE__);	\
 		__once = true;				\
 	}						\
 	unlikely(__ret_warn_on);			\
@@ -163,8 +162,8 @@ struct zus_inode_info {
 
 struct zus_sbi_operations {
 	struct zus_inode_info* (*new_inode)(struct zus_sb_info *sbi,
-				void *app_ptr, struct
-				zufs_ioc_new_inode *ioc_new);
+				void *app_ptr,
+				struct zufs_ioc_new_inode *ioc_new);
 	void (*free_inode)(struct zus_inode_info *zii);
 
 	ulong (*lookup)(struct zus_inode_info *dir_ii, struct zufs_str *str);
@@ -317,8 +316,8 @@ struct zus_thread_params {
 	ulong __flags; /* warnings on/off */
 };
 
-#define ZTP_INIT(ztp) 			\
-{					\
+#define ZTP_INIT(ztp)				\
+{						\
 	memset((ztp), 0, sizeof(*(ztp)));	\
 	(ztp)->nid = (ztp)->one_cpu = (-1);	\
 }
@@ -326,6 +325,8 @@ struct zus_thread_params {
 typedef void *(*__start_routine) (void *); /* pthread programming style NOT */
 int zus_thread_create(pthread_t *new_tread, struct zus_thread_params *params,
 		      __start_routine fn, void *user_arg);
+int zus_alloc_exec_buff(struct zus_sb_info *sbi, uint max_bytes, uint pool_num,
+			struct fba *fba);
 
 /* zus-vfs.c */
 int zus_register_all(int fd);
@@ -339,8 +340,6 @@ struct zus_inode_info *zus_iget(struct zus_sb_info *sbi, ulong ino);
 int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr);
 const char *ZUFS_OP_name(enum e_zufs_operation op);
 
-int zus_alloc_exec_buff(struct zus_sb_info *sbi, uint max_bytes, uint pool_num,
-			struct fba *fba);
 
 /* dyn_pr.c */
 int zus_add_module_ddbg(const char *fs_name, void *handle);
@@ -459,6 +458,11 @@ static inline int __atomic_dec_testzero(int *v)
 static inline int pa_get_page(struct pa_page *page)
 {
 	return _zu_atomic_add_unless(&page->refcount, 1, 0);
+}
+
+static inline int pa_page_count(struct pa_page *page)
+{
+	return __atomic_load_n(&page->refcount, __ATOMIC_SEQ_CST);
 }
 
 /* Return true if the refcount droped to 0 */

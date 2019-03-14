@@ -351,7 +351,8 @@ static int clflushopt_avail(void)
 void (*cl_flush_opt)(void *buf, uint32_t len) = cl_flush;
 
 __attribute__((constructor))
-static void clflush_init(void) {
+static void clflush_init(void) 
+{
 	if (clflushopt_avail())
 		cl_flush_opt = __cl_flush_opt;
 }

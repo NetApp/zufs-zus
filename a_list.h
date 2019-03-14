@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * The toyfs reference file-system implementation via zufs
+ * Simple double-linked list
  *
  * Copyright (c) 2018 NetApp, Inc. All rights reserved.
  *
@@ -74,7 +74,7 @@ static inline int a_list_empty(const struct a_list_head *head)
 
 #ifndef container_of
 #define container_of(ptr, type, member) ({			\
-	(type *)( (void *)ptr - offsetof(type,member) );})
+	(type *)((void *)ptr - offsetof(type, member)); })
 #endif /* container_of */
 
 #define a_list_first_entry(ptr, type, member)		\

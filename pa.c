@@ -26,7 +26,7 @@
  * Force fba allocations to be 2M aligned. We don't care for out-of-range pages
  * as they are never touched and therefore remains unallocated.
  */
-#define FBA_ALIGNSIZE 	(ZUFS_ALLOC_MASK + 1)
+#define FBA_ALIGNSIZE	(ZUFS_ALLOC_MASK + 1)
 
 int  fba_alloc(struct fba *fba, size_t size)
 {
@@ -36,7 +36,7 @@ int  fba_alloc(struct fba *fba, size_t size)
 	 */
 	fba->fd = open("/dev/shm/", O_RDWR | O_TMPFILE | O_EXCL, 0666);
 	if (fba->fd < 0) {
-		ERROR("Error opening <%s>: %s\n","/tmp/", strerror(errno));
+		ERROR("Error opening <%s>: %s\n", "/tmp/", strerror(errno));
 		return errno;
 	}
 

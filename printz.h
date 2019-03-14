@@ -46,7 +46,7 @@ struct _ddebug {
 do {									\
 	DEFINE_DYNAMIC_DEBUG_METADATA(desc, fmt);			\
 	if (desc.active)						\
-		fprintf(stderr, LOG_STR(LOG_INFO) "%s: " fmt, 		\
+		fprintf(stderr, LOG_STR(LOG_INFO) "%s: " fmt,		\
 			desc.modname, ## args);				\
 } while (0)
 

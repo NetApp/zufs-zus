@@ -19,7 +19,7 @@
 
 /* Just a wraper for the commom unexpected print */
 static inline
-int _ioctl(int fd, ulong zu_vect, struct zufs_ioc_hdr *hdr, const char* msg)
+int _ioctl(int fd, ulong zu_vect, struct zufs_ioc_hdr *hdr, const char *msg)
 {
 	int ret;
 
