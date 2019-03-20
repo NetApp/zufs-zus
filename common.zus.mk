@@ -107,7 +107,7 @@ else
 endif
 
 $(PROJ_TARGET): $(PROJ_TARGET_DEPS) $(OBJS)
-	$(eval LINK_CMD := $(CC) $(LDFLAGS) $(OBJS) -o $(PROJ_TARGET))
+	$(eval LINK_CMD := $(CC) $(OBJS) $(LDFLAGS) -o $(PROJ_TARGET))
 ifeq ($(CONFIG_BUILD_VERBOSE),1)
 	$(LINK_CMD)
 else
