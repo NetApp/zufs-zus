@@ -50,6 +50,8 @@ endif
 
 ifeq ($(CONFIG_TRY_ANON_MMAP),1)
 CDEFS += CONFIG_TRY_ANON_MMAP=1
+else
+CDEFS += CONFIG_TRY_ANON_MMAP=0
 endif
 
 CDEFS := $(addprefix -D,$(CDEFS))
