@@ -68,6 +68,9 @@ static int _fba_alloc(struct fba *fba, size_t size, int flags)
 	fba->orig_ptr = fba->ptr;
 	fba->size = size;
 
+	DBG("fba allocated flags=0x%x fd=%d ptr=%p size=0x%lx\n", flags,
+	    fba->fd, fba->ptr, size);
+
 	return 0;
 }
 
@@ -92,23 +95,24 @@ static int _fba_alloc_huge(struct fba *fba, size_t size)
 
 int fba_alloc_align(struct fba *fba, size_t size, bool huge)
 {
+	size_t aligned_size;
 	ulong addr;
 	int err;
 
-	size = ALIGN(size + FBA_ALIGNSIZE, FBA_ALIGNSIZE);
+	aligned_size = ALIGN(size + FBA_ALIGNSIZE, FBA_ALIGNSIZE);
 
 	if (huge)
-		err = _fba_alloc_huge(fba, size);
+		err = _fba_alloc_huge(fba, aligned_size);
 	else
-		err = fba_alloc(fba, size);
+		err = fba_alloc(fba, aligned_size);
 
 	if (unlikely(err))
 		return err;
 
 	addr = ALIGN((ulong)fba->ptr, FBA_ALIGNSIZE);
 	if (fba->ptr != (void *)addr) {
-		DBG("fba: fd=%d mmap-addr=0x%lx addr=0x%lx msize=0x%lx\n",
-			fba->fd, (ulong)fba->ptr, addr, size);
+		DBG("fba: fd=%d mmap-addr=0x%lx addr=0x%lx msize=0x%lx aligned_size=0x%lx\n",
+		    fba->fd, (ulong)fba->ptr, addr, size, aligned_size);
 		fba->ptr = (void *)addr;
 	}
 	return 0;
