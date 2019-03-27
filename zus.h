@@ -313,7 +313,7 @@ void zuf_root_close(int *fd);
 #define ZUS_NUMA_NO_NID	(~0U)
 #define ZUS_CPU_ALL	(~0U)
 
-extern struct zufs_ioc_numa_map g_zus_numa_map;
+extern struct zufs_ioc_numa_map *g_zus_numa_map;
 int zus_cpu_to_node(int cpu);
 int zus_current_onecpu(void);
 int zus_current_cpu(void);

@@ -71,17 +71,24 @@ struct zus_base_thread {
 };
 
 static pthread_key_t g_zts_id_key;
-struct zufs_ioc_numa_map g_zus_numa_map;
+
+union zus_numa_map_page {
+	struct zufs_ioc_numa_map numa_map;
+	__u8 pad[PAGE_SIZE];
+} __aligned(64);
+
+static union zus_numa_map_page g_zus_numa_map_page;
+struct zufs_ioc_numa_map *g_zus_numa_map = &g_zus_numa_map_page.numa_map;
 
 static int _numa_map_init(int fd)
 {
-	return zuf_numa_map(fd, &g_zus_numa_map);
+	return zuf_numa_map(fd, g_zus_numa_map);
 }
 
 static inline bool ___BAD_CPU(uint cpu)
 {
 	/* TODO: WARN_ON_ONCE */
-	if (ZUS_WARN_ON(g_zus_numa_map.online_cpus < cpu)) {
+	if (ZUS_WARN_ON(g_zus_numa_map->online_cpus < cpu)) {
 		ERROR("Bad cpu=%u\n", cpu);
 		return true; /* yell, but do not crash */
 	}
@@ -95,7 +102,7 @@ int zus_cpu_to_node(int cpu)
 	if (BAD_CPU(cpu))
 		return 0; /* Yell but don't crash */
 
-	return g_zus_numa_map.cpu_to_node[cpu];
+	return g_zus_numa_map->cpu_to_node[cpu];
 }
 
 int zus_current_onecpu(void)
@@ -163,17 +170,17 @@ static int zus_set_numa_affinity(cpu_set_t *affinity, int nid)
 
 	CPU_ZERO(affinity);
 
-	for (i = 0; i < g_zus_numa_map.online_cpus; ++i) {
+	for (i = 0; i < g_zus_numa_map->online_cpus; ++i) {
 		if (zus_cpu_to_node(i) == nid)
 			break;
 	}
 
-	if (i == g_zus_numa_map.online_cpus) {
+	if (i == g_zus_numa_map->online_cpus) {
 		ERROR("Wrong nid=%d\n", nid);
 		return -EINVAL;
 	}
 
-	for (; i < g_zus_numa_map.online_cpus; ++i) {
+	for (; i < g_zus_numa_map->online_cpus; ++i) {
 		if (zus_cpu_to_node(i) != nid)
 			break;
 		CPU_SET(i, affinity);
@@ -587,7 +594,7 @@ static void *zus_mount_thread(void *callback_info)
 
 		if (zim->hdr.operation == ZUFS_M_MOUNT && !g_ztp.num_zts) {
 			err = zus_start_all_threads(&g_mount.tp,
-						    g_zus_numa_map.online_cpus,
+						    g_zus_numa_map->online_cpus,
 						    zim->zmi.num_channels);
 			if (unlikely(err))
 				goto next;
