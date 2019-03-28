@@ -130,8 +130,8 @@ int zus_mount(int fd, struct zufs_ioc_mount *zim)
 
 	sbi = zfi->op->sbi_alloc(zfi);
 	if (unlikely(!sbi)) {
-		err = -ENOMEM;
-		goto err;
+		zim->hdr.err = -ENOMEM;
+		return zim->hdr.err;
 	}
 	sbi->zfi = zim->zmi.zus_zfi;
 	sbi->kern_sb_id = zim->zmi.sb_id;
