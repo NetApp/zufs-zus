@@ -320,8 +320,8 @@ static int foofs_add_dentry(struct zus_inode_info *dir_ii,
 
 	de = _find_empty_de(dir_ii);
 	if (unlikely(!de)) {
-		DBG("[%ld] [%.*s] ino=%ld\n",
-		    zi_ino(dir_ii->zi), str->len, str->name, de->ino);
+		DBG("[%ld] [%.*s] => -ENOSPC\n",
+		    zi_ino(dir_ii->zi), str->len, str->name);
 		return -ENOSPC;
 	}
 
