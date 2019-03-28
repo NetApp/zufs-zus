@@ -476,6 +476,7 @@ static int _zus_start_chan_threads(struct zus_thread_params *tp, uint num_cpus,
 		zt->no = tp->one_cpu = i;
 		zt->chan = chan;
 		err = __zus_thread_create(&zt->zbt, tp, _zu_thread, zt);
+		tp->name = NULL;
 		if (err)
 			return err;
 	}
