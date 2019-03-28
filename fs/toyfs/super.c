@@ -535,6 +535,10 @@ static void _itable_remove(struct toyfs_itable *itable,
 		pp = &(*pp)->next;
 	}
 	toyfs_assert(tir != NULL);
+	if (!tir) { /* Make clang-scan happy */
+		_itable_unlock(itable);
+		return;
+	}
 	*pp = tir->next;
 	itable->icount--;
 	_itable_unlock(itable);

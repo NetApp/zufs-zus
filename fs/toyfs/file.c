@@ -852,7 +852,6 @@ static int _clone_range(struct toyfs_inode_info *src_tii,
 
 	toyfs_assert(_is_entire_page(src_off, dst_off, len));
 	src_iblkref = _fetch_iblkref(src_tii, src_off);
-	dst_iblkref = _fetch_iblkref(dst_tii, dst_off);
 
 	if (src_iblkref) {
 		dst_iblkref = _require_iblkref(dst_tii, dst_off);
