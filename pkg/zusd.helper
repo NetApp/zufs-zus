@@ -19,7 +19,7 @@ signal_apps()
 	local mntdev=$2
 	local pids
 
-	if pids=$(/sbin/lsof -t ${mntdev}) ; then
+	if pids=$(lsof -t ${mntdev}) ; then
 		kill -s ${signal} ${pids}
 	else
 		echo "No apps founds"
@@ -31,14 +31,14 @@ unload_libfs()
 	local libfs=$1
 	local mntdevs mntdev
 
-	mntdevs=$(/bin/grep ${libfs} /proc/self/mounts | /bin/cut -d" " -f1)
+	mntdevs=$(grep ${libfs} /proc/self/mounts | cut -d" " -f1)
 
 	for mntdev in ${mntdevs} ; do
 		signal_apps SIGTERM ${mntdev}
 		sleep 1 # wait a bit for apps to stop
 		signal_apps SIGKILL ${mntdev}
-		/bin/umount -v -t ${libfs} ${mntdev}
-		/sbin/fsck.${libfs} ${mntdev}
+		umount -v -t ${libfs} ${mntdev}
+		fsck.${libfs} ${mntdev}
 	done
 }
 
@@ -72,30 +72,43 @@ unload() {
 
 	unload_zusd
 
-	/bin/umount -v -t zuf ${ZUF_ROOT}
-	/sbin/rmmod -v zuf
+	umount -v -t zuf ${ZUF_ROOT}
+	rmmod -v zuf
 }
 
 load()
 {
 	local zuf_mod=/usr/lib/zufs/extra/zuf.ko
-	local kver=$(/bin/uname -r)
-	local kabi=$(echo ${kver} | /bin/sed -e 's|\([0-9.]*-[0-9]*\).*|\1|')
+	local kver=$(uname -r)
+	local kabi=$(echo ${kver} | sed -e 's|\([0-9.]*-[0-9]*\).*|\1|')
+	local destdir
 
 	# cleanup previous loads
-	if /bin/grep -qw zuf /proc/self/mounts ; then
+	if grep -qw zuf /proc/self/mounts ; then
 		unload
+	fi
+
+	source /etc/os-release
+
+	if [[ "${ID}" == "centos" || "${ID}" == "rhel" ]] ; then
+		destdir=/lib/modules/${kver}/extra
+	else
+		destdir=/lib/modules/${kver}/kernel/fs/zuf
+	fi
+
+	if [[ ! -d ${destdir} ]] ; then
+		mkdir -p ${destdir}
 	fi
 
 	# in case we booted a new kernel that isn't familiar with zuf
 	# link it hoping the kernel ABI still matches
-	if ! /sbin/modinfo zuf >/dev/null ; then
-		/bin/ln -sf ${zuf_mod%.ko}.*${kabi}*.ko /lib/modules/${kver}/extra/zuf.ko
-		/sbin/depmod
+	if ! modinfo zuf >/dev/null ; then
+		ln -sf ${zuf_mod%.ko}.*${kabi}*.ko ${destdir}/zuf.ko
+		depmod
 	fi
 
-	/sbin/modprobe -v zuf
-	/bin/mount -v -t zuf nodev ${ZUF_ROOT}
+	modprobe -v zuf
+	mount -v -t zuf nodev ${ZUF_ROOT}
 
 	exec /sbin/zusd ${ZUSD_ARGS}
 }

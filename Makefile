@@ -37,15 +37,15 @@ all: core $(CONFIG_LIBFS_MODULES)
 
 install:
 	pkg/install.sh
-rpm:
-	pkg/create_pkg.sh
+rpm deb:
+	pkg/create_pkg.sh $@
 cscope:
 	find . -type f -name '*.[c|h]' > cscope.files
 	find . -type l -name '*.[c|h]' -exec realpath \
 			--relative-to=$(CURDIR) '{}' \; >> cscope.files
 	cscope -bcqR
 
-.PHONY: install rpm all clean cscope
+.PHONY: install rpm deb all clean cscope
 .NOTPARALLEL:
 .DEFAULT_GOAL := all
 else
