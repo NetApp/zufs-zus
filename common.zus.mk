@@ -29,6 +29,13 @@ CWARNS += frame-larger-than=4096 larger-than=4096
 CWARNS += $(PROJ_WARNS)
 # Turn off some warnings
 CWARNS += no-unused-parameter no-missing-field-initializers
+# Turn off clang-specific warnings we don't care about
+ifeq ($(CC),clang)
+CWARNS += no-gnu-variable-sized-type-not-at-end
+CWARNS += no-address-of-packed-member
+CWARNS += no-cast-align
+CWARNS += no-unused-function
+endif
 
 ifeq ($(CONFIG_PEDANTIC),1)
 CWARNS += format=2 sign-conversion conversion
