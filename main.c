@@ -58,7 +58,7 @@ static void usage(int argc, char *argv[])
 	uint s = sizeof(spf);
 	int i, l;
 
-	fprintf(stderr, msg);
+	fprintf(stderr, "%s", msg);
 	l = snprintf(m, s, "got: %s ", argv[0]);
 	m += l; s -= l;
 	for (i = 1; i < argc; ++i) {
