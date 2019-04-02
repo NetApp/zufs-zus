@@ -553,7 +553,8 @@ const char *ZUFS_OP_name(enum e_zufs_operation op)
 
 int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 {
-	DBG("OP=%d off=0x%x len=0x%x\n",hdr->operation, hdr->offset, hdr->len);
+	DBG("[%s] OP=%d off=0x%x len=0x%x\n", ZUFS_OP_name(hdr->operation),
+		hdr->operation, hdr->offset, hdr->len);
 
 	switch (hdr->operation) {
 	case ZUFS_OP_NEW_INODE:
