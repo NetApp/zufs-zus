@@ -316,16 +316,29 @@ void zuf_root_close(int *fd);
 #define ZUS_NUMA_NO_NID	(~0U)
 #define ZUS_CPU_ALL	(~0U)
 
-extern struct zufs_ioc_numa_map *g_zus_numa_map;
+extern struct zufs_ioc_numa_map *zus_numa_map;
+extern unsigned int zus_nr_cpu_ids;
+extern cpu_set_t *zus_cpu_possible_mask;
+extern cpu_set_t *zus_cpu_online_mask;
 int zus_cpu_to_node(int cpu);
+bool zus_cpu_online(int cpu);
 int zus_current_onecpu(void);
 int zus_current_cpu(void);
 int zus_current_nid(void);
+unsigned int zus_cpumask_next(int n, cpu_set_t *srcp);
+
+#define zus_num_possible_nodes() (zus_numa_map->possible_nodes)
+#define zus_num_possible_cpus()  (zus_numa_map->possible_cpus)
+#define zus_num_online_nodes()   (zus_numa_map->online_nodes)
+#define zus_num_online_cpus()    (zus_numa_map->online_cpus)
+
+#define zus_for_each_cpu(cpu, mask)			\
+	for ((cpu) = -1;				\
+		(cpu) = zus_cpumask_next((cpu), (mask)),\
+		(cpu) < zus_nr_cpu_ids;)
+
 void *zus_private_get(void);
 void zus_private_set(void*);
-
-int zus_get_cpu(void);
-void zus_put_cpu(int cpu);
 
 struct zus_thread_params {
 	const char *name; /* only used for the duration of the call */

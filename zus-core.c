@@ -23,6 +23,9 @@
 #include "zuf_call.h"
 #include "wtz.h"
 
+/* TODO: Maybe put ZUS_BUG_ON in zus.h ? */
+#define ZUS_BUILD_BUG_ON(expr) _Static_assert(!(expr), #expr)
+
 /* TODO: Where to put */
 typedef unsigned int uint;
 
@@ -78,32 +81,91 @@ union zus_numa_map_page {
 	__u8 pad[PAGE_SIZE];
 } __aligned(64);
 
-static union zus_numa_map_page g_zus_numa_map_page;
-struct zufs_ioc_numa_map *g_zus_numa_map = &g_zus_numa_map_page.numa_map;
+static union zus_numa_map_page _zus_numa_map_page;
+struct zufs_ioc_numa_map *zus_numa_map;
+
+unsigned int zus_nr_cpu_ids;
+static cpu_set_t __zus_cpu_possible_mask;
+static cpu_set_t __zus_cpu_online_mask;
+cpu_set_t *zus_cpu_possible_mask = &__zus_cpu_possible_mask;
+cpu_set_t *zus_cpu_online_mask = &__zus_cpu_online_mask;
+
+unsigned int zus_cpumask_next(int cpu, cpu_set_t *srcp)
+{
+	while (cpu < (int)zus_nr_cpu_ids) {
+		if (likely(CPU_ISSET(++cpu, srcp)))
+			return cpu;
+	}
+	return (unsigned int)(-1);
+}
+
+static void _set_cpumasks(void)
+{
+	unsigned int cpu, node;
+	cpu_set_t *cpusetp;
+	struct zufs_ioc_numa_map *numa_map = &_zus_numa_map_page.numa_map;
+
+	ZUS_BUILD_BUG_ON(sizeof(struct zufs_cpu_set) != sizeof(cpu_set_t));
+	ZUS_BUILD_BUG_ON(sizeof(cpusetp->__bits) !=
+			 sizeof(numa_map->cpu_set_per_node[0].bits));
+
+	for (cpu = 0; cpu < numa_map->possible_cpus; ++cpu) {
+		CPU_SET(cpu, zus_cpu_possible_mask);
+		for (node = 0; node < numa_map->possible_nodes; ++node) {
+			cpusetp =
+				(cpu_set_t*)(&numa_map->cpu_set_per_node[node]);
+
+			if (likely(CPU_ISSET(cpu, cpusetp)))
+				CPU_SET(cpu, zus_cpu_online_mask);
+		}
+	}
+
+	zus_nr_cpu_ids = (unsigned int)numa_map->possible_cpus;
+	zus_numa_map = numa_map;
+}
+
+bool zus_cpu_online(int cpu)
+{
+	return (likely((__u32)cpu < zus_nr_cpu_ids) &&
+		CPU_ISSET(cpu, zus_cpu_online_mask));
+}
 
 static int _numa_map_init(int fd)
 {
-	return zuf_numa_map(fd, g_zus_numa_map);
+	return zuf_numa_map(fd, &_zus_numa_map_page.numa_map);
 }
 
 static inline bool ___BAD_CPU(uint cpu)
 {
 	/* TODO: WARN_ON_ONCE */
-	if (ZUS_WARN_ON(g_zus_numa_map->online_cpus < cpu)) {
+	if (ZUS_WARN_ON(zus_numa_map->possible_cpus <= cpu)) {
 		ERROR("Bad cpu=%u\n", cpu);
 		return true; /* yell, but do not crash */
 	}
-
+	if (ZUS_WARN_ON(!zus_cpu_online((int)cpu))) {
+		ERROR("offline cpu=%u\n", cpu);
+		return true;
+	}
 	return false;
 }
 #define BAD_CPU(cpu) (unlikely(___BAD_CPU(cpu)))
 
 int zus_cpu_to_node(int cpu)
 {
+	int node;
+
 	if (BAD_CPU(cpu))
 		return 0; /* Yell but don't crash */
 
-	return g_zus_numa_map->cpu_to_node[cpu];
+	for (node = 0; node < (int)zus_num_possible_nodes(); ++node) {
+		cpu_set_t *cpusetp =
+			(cpu_set_t*)(&zus_numa_map->cpu_set_per_node[node]);
+
+		if (likely(CPU_ISSET(cpu, cpusetp)))
+			return node;
+	}
+	ZUS_WARN_ON_ONCE(node);
+	return 0;
 }
 
 int zus_current_onecpu(void)
@@ -167,25 +229,13 @@ int zus_current_nid(void)
 
 static int zus_set_numa_affinity(cpu_set_t *affinity, int nid)
 {
-	uint i;
-
-	CPU_ZERO(affinity);
-
-	for (i = 0; i < g_zus_numa_map->online_cpus; ++i) {
-		if (zus_cpu_to_node(i) == nid)
-			break;
-	}
-
-	if (i == g_zus_numa_map->online_cpus) {
+	if ((unsigned int)nid >= zus_numa_map->possible_nodes) {
 		ERROR("Wrong nid=%d\n", nid);
 		return -EINVAL;
 	}
+	memcpy(affinity, &zus_numa_map->cpu_set_per_node[nid],
+		sizeof(*affinity));
 
-	for (; i < g_zus_numa_map->online_cpus; ++i) {
-		if (zus_cpu_to_node(i) != nid)
-			break;
-		CPU_SET(i, affinity);
-	}
 	return 0;
 }
 
@@ -467,18 +517,17 @@ fail:
 	return NULL;
 }
 
-static int _zus_start_chan_threads(struct zus_thread_params *tp, uint num_cpus,
-				   uint chan)
+static int _zus_start_chan_threads(struct zus_thread_params *tp, uint chan)
 {
 	uint i, err;
 
-	g_ztp.zts[chan] = calloc(num_cpus, sizeof(*g_ztp.zts[0]));
+	g_ztp.zts[chan] = calloc(zus_num_possible_cpus(), sizeof(*g_ztp.zts[0]));
 	if (!g_ztp.zts[chan])
 		return -ENOMEM;
 
-	wtz_arm(&g_ztp.wtz, num_cpus);
+	wtz_arm(&g_ztp.wtz, zus_num_online_cpus());
 
-	for (i = 0; i < num_cpus; ++i) {
+	zus_for_each_cpu(i, zus_cpu_online_mask) {
 		char zt_name[32];
 		struct _zu_thread *zt = &g_ztp.zts[chan][i];
 
@@ -498,10 +547,9 @@ static int _zus_start_chan_threads(struct zus_thread_params *tp, uint num_cpus,
 /* forward declaration */
 static void zus_stop_all_threads(void);
 
-static int zus_start_all_threads(struct zus_thread_params *tp, uint num_cpus,
-				 uint num_chans)
+static int zus_start_all_threads(struct zus_thread_params *tp, uint num_chans)
 {
-	uint c;
+	uint c, num_cpus = zus_num_possible_cpus();
 	int err;
 
 	wtz_init(&g_ztp.wtz);
@@ -509,7 +557,7 @@ static int zus_start_all_threads(struct zus_thread_params *tp, uint num_cpus,
 	g_ztp.max_channels = num_chans;
 
 	for (c = 0; c < g_ztp.max_channels; ++c) {
-		err = _zus_start_chan_threads(tp, num_cpus, c);
+		err = _zus_start_chan_threads(tp, c);
 		if (unlikely(err))
 			goto fail;
 	}
@@ -620,6 +668,7 @@ static void *zus_mount_thread(void *callback_info)
 		ERROR("_numa_map_init => %d\n", g_mount.zbt.err);
 		goto out;
 	}
+	_set_cpumasks();
 
 	g_mount.zbt.err = zus_register_all(g_mount.fd);
 	if (g_mount.zbt.err) {
@@ -634,7 +683,6 @@ static void *zus_mount_thread(void *callback_info)
 
 		if (zim->hdr.operation == ZUFS_M_MOUNT && !g_ztp.num_zts) {
 			err = zus_start_all_threads(&g_mount.tp,
-						    g_zus_numa_map->online_cpus,
 						    zim->zmi.num_channels);
 			if (unlikely(err))
 				goto next;
