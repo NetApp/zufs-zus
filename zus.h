@@ -19,6 +19,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <sched.h>
+#include <sys/mman.h>
 
 /* On old GCC systems we do not yet have STATX stuff in sys/stat.h
  * so in this case include also the kernel header.
@@ -571,5 +572,14 @@ extern int register_fs(int fd);
 /* below two need to match. C is not bash */
 #define REGISTER_FS_FN		 register_fs
 #define REGISTER_FS_NAME	"register_fs"
+
+enum zus_mlock_mode {
+	MLOCK_NONE = 0,	/* do not call mlock */
+	MLOCK_CURRENT,	/* mlockall(MCL_CURRENT) and mlock per alloc */
+	MLOCK_ALL,	/* mlockall(MCL_CURRENT | MCL_FUTURE) */
+};
+
+extern int g_mlock;
+#define NEED_MLOCK	(g_mlock == MLOCK_CURRENT)
 
 #endif /* define __ZUS_H__ */

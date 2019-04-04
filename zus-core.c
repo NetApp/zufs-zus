@@ -31,6 +31,7 @@ char g_zus_root_path_stor[PATH_MAX];
 const char *g_zus_root_path = g_zus_root_path_stor;
 
 ulong g_DBGMASK;
+int g_mlock = MLOCK_CURRENT; /* default to MCL_CURRENT */
 
 int zuf_root_open_tmp(int *fd)
 {

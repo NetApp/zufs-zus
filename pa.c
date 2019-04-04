@@ -20,6 +20,12 @@
 #include "zus.h"
 #include "zuf_call.h"
 
+/* PA_SIZE - 2GB  total allowed data held in pages */
+/* TODO: get this param from FS
+ * TODO2: grow dynamically
+ */
+#define PA_SIZE		(1UL << 31)
+
 /* ~~~~ fba ~~~~ */
 
 /*
@@ -75,7 +81,13 @@ static int _fba_alloc(struct fba *fba, size_t size, int flags)
 
 int fba_alloc(struct fba *fba, size_t size)
 {
-	return _fba_alloc(fba, size, MAP_SHARED);
+	int err = _fba_alloc(fba, size, MAP_SHARED);
+
+	if (NEED_MLOCK && size < PA_SIZE) {
+		err = mlock(fba->ptr, size);
+		ZUS_WARN_ON(err);
+	}
+	return err;
 }
 
 static int _fba_alloc_huge(struct fba *fba, size_t size)
@@ -86,7 +98,7 @@ static int _fba_alloc_huge(struct fba *fba, size_t size)
 	if (unlikely(err)) {
 		/* fallback to 4k pages */
 		INFO("mmap failed huge=> %d: %s\n", errno, strerror(errno));
-		return fba_alloc(fba, size);
+		return _fba_alloc(fba, size, MAP_SHARED);
 	}
 
 	return 0;
@@ -103,7 +115,7 @@ int fba_alloc_align(struct fba *fba, size_t size, bool huge)
 	if (huge)
 		err = _fba_alloc_huge(fba, aligned_size);
 	else
-		err = fba_alloc(fba, aligned_size);
+		err = _fba_alloc(fba, aligned_size, MAP_SHARED);
 
 	if (unlikely(err))
 		return err;
@@ -126,6 +138,12 @@ int fba_alloc_align(struct fba *fba, size_t size, bool huge)
 		fba->ptr = (void *)addr;
 		fba->size = size;
 	}
+
+	if (NEED_MLOCK && size < PA_SIZE) {
+		err = mlock(fba->ptr, size);
+		ZUS_WARN_ON(err);
+	}
+
 	return 0;
 }
 
@@ -149,12 +167,6 @@ int fba_punch_hole(struct fba *fba, ulong index, uint nump)
 }
 
 /* ~~~ pa - Page Allocator ~~~ */
-
-/* PA_SIZE - 2GB  total allowed data held in pages */
-/* TODO: get this param from FS
- * TODO2: grow dynamically
- */
-#define PA_SIZE		(1UL << 31)
 
 /* 2MB worth of pages (= 32k pages) */
 #define PA_PAGES_AT_A_TIME ((1UL << 21) / sizeof(struct pa_page))
@@ -243,6 +255,11 @@ rescan:
 	goto rescan;
 
 out:
+	if (NEED_MLOCK && page) {
+		err = mlock(pa_page_address(sbi, page), npages * PAGE_SIZE);
+		ZUS_WARN_ON(err);
+	}
+
 	pthread_spin_unlock(&pa->lock);
 
 	return page;
@@ -254,6 +271,11 @@ void __pa_free(struct pa_page *page)
 	struct zus_sb_info *sbi = (void *)((ulong)page->owner & ~ZUS_SBI_MASK);
 	struct pa *pa = &sbi->pa[POOL_NUM];
 
+	if (NEED_MLOCK) {
+		int err = munlock(pa_page_address(sbi, page), PAGE_SIZE);
+
+		ZUS_WARN_ON(err);
+	}
 	fba_punch_hole(&pa->data, pa_page_to_bn(sbi, page), 1);
 
 	pthread_spin_lock(&pa->lock);
