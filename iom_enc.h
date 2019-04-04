@@ -55,8 +55,7 @@ static inline void _zus_iom_enc_type_val(__u64 *ptr, enum ZUFS_IOM_TYPE type,
 					 ulong val)
 {
 	ZUS_WARN_ON(val & ~ZUFS_IOM_FIRST_VAL_MASK);
-
-	*ptr = (__u64)val | ((__u64)type << ZUFS_IOM_VAL_BITS);
+	_zufs_iom_enc_type_val(ptr, type, val);
 }
 
 /* iomb comes ZEROed! */
@@ -98,6 +97,7 @@ static inline void _zus_iom_start(struct zus_iomap_build *iomb, void *priv,
 				  iomb_done_fn done)
 {
 	iomb->cur_iom_e = iomb->ziom->iom_e;
+	iomb->ziom->iom_n = 0;
 	iomb->ziom->iom_e[0] = 0;
 	iomb->done = done;
 	iomb->priv = priv;
@@ -114,13 +114,13 @@ static inline void _zus_iom_end(struct zus_iomap_build *iomb)
 
 static inline int _zus_iom_enc_wbinv(struct zus_iomap_build *iomb)
 {
-	void *next_iom_e = iomb->cur_iom_e + 1;
+	__u64 *iom_e = iomb->cur_iom_e;
 
-	if (unlikely(iomb->end_iom_e < next_iom_e))
+	if (unlikely(iomb->end_iom_e < (void*)(iom_e + 1)))
 		return -ENOSPC;
 
-	_zus_iom_enc_type_val(iomb->cur_iom_e, IOM_WBINV, 0);
-	iomb->cur_iom_e = next_iom_e;
+	iomb->cur_iom_e = iom_e + 1;
+	_zus_iom_enc_type_val(iom_e, IOM_WBINV, 0);
 	return 0;
 }
 
@@ -202,4 +202,16 @@ static inline int _zus_iom_enc_t2_zusmem_read(struct zus_iomap_build *iomb,
 					 IOM_T2_ZUSMEM_READ);
 }
 
+static inline bool _ziom_enc_t1_bn(struct zus_iomap_build *iomb, ulong bn,
+				     uint pool)
+{
+	__u64 *iom_e = iomb->cur_iom_e;
+
+	iomb->cur_iom_e = iom_e + 1;
+	_zufs_iom_enc_bn(iom_e, bn, pool);
+	++iomb->ziom->iom_n;
+
+	/* Special no need to call _zus_iom_end, Returns true if more space */
+	return  iomb->cur_iom_e < iomb->end_iom_e;
+}
 #endif /* define __ZUS_IOM_H__ */

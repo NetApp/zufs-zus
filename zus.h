@@ -42,11 +42,6 @@
 #include "_pr.h"
 #include "a_list.h"
 
-#ifndef likely
-#define likely(x_)	__builtin_expect(!!(x_), 1)
-#define unlikely(x_)	__builtin_expect(!!(x_), 0)
-#endif
-
 #include "md.h"
 #include "movnt.h"
 
