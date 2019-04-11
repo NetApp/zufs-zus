@@ -418,19 +418,19 @@ static void *_zu_thread(void *callback_info)
 
 	zt->zbt.err = zuf_root_open_tmp(&zt->fd);
 	if (zt->zbt.err)
-		return NULL;
+		goto fail;
 
 	zt->zbt.err = zuf_zt_init(zt->fd, zt->no, zt->chan, ZUS_MAX_OP_SIZE);
 	if (zt->zbt.err)
-		return NULL; /* leak the file it is fine */
+		goto fail;
 
 	zt->zbt.err = _zu_mmap(zt);
 	if (zt->zbt.err)
-		return NULL; /* leak the file it is fine */
+		goto fail;
 
 	zt->zbt.err = _zu_ioc_buff_mmap(zt, (void **)&op);
 	if (zt->zbt.err)
-		return NULL;
+		goto fail;
 
 	DBG("[%u] thread Init fd=%d api_mem=%p\n",
 	     zt->no, zt->fd, zt->api_mem);
@@ -458,6 +458,13 @@ static void *_zu_thread(void *callback_info)
 
 	DBG("[%u] thread Exit\n", zt->no);
 	return zt;
+
+fail:
+	/* It's OK to leak here, stop function will cleanup */
+	ERROR("ZT(%d.%d) create failed => %d\n", zt->no, zt->chan, zt->zbt.err);
+	wtz_release(&g_ztp.wtz);
+
+	return NULL;
 }
 
 static int _zus_start_chan_threads(struct zus_thread_params *tp, uint num_cpus,
@@ -508,6 +515,20 @@ static int zus_start_all_threads(struct zus_thread_params *tp, uint num_cpus,
 	}
 
 	wtz_wait(&g_ztp.wtz);
+
+	/* verify that all ZTs started successfully */
+	for (c = 0; c < g_ztp.max_channels; ++c) {
+		uint i;
+
+		for (i = 0; i < num_cpus; ++i) {
+			struct _zu_thread *zt = &g_ztp.zts[c][i];
+			if (unlikely(zt->zbt.err)) {
+				err = zt->zbt.err;
+				goto fail;
+			}
+		}
+	}
+
 	INFO("%u * %u ZT threads ready\n", num_cpus, num_chans);
 	return 0;
 
