@@ -300,6 +300,8 @@ static inline void zus_std_remove_dentry(struct zus_inode *dir_zi,
 
 /* zus-core */
 
+int zus_zt_signal_pending(void);
+
 /* Open an O_TMPFILE on the zuf-root we belong to */
 int zuf_root_open_tmp(int *fd);
 void zuf_root_close(int *fd);

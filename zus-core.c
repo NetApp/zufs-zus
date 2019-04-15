@@ -334,6 +334,7 @@ struct _zu_thread {
 	int fd;
 	void *api_mem;
 	volatile bool stop;
+	struct zufs_ioc_hdr *op_hdr;
 };
 
 struct zt_pool {
@@ -432,6 +433,8 @@ static void *_zu_thread(void *callback_info)
 
 	DBG("[%u] thread Init fd=%d api_mem=%p\n",
 	     zt->no, zt->fd, zt->api_mem);
+
+	zt->op_hdr = &op->hdr;
 
 	wtz_release(&g_ztp.wtz);
 
@@ -546,6 +549,20 @@ static void zus_stop_all_threads(void)
 		_zus_stop_chan_threads(c);
 
 	memset(&g_ztp, 0, sizeof(g_ztp));
+}
+
+int zus_zt_signal_pending(void)
+{
+	struct zus_base_thread *zbt = pthread_getspecific(g_zts_id_key);
+	struct _zu_thread *zt;
+
+	/* only ZTs are supported */
+	if (ZUS_WARN_ON(zbt->threadfn != _zu_thread))
+		return 0;
+
+	zt = container_of(zbt, typeof(*zt), zbt);
+
+	return (zt->op_hdr->flags & ZUFS_H_INTR);
 }
 
 /* ~~~~ mount thread ~~~~~ */
