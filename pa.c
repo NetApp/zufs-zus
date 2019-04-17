@@ -65,7 +65,6 @@ static int _fba_alloc(struct fba *fba, size_t size, int flags)
 		ERROR("madvise(DONTDUMP) failed=> %d: %s\n", errno,
 		      strerror(errno));
 
-	fba->orig_ptr = fba->ptr;
 	fba->size = size;
 
 	DBG("fba allocated flags=0x%x fd=%d ptr=%p size=0x%lx\n", flags,
@@ -111,9 +110,21 @@ int fba_alloc_align(struct fba *fba, size_t size, bool huge)
 
 	addr = ALIGN((ulong)fba->ptr, FBA_ALIGNSIZE);
 	if (fba->ptr != (void *)addr) {
+		size_t start_len, end_len;
+
 		DBG("fba: fd=%d mmap-addr=0x%lx addr=0x%lx msize=0x%lx aligned_size=0x%lx\n",
 		    fba->fd, (ulong)fba->ptr, addr, size, aligned_size);
+
+		/* unmap the unaligned edges and fix the ptr and size */
+		start_len = addr - (ulong)fba->ptr;
+		end_len = ((ulong)fba->ptr + aligned_size) - (addr + size) -
+								start_len;
+
+		munmap(fba->ptr, start_len);
+		munmap((void *)(addr + size), end_len);
+
 		fba->ptr = (void *)addr;
+		fba->size = size;
 	}
 	return 0;
 }
@@ -121,7 +132,7 @@ int fba_alloc_align(struct fba *fba, size_t size, bool huge)
 void fba_free(struct fba *fba)
 {
 	if (fba->fd >= 0) {
-		munmap(fba->orig_ptr, fba->size);
+		munmap(fba->ptr, fba->size);
 		close(fba->fd);
 		fba->fd = -1;
 	}

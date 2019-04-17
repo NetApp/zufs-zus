@@ -738,7 +738,6 @@ int zus_alloc_exec_buff(struct zus_sb_info *sbi, uint max_bytes, uint pool_num,
 	if (unlikely(err))
 		goto error;
 
-	fba->orig_ptr = fba->ptr;
 	return 0;
 
 error:
