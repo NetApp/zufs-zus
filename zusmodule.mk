@@ -2,7 +2,6 @@ include $(M)/Makefile
 ZDIR ?=$(CURDIR)
 MAKEFLAGS := --no-print-directory
 
-PROJ_TARGET := $(M)/lib$(ZM_NAME).so
 PROJ_OBJS := $(ZM_OBJS)
 PROJ_CDEFS := $(ZM_CDEFS)
 PROJ_WARNS := $(ZM_WARNS)
@@ -12,7 +11,8 @@ PROJ_LIB_DIRS := $(ZDIR) $(ZM_LIB_DIRS)
 PROJ_CFLAGS := $(ZM_CFLAGS)
 PROJ_LDFLAGS := $(ZM_LDFLAGS)
 PROJ_OBJS_DEPS := $(M)/Makefile $(ZM_OBJS_DEPS) $(ZDIR)/zusmodule.mk
-PROJ_TARGET_DEPS += $(ZDIR)/libzus.so $(ZM_TARGET_DEPS)
+PROJ_EXTRA_OBJS := $(ZM_EXTRA_OBJS)
+PROJ_TARGET_DEPS += $(ZDIR)/libzus.so $(ZM_TARGET_DEPS) $(ZM_EXTRA_OBJS)
 
 # A ZM_GENERIC==1 setting represnts a generic module that isn't a file system
 # library. (tests, mkfs programs, etc.)

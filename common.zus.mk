@@ -107,7 +107,7 @@ endef
 
 define LINK_CMD =
 	$(if $(Q),@echo "LD [$(BUILD_STR)] $(notdir $(PROJ_TARGET))",)
-	$(Q)$(CC) $(OBJS) $(LDFLAGS) -o $(PROJ_TARGET)
+	$(Q)$(CC) $(OBJS) $(PROJ_EXTRA_OBJS) $(LDFLAGS) -o $(PROJ_TARGET)
 endef
 
 $(OBJS_DIR)/%.o: $(PROJ_DIR)%.c $(PROJ_OBJS_DEPS)
