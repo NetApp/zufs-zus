@@ -96,24 +96,26 @@ ifneq ($(realpath $(CONFIG)),)
 PROJ_OBJS_DEPS += $(CONFIG)
 endif
 
-$(OBJS_DIR)/%.o: $(PROJ_DIR)%.c $(PROJ_OBJS_DEPS)
-	$(eval BUILD_CMD := $(CC) $(CFLAGS) -c $< -o $@)
-	@mkdir -p $(dir $@)
-ifeq ($(CONFIG_BUILD_VERBOSE),1)
-	$(BUILD_CMD)
-else
-	@echo "CC [$(BUILD_STR)] $(notdir $@)"
-	@$(BUILD_CMD)
+ifneq ($(CONFIG_BUILD_VERBOSE),1)
+	Q := @
 endif
 
+define BUILD_CMD =
+	$(if $(Q),@echo "CC [$(BUILD_STR)] $(notdir $(1))",)
+	$(Q)$(CC) $(CFLAGS) -c $(2) -o $(1)
+endef
+
+define LINK_CMD =
+	$(if $(Q),@echo "LD [$(BUILD_STR)] $(notdir $(PROJ_TARGET))",)
+	$(Q)$(CC) $(OBJS) $(LDFLAGS) -o $(PROJ_TARGET)
+endef
+
+$(OBJS_DIR)/%.o: $(PROJ_DIR)%.c $(PROJ_OBJS_DEPS)
+	@mkdir -p $(dir $@)
+	$(call BUILD_CMD,$@,$<)
+
 $(PROJ_TARGET): $(PROJ_TARGET_DEPS) $(OBJS)
-	$(eval LINK_CMD := $(CC) $(OBJS) $(LDFLAGS) -o $(PROJ_TARGET))
-ifeq ($(CONFIG_BUILD_VERBOSE),1)
-	$(LINK_CMD)
-else
-	@echo "LD [$(BUILD_STR)] $(notdir $(PROJ_TARGET))"
-	@$(LINK_CMD)
-endif
+	$(call LINK_CMD)
 
 __clean: $(PROJ_CLEAN_DEPS)
 	@rm -f $(OBJS_DEPS) $(PROJ_TARGET) $(OBJS)
