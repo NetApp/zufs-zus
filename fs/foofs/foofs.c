@@ -168,14 +168,14 @@ static void foofs_sbi_free(struct zus_sb_info *sbi)
 }
 
 static
-int foofs_sbi_init(struct zus_sb_info *sbi, struct zufs_ioc_mount *zim)
+int foofs_sbi_init(struct zus_sb_info *sbi, struct zufs_mount_info *zmi)
 {
 	_init_root(sbi);
 	sbi->z_root = zus_iget(sbi, FOOFS_ROOT_NO);
 	if (unlikely(!sbi->z_root))
 		return -ENOMEM;
 
-	zim->zmi.s_blocksize_bits = PAGE_SHIFT;
+	zmi->s_blocksize_bits = PAGE_SHIFT;
 	return 0;
 }
 

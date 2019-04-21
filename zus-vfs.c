@@ -136,7 +136,7 @@ int zus_mount(int fd, struct zufs_ioc_mount *zim)
 	if (unlikely(err))
 		goto err;
 
-	err = sbi->zfi->op->sbi_init(sbi, zim);
+	err = sbi->zfi->op->sbi_init(sbi, &zim->zmi);
 	if (unlikely(err))
 		goto err;
 
@@ -166,7 +166,7 @@ int zus_remount(int fd, struct zufs_ioc_mount *zim)
 	struct zus_sb_info *sbi = zim->zmi.zus_sbi;
 
 	if (sbi->zfi->op->sbi_remount)
-		return sbi->zfi->op->sbi_remount(sbi, zim);
+		return sbi->zfi->op->sbi_remount(sbi, &zim->zmi);
 	return 0;
 }
 

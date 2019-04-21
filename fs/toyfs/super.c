@@ -849,7 +849,7 @@ static int _sbi_init(struct toyfs_sb_info *sbi)
 	return 0;
 }
 
-int toyfs_sbi_init(struct zus_sb_info *zsbi, struct zufs_ioc_mount *zim)
+int toyfs_sbi_init(struct zus_sb_info *zsbi, struct zufs_mount_info *zmi)
 {
 	int err;
 	struct toyfs_sb_info *sbi = Z2SBI(zsbi);
@@ -858,10 +858,10 @@ int toyfs_sbi_init(struct zus_sb_info *zsbi, struct zufs_ioc_mount *zim)
 	if (err)
 		return err;
 
-	zim->zmi.zus_sbi = &sbi->s_zus_sbi;
-	zim->zmi.zus_ii = sbi->s_zus_sbi.z_root;
-	zim->zmi.s_blocksize_bits = PAGE_SHIFT;
-	zim->zmi.acl_on = 1;
+	zmi->zus_sbi = &sbi->s_zus_sbi;
+	zmi->zus_ii = sbi->s_zus_sbi.z_root;
+	zmi->s_blocksize_bits = PAGE_SHIFT;
+	zmi->acl_on = 1;
 
 	return 0;
 }

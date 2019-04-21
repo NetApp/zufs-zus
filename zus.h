@@ -238,9 +238,9 @@ struct zus_zfi_operations {
 	struct zus_sb_info *(*sbi_alloc)(struct zus_fs_info *zfi);
 	void (*sbi_free)(struct zus_sb_info *sbi);
 
-	int (*sbi_init)(struct zus_sb_info *sbi, struct zufs_ioc_mount *zim);
+	int (*sbi_init)(struct zus_sb_info *sbi, struct zufs_mount_info *zmi);
 	int (*sbi_fini)(struct zus_sb_info *sbi);
-	int (*sbi_remount)(struct zus_sb_info *sbi, struct zufs_ioc_mount *zim);
+	int (*sbi_remount)(struct zus_sb_info *sbi, struct zufs_mount_info *zmi);
 };
 
 struct zus_fs_info {
