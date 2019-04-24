@@ -482,6 +482,19 @@ static int _get_put_block(struct zufs_ioc_hdr *hdr)
 	return	zii->op->get_block(zii, get_block);
 }
 
+static int _get_put_multy(struct zufs_ioc_hdr *hdr)
+{
+	struct zufs_ioc_IO *io = (void *)hdr;
+	struct zus_inode_info *zii = io->zus_ii;
+
+	if (unlikely(!zii->op->get_put_multy)) {
+		ERROR("No get_put_multy operation set\n");
+		return -EIO;
+	}
+
+	return	zii->op->get_put_multy(zii, io);
+}
+
 static int _mmap_close(struct zufs_ioc_hdr *hdr)
 {
 	struct zufs_ioc_mmap_close *mmap_close = (void *)hdr;
@@ -653,6 +666,8 @@ const char *ZUFS_OP_name(enum e_zufs_operation op)
 		CASE_ENUM_NAME(ZUFS_OP_XATTR_SET);
 		CASE_ENUM_NAME(ZUFS_OP_XATTR_LIST);
 		CASE_ENUM_NAME(ZUFS_OP_FIEMAP);
+		CASE_ENUM_NAME(ZUFS_OP_GET_MULTY);
+		CASE_ENUM_NAME(ZUFS_OP_PUT_MULTY);
 		CASE_ENUM_NAME(ZUFS_OP_BREAK);
 		CASE_ENUM_NAME(ZUFS_OP_MAX_OPT);
 	default:
@@ -716,6 +731,11 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 		return _fiemap(app_ptr, hdr);
 	case ZUFS_OP_SHOW_OPTIONS:
 		return _show_options(hdr);
+
+	case ZUFS_OP_GET_MULTY:
+	case ZUFS_OP_PUT_MULTY:
+		return _get_put_multy(hdr);
+
 	case ZUFS_OP_BREAK:
 		break;
 	default:

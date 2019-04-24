@@ -129,6 +129,8 @@ struct zus_zii_operations {
 			 struct zufs_ioc_IO *get_block);
 	int (*put_block)(struct zus_inode_info *zii,
 			 struct zufs_ioc_IO *put_block);
+	int (*get_put_multy)(struct zus_inode_info *zii,
+			 struct zufs_ioc_IO *io);
 	int (*mmap_close)(struct zus_inode_info *zii,
 			 struct zufs_ioc_mmap_close *mmap_close);
 	int (*get_symlink)(struct zus_inode_info *zii, void **symlink);
