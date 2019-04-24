@@ -165,6 +165,10 @@ int main(int argc, char *argv[])
 	if (unlikely(err))
 		return err;
 
+	err = zus_slab_init();
+	if (unlikely(err))
+		return err;
+
 	err = zus_mount_thread_start(&tp, path);
 	if (unlikely(err))
 		goto stop;

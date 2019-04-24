@@ -406,7 +406,13 @@ struct pa_page {
 	int			units;
 	int			refcount;
 
-	struct a_list_head	list;
+	union {
+		struct a_list_head	list;
+		struct slab_info {
+			int	slab_uc;
+			int	slab_cpu;
+		} sinfo;
+	};
 
 	unsigned long		private;
 	void			*private2;
@@ -594,5 +600,20 @@ enum zus_mlock_mode {
 
 extern int g_mlock;
 #define NEED_MLOCK	(g_mlock == MLOCK_CURRENT)
+
+/* ~~~ memory allocator ~~~ */
+#define ZUS_ZERO 1
+
+int zus_slab_init(void);
+void zus_slab_fini(void);
+void *zus_malloc(size_t size);
+void *zus_calloc(size_t nmemb, size_t size);
+void *zus_realloc(void *ptr, size_t size);
+void zus_free(void *ptr);
+struct pa_page *zus_alloc_page(int mask);
+void zus_free_page(struct pa_page *);
+void *zus_page_address(struct pa_page *page);
+void *zus_virt_to_page(void *addr);
+struct zus_sb_info *zus_global_sbi(void);
 
 #endif /* define __ZUS_H__ */
