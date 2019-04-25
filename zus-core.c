@@ -30,6 +30,12 @@
 typedef unsigned int uint;
 
 /* ~~~ zuf-root files ~~~ */
+#ifdef CONFIG_ZUF_DEF_PATH
+#define ZUF_DEF_PATH CONFIG_ZUF_DEF_PATH
+#else
+#define ZUF_DEF_PATH "/sys/fs/zuf"
+#endif
+
 char g_zus_root_path_stor[PATH_MAX];
 const char *g_zus_root_path = g_zus_root_path_stor;
 
@@ -731,14 +737,23 @@ out:
 	return (void *)((long)g_mount.zbt.err);
 }
 
+int zus_init_zuf(const char *zuf_path)
+{
+	const char *path = zuf_path ?: ZUF_DEF_PATH;
+
+	strncpy(g_zus_root_path_stor, path,
+		sizeof(g_zus_root_path_stor) - 1);
+
+	return 0;
+}
+
 int zus_mount_thread_start(struct zus_thread_params *tp, const char *zuf_path)
 {
 	struct zus_thread_params mnttp = {};
 	int err;
 
 	pthread_key_create(&g_zts_id_key, NULL);
-	strncpy(g_zus_root_path_stor, zuf_path,
-		sizeof(g_zus_root_path_stor) - 1);
+	zus_init_zuf(zuf_path);
 	g_mount.tp = *tp; /* this is for the _zu threads */
 
 	ZTP_INIT(&mnttp); /* Just a Plain thread */

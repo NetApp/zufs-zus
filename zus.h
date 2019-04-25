@@ -304,6 +304,7 @@ static inline void zus_std_remove_dentry(struct zus_inode *dir_zi,
 int zus_zt_signal_pending(void);
 
 int zus_numa_map_init(int fd);
+int zus_init_zuf(const char *zuf_path);
 /* Open an O_TMPFILE on the zuf-root we belong to */
 int zuf_root_open_tmp(int *fd);
 void zuf_root_close(int *fd);

@@ -21,14 +21,6 @@
 #include "zus.h"
 #include "zusd.h"
 
-#ifdef CONFIG_ZUF_DEF_PATH
-
-#define ZUF_DEF_PATH CONFIG_ZUF_DEF_PATH
-#else
-#define ZUF_DEF_PATH "/sys/fs/zuf"
-#endif
-
-
 static void usage(int argc, char *argv[])
 {
 	static char msg[] = {
@@ -87,7 +79,7 @@ int main(int argc, char *argv[])
 	const char *shortopt = "r::f::n::d::l::m";
 	char op;
 	struct zus_thread_params tp;
-	const char *path = ZUF_DEF_PATH;
+	const char *path = NULL;
 	int err, flags = 0;
 
 	ZTP_INIT(&tp);
