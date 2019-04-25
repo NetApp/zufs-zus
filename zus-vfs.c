@@ -668,6 +668,7 @@ const char *ZUFS_OP_name(enum e_zufs_operation op)
 		CASE_ENUM_NAME(ZUFS_OP_FIEMAP);
 		CASE_ENUM_NAME(ZUFS_OP_GET_MULTY);
 		CASE_ENUM_NAME(ZUFS_OP_PUT_MULTY);
+		CASE_ENUM_NAME(ZUFS_OP_NOOP);
 		CASE_ENUM_NAME(ZUFS_OP_BREAK);
 		CASE_ENUM_NAME(ZUFS_OP_MAX_OPT);
 	default:
@@ -675,10 +676,32 @@ const char *ZUFS_OP_name(enum e_zufs_operation op)
 	}
 }
 
+static void _some_pigy_put(struct zufs_ioc_hdr *hdr)
+{
+	while (hdr->flags & ZUFS_H_HAS_PIGY_PUT) {
+		/* Kernel made sure to update hdr->in_len including the
+		 * iom_n. Kernel also checks bounds.
+		 */
+		hdr = (void *)hdr + hdr->in_len;
+
+		if (unlikely(hdr->operation != ZUFS_OP_PUT_MULTY)) {
+			ERROR("Not yet, easily support pigy ANY operation(%s)\n",
+			      ZUFS_OP_name(hdr->operation));
+			break;
+		}
+		_get_put_multy(hdr);
+	}
+}
+
 int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 {
 	DBG("[%s] OP=%d off=0x%x len=0x%x\n", ZUFS_OP_name(hdr->operation),
 		hdr->operation, hdr->offset, hdr->len);
+
+	if (hdr->flags & ZUFS_H_HAS_PIGY_PUT) {
+		_some_pigy_put(hdr);
+		hdr->flags &= ~ZUFS_H_HAS_PIGY_PUT;
+	}
 
 	switch (hdr->operation) {
 	case ZUFS_OP_NEW_INODE:
@@ -736,6 +759,7 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 	case ZUFS_OP_PUT_MULTY:
 		return _get_put_multy(hdr);
 
+	case ZUFS_OP_NOOP:
 	case ZUFS_OP_BREAK:
 		break;
 	default:
