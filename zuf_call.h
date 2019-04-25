@@ -27,7 +27,7 @@ int _ioctl(int fd, ulong zu_vect, struct zufs_ioc_hdr *hdr, const char *msg)
 	if (ret) {
 		ERROR("Unexpected ioctl => %d errno=%d zu_n=%lx zu_s=%s hdr=%d\n",
 		      ret, errno, zu_vect, msg, hdr->err);
-		return ret;
+		return -errno;
 	}
 
 	return hdr->err;
