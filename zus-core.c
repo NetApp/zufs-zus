@@ -404,6 +404,37 @@ int zus_thread_create(pthread_t *new_tread, struct zus_thread_params *tp,
 	return 0;
 }
 
+int zus_thread_current_init(void)
+{
+	struct zus_base_thread *zbt;
+
+	if (ZUS_WARN_ON(pthread_getspecific(g_zts_id_key)))
+		return -EEXIST;
+
+	zbt = calloc(1, sizeof(*zbt));
+	if (unlikely(!zbt))
+		return -ENOMEM;
+
+	zbt->one_cpu = sched_getcpu();
+	zbt->nid = zus_cpu_to_node(zbt->one_cpu);
+
+	pthread_setspecific(g_zts_id_key, zbt);
+
+	return 0;
+}
+
+void zus_thread_current_fini(void)
+{
+	struct zus_base_thread *zbt = pthread_getspecific(g_zts_id_key);
+
+	if (ZUS_WARN_ON(!zbt))
+		return;
+
+	pthread_setspecific(g_zts_id_key, NULL);
+
+	free(zbt);
+}
+
 /* ~~~ Zu Threads ZT(s) ~~~ */
 /* These are the zus-core dispatchers threads */
 
@@ -741,6 +772,8 @@ int zus_init_zuf(const char *zuf_path)
 {
 	const char *path = zuf_path ?: ZUF_DEF_PATH;
 
+	pthread_key_create(&g_zts_id_key, NULL);
+
 	strncpy(g_zus_root_path_stor, path,
 		sizeof(g_zus_root_path_stor) - 1);
 
@@ -752,7 +785,6 @@ int zus_mount_thread_start(struct zus_thread_params *tp, const char *zuf_path)
 	struct zus_thread_params mnttp = {};
 	int err;
 
-	pthread_key_create(&g_zts_id_key, NULL);
 	zus_init_zuf(zuf_path);
 	g_mount.tp = *tp; /* this is for the _zu threads */
 

@@ -118,6 +118,115 @@ static void _zus_sbi_fini(struct zus_sb_info *sbi)
 	sbi->zfi->op->sbi_free(sbi);
 }
 
+int zus_private_mount(struct zus_fs_info *zfi, const char *options,
+		      struct zufs_ioc_mount_private **zip_out)
+{
+	struct zufs_ioc_mount_private *zip;
+	struct zus_sb_info *sbi = NULL;
+	int zip_len;
+	int err;
+
+	zip_len = sizeof(*zip) + strlen(options) + 1;
+
+	zip = calloc(1, zip_len);
+	if (!zip) {
+		ERROR("failed to allocate memory\n");
+		return -ENOMEM;
+	}
+
+	zip->zmi.zus_zfi = zfi;
+
+	err = zuf_root_open_tmp(&zip->mount_fd);
+	if (unlikely(err))
+		goto fail;
+
+	err = zus_numa_map_init(zip->mount_fd);
+	if (unlikely(err))
+		goto fail_fd;
+
+	err = zus_thread_current_init();
+	if (unlikely(err))
+		goto fail_fd;
+
+	sbi = zfi->op->sbi_alloc(zfi);
+	if (unlikely(!sbi)) {
+		err = -ENOMEM;
+		goto fail_alloc;
+	}
+
+	zip->hdr.in_len = zip_len;
+	zip->zmi.po.mount_options_len = strlen(options);
+	memcpy(&zip->zmi.po.mount_options, options,
+		zip->zmi.po.mount_options_len);
+	memcpy(&zip->rfi, &zfi->rfi, sizeof(struct register_fs_info));
+
+	err = zuf_private_mount(zip->mount_fd, zip);
+	if (unlikely(err))
+		goto fail_mount;
+
+	sbi->zfi = zip->zmi.zus_zfi;
+	sbi->kern_sb_id = zip->zmi.sb_id;
+	err = _pmem_grab(sbi, zip->zmi.pmem_kern_id);
+	if (unlikely(err))
+		goto fail_grab;
+
+	err = sbi->zfi->op->sbi_init(sbi, &zip->zmi);
+	if (unlikely(err)) {
+		zus_sbi_set_flag(sbi, ZUS_SBIF_ERROR);
+		goto fail_sbi_init;
+	}
+
+	zip->zmi.zus_sbi = sbi;
+	zip->zmi._zi = pmem_dpp_t(md_addr_to_offset(&sbi->md, sbi->z_root->zi));
+	zip->zmi.zus_ii = sbi->z_root;
+
+	DBG("[%lld] _zi 0x%lx zus_ii=%p\n",
+	    sbi->z_root->zi->i_ino, (ulong)zip->zmi._zi, zip->zmi.zus_ii);
+
+	*zip_out = zip;
+
+	return 0;
+
+fail_sbi_init:
+	if (sbi->z_root)
+		sbi->z_root->op->evict(sbi->z_root);
+	if (sbi->zfi->op->sbi_fini)
+		sbi->zfi->op->sbi_fini(sbi);
+	_pmem_ungrab(sbi);
+fail_grab:
+	zuf_private_umount(zip->mount_fd, zip);
+fail_mount:
+	zfi->op->sbi_free(sbi);
+fail_alloc:
+	zus_thread_current_fini();
+fail_fd:
+	close(zip->mount_fd);
+fail:
+	free(zip);
+
+	return err;
+}
+
+int zus_private_umount(struct zufs_ioc_mount_private *zip)
+{
+	struct zus_sb_info *sbi = zip->zmi.zus_sbi;
+	int err = 0;
+
+	/* evict root inode (done by VFS on regular mount) */
+	if (sbi->z_root)
+		sbi->z_root->op->evict(sbi->z_root);
+
+	if (sbi->zfi->op->sbi_fini)
+		err = sbi->zfi->op->sbi_fini(sbi);
+	_pmem_ungrab(sbi);
+	zuf_private_umount(zip->mount_fd, zip);
+	sbi->zfi->op->sbi_free(sbi);
+	zus_thread_current_fini();
+	close(zip->mount_fd);
+	free(zip);
+	return err;
+}
+
 int zus_mount(int fd, struct zufs_ioc_mount *zim)
 {
 	struct zus_fs_info *zfi = zim->zmi.zus_zfi;

@@ -361,6 +361,8 @@ struct zus_thread_params {
 typedef void *(*__start_routine) (void *); /* pthread programming style NOT */
 int zus_thread_create(pthread_t *new_tread, struct zus_thread_params *params,
 		      __start_routine fn, void *user_arg);
+int zus_thread_current_init(void);
+void zus_thread_current_fini(void);
 int zus_alloc_exec_buff(struct zus_sb_info *sbi, uint max_bytes, uint pool_num,
 			struct fba *fba);
 
@@ -376,6 +378,9 @@ struct zus_inode_info *zus_iget(struct zus_sb_info *sbi, ulong ino);
 int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr);
 const char *ZUFS_OP_name(enum e_zufs_operation op);
 
+int zus_private_mount(struct zus_fs_info *zfi, const char *options,
+		      struct zufs_ioc_mount_private **zip_out);
+int zus_private_umount(struct zufs_ioc_mount_private *zip);
 
 /* dyn_pr.c */
 int zus_add_module_ddbg(const char *fs_name, void *handle);

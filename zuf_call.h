@@ -94,3 +94,15 @@ int zuf_iomap_exec(int fd, struct zufs_ioc_iomap_exec *ziome)
 {
 	return _ioctl(fd, ZU_IOC_IOMAP_EXEC, &ziome->hdr, "ZU_IOC_IOMAP_EXEC");
 }
+
+static inline
+int zuf_private_mount(int fd, struct zufs_ioc_mount_private *zip)
+{
+	return _ioctl(fd, ZU_IOC_PRIVATE_MOUNT, &zip->hdr, "ZU_IOC_PRIVATE_MOUNT");
+}
+
+static inline
+int zuf_private_umount(int fd, struct zufs_ioc_mount_private *zip)
+{
+	return _ioctl(fd, ZU_IOC_PRIVATE_UMOUNT, &zip->hdr, "ZU_IOC_PRIVATE_UMOUNT");
+}
