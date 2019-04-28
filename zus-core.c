@@ -139,9 +139,17 @@ bool zus_cpu_online(int cpu)
 		CPU_ISSET(cpu, zus_cpu_online_mask));
 }
 
-static int _numa_map_init(int fd)
+int zus_numa_map_init(int fd)
 {
-	return zuf_numa_map(fd, &_zus_numa_map_page.numa_map);
+	int err;
+
+	err = zuf_numa_map(fd, &_zus_numa_map_page.numa_map);
+	if (unlikely(err))
+		return err;
+
+	_set_cpumasks();
+
+	return 0;
 }
 
 static inline bool ___BAD_CPU(uint cpu)
@@ -669,12 +677,11 @@ static void *zus_mount_thread(void *callback_info)
 
 	INFO("Mount thread Running fd=%d\n", g_mount.fd);
 
-	g_mount.zbt.err = _numa_map_init(g_mount.fd);
+	g_mount.zbt.err = zus_numa_map_init(g_mount.fd);
 	if (unlikely(g_mount.zbt.err)) {
-		ERROR("_numa_map_init => %d\n", g_mount.zbt.err);
+		ERROR("zus_numa_map_init => %d\n", g_mount.zbt.err);
 		goto out;
 	}
-	_set_cpumasks();
 
 	g_mount.zbt.err = zus_register_all(g_mount.fd);
 	if (g_mount.zbt.err) {
