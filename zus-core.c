@@ -36,6 +36,15 @@ const char *g_zus_root_path = g_zus_root_path_stor;
 ulong g_DBGMASK;
 int g_mlock = MLOCK_CURRENT; /* default to MCL_CURRENT */
 
+/*
+ * Converts user-space error code to kernel conventions: change positive errno
+ * codes to negative.
+ */
+static __s32 _errno_UtoK(__s32 err)
+{
+	return (err < 0) ? err : -err;
+}
+
 int zuf_root_open_tmp(int *fd)
 {
 	/* RDWR also for the mmap */
@@ -358,7 +367,7 @@ int __zus_thread_create(struct zus_base_thread *zbt,
 error:
 	pthread_attr_destroy(&attr);
 	zbt->thread = 0;
-	return zbt->err = err;
+	return zbt->err = _errno_UtoK(err);
 }
 
 int zus_thread_create(pthread_t *new_tread, struct zus_thread_params *tp,
@@ -456,15 +465,6 @@ int _do_op(struct _zu_thread *zt, struct zufs_ioc_wait_operation *op)
 	void *app_ptr = zt->api_mem + op->hdr.offset;
 
 	return zus_do_command(app_ptr, &op->hdr);
-}
-
-/*
- * Converts user-space error code to kernel conventions: change positive errno
- * codes to negative.
- */
-static __s32 _errno_UtoK(__s32 err)
-{
-	return (err < 0) ? err : -err;
 }
 
 static void *_zu_thread(void *callback_info)
