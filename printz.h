@@ -52,11 +52,11 @@ do {									\
 
 #define __pr(s, args ...) fprintf(stderr, s, ## args)
 
-#define pr_crit(s, args ...) __pr("<2>" s, ## args)
-#define pr_err(s, args ...) __pr("<3>" s, ## args)
-#define pr_warning(s, args ...) __pr("<4>" s, ## args)
+#define pr_crit(s, args ...) __pr(LOG_STR(LOG_CRIT) s, ## args)
+#define pr_err(s, args ...) __pr(LOG_STR(LOG_ERR) s, ## args)
+#define pr_warning(s, args ...) __pr(LOG_STR(LOG_WARNING) s, ## args)
 #define pr_warn pr_warning
-#define pr_info(s, args ...) __pr("<5>" s, ## args)
+#define pr_info(s, args ...) __pr(LOG_STR(LOG_INFO) s, ## args)
 #define pr_debug(s, args ...) dyn_dbg_pr(s, ## args)
 
 #endif /* define ___PRINTZ_H__ */
