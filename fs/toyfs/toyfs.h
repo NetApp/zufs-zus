@@ -210,7 +210,7 @@ void toyfs_sbi_lock(struct toyfs_sb_info *sbi);
 void toyfs_sbi_unlock(struct toyfs_sb_info *sbi);
 void toyfs_lock_inodes(struct toyfs_sb_info *sbi);
 void toyfs_unlock_inodes(struct toyfs_sb_info *sbi);
-int toyfs_sbi_init(struct zus_sb_info *zsbi, struct zufs_ioc_mount *zim);
+int toyfs_sbi_init(struct zus_sb_info *zsbi, struct zufs_mount_info *zim);
 int toyfs_sbi_fini(struct zus_sb_info *zsbi);
 struct zus_sb_info *toyfs_sbi_alloc(struct zus_fs_info *zfi);
 void toyfs_sbi_free(struct zus_sb_info *zsbi);
