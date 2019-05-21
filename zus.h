@@ -324,6 +324,7 @@ int zus_cpu_to_node(int cpu);
 bool zus_cpu_online(int cpu);
 int zus_current_onecpu(void);
 int zus_current_cpu(void);
+int zus_current_cpu_silent(void);
 int zus_current_nid(void);
 unsigned int zus_cpumask_next(int n, cpu_set_t *srcp);
 

@@ -405,7 +405,7 @@ static struct zus_slab *_slab_of_cpu(int cpu)
 
 static void *_zus_gsa_malloc(size_t size)
 {
-	int i, cpu = zus_current_cpu();
+	int i, cpu = zus_current_cpu_silent();
 	struct zus_slab *slab;
 	void *ptr;
 

@@ -198,7 +198,8 @@ static int __zus_current_cpu(bool warn)
 {
 	struct zus_base_thread *zbt = pthread_getspecific(g_zts_id_key);
 
-	if (ZUS_WARN_ON(!zbt)) /* not created by us */
+	ZUS_WARN_ON(warn && !zbt);
+	if (!zbt) /* not created by us */
 		return sched_getcpu();
 
 	ZUS_WARN_ON_ONCE(warn && (zbt->one_cpu == ZUS_CPU_ALL));
@@ -211,6 +212,11 @@ static int __zus_current_cpu(bool warn)
 int zus_current_cpu(void)
 {
 	return __zus_current_cpu(true);
+}
+
+int zus_current_cpu_silent(void)
+{
+	return __zus_current_cpu(false);
 }
 
 int zus_current_nid(void)
