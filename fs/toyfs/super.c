@@ -122,7 +122,7 @@ struct toyfs_inode_info *toyfs_alloc_ii(struct toyfs_sb_info *sbi)
 	if (!sbi->s_statvfs.f_ffree || !sbi->s_statvfs.f_favail)
 		goto out;
 
-	tii = (struct toyfs_inode_info *)malloc(sizeof(*tii));
+	tii = (struct toyfs_inode_info *)zus_malloc(sizeof(*tii));
 	if (!tii)
 		goto out;
 
@@ -166,7 +166,7 @@ void toyfs_tii_free(struct toyfs_inode_info *tii)
 	tii->ti = NULL;
 	tii->sbi = NULL;
 	tii->valid = false;
-	free(tii);
+	zus_free(tii);
 	sbi->s_statvfs.f_ffree++;
 	sbi->s_statvfs.f_favail++;
 }
@@ -502,7 +502,7 @@ static void _itable_insert(struct toyfs_itable *itable,
 	struct toyfs_inode_ref **ient;
 	struct toyfs_inode_ref *tir;
 
-	tir = (struct toyfs_inode_ref *)calloc(1, sizeof(*tir));
+	tir = (struct toyfs_inode_ref *)zus_calloc(1, sizeof(*tir));
 	toyfs_assert(tir != NULL);
 
 	_itable_lock(itable);
@@ -544,7 +544,7 @@ static void _itable_remove(struct toyfs_itable *itable,
 	_itable_unlock(itable);
 
 	memset(tir, 0, sizeof(*tir));
-	free(tir);
+	zus_free(tir);
 }
 
 void toyfs_i_track(struct toyfs_inode_info *tii)
@@ -582,7 +582,7 @@ struct zus_sb_info *toyfs_sbi_alloc(struct zus_fs_info *zfi)
 
 	INFO("sbi_alloc: zfi=%p\n", zfi);
 
-	sbi = (struct toyfs_sb_info *)malloc(sizeof(*sbi));
+	sbi = (struct toyfs_sb_info *)zus_malloc(sizeof(*sbi));
 	if (!sbi)
 		return NULL;
 
@@ -600,7 +600,7 @@ void toyfs_sbi_free(struct zus_sb_info *zsbi)
 	struct toyfs_sb_info *sbi = Z2SBI(zsbi);
 
 	INFO("sbi_free: sbi=%p\n", sbi);
-	free(sbi);
+	zus_free(sbi);
 }
 
 struct toyfs_pmemb *toyfs_acquire_pmemb(struct toyfs_sb_info *sbi)
