@@ -103,7 +103,7 @@ toyfs_new_inode(struct zus_sb_info *zsbi,
 			pmemb = toyfs_acquire_pmemb(sbi);
 			if (!pmemb) {
 				toyfs_release_inode(sbi, ti);
-				return NULL;
+				goto out_err;
 			}
 			memcpy(pmemb->dat, symname, symlen);
 			tii->ti->i_sym_dpp = toyfs_page2dpp(sbi, pmemb);
