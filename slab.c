@@ -340,6 +340,11 @@ static void _slab_fini(struct zus_slab *slab)
 			se = a_list_first_entry(&slab_list->head,
 						struct zus_slab_elem, list);
 			page = pa_virt_to_page(slab->sbi, se);
+			if (ZUS_WARN_ON(page->sinfo.slab_uc)) {
+				ERROR("Slab-Leak! uc=%d\n", page->sinfo.slab_uc);
+				break;
+			}
+
 			_slab_page_fini(slab, page, slab_index);
 			last = pa_put_page(page);
 			ZUS_WARN_ON(!last);
