@@ -83,6 +83,9 @@ int fba_alloc(struct fba *fba, size_t size)
 {
 	int err = _fba_alloc(fba, size, MAP_SHARED);
 
+	if (err)
+		return err;
+
 	if (NEED_MLOCK && size < PA_SIZE) {
 		err = mlock(fba->ptr, size);
 		ZUS_WARN_ON(err);
