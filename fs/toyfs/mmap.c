@@ -29,8 +29,8 @@
 #define GB_WRITE 1
 
 
-static zu_dpp_t _resolve_dpp(const struct toyfs_inode_info *tii,
-			     struct toyfs_pmemb *pmemb)
+static uint64_t _resolve_bn(const struct toyfs_inode_info *tii,
+				struct toyfs_pmemb *pmemb)
 {
 	return pmemb ? toyfs_addr2bn(tii->sbi, (void *)pmemb) : 0;
 }
@@ -39,11 +39,18 @@ static int _get_block_rd(struct toyfs_inode_info *tii, loff_t off,
 			 struct zufs_ioc_IO *get_block)
 {
 	struct toyfs_pmemb *pmemb;
+	struct zus_iomap_build iomb = {};
 
+	_zus_iom_init_4_ioc_io(&iomb, &tii->sbi->s_zus_sbi,
+				get_block, ZUS_MAX_OP_SIZE);
 	pmemb = toyfs_resolve_pmemb(tii, off);
 	get_block->gp_block.rw = GB_READ;
-	get_block->gp_block.pmem_bn = _resolve_dpp(tii, pmemb);
 	get_block->gp_block.ret_flags = 0;
+
+	_zus_iom_start(&iomb, NULL, NULL);
+	_ziom_enc_t1_bn(&iomb, _resolve_bn(tii, pmemb), 0);
+	_zus_iom_end(&iomb);
+
 	return 0;
 }
 
@@ -52,19 +59,31 @@ static int _get_block_wr(struct toyfs_inode_info *tii, loff_t off,
 {
 	uint64_t pmem_bn;
 	struct toyfs_pmemb *pmemb;
+	struct zus_iomap_build iomb = {};
+
+	_zus_iom_init_4_ioc_io(&iomb, &tii->sbi->s_zus_sbi,
+				get_block, ZUS_MAX_OP_SIZE);
 
 	pmemb = toyfs_resolve_pmemb(tii, off);
 	if (pmemb) {
 		get_block->gp_block.rw = GB_WRITE;
-		get_block->gp_block.pmem_bn = _resolve_dpp(tii, pmemb);
 		get_block->gp_block.ret_flags = 0;
+
+		_zus_iom_start(&iomb, NULL, NULL);
+		_ziom_enc_t1_bn(&iomb, _resolve_bn(tii, pmemb), 0);
+		_zus_iom_end(&iomb);
+
 		return 0;
 	}
 	pmem_bn = toyfs_require_pmem_bn(tii, off);
 	if (pmem_bn) {
 		get_block->gp_block.rw = GB_WRITE;
-		get_block->gp_block.pmem_bn = pmem_bn;
 		get_block->gp_block.ret_flags = ZUFS_GBF_NEW;
+
+		_zus_iom_start(&iomb, NULL, NULL);
+		_ziom_enc_t1_bn(&iomb, pmem_bn, 0);
+		_zus_iom_end(&iomb);
+
 		return 0;
 	}
 	return -ENOSPC;
