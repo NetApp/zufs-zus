@@ -6,32 +6,31 @@ PROJ_OBJS := $(ZM_OBJS)
 PROJ_CDEFS := $(ZM_CDEFS)
 PROJ_WARNS := $(ZM_WARNS)
 PROJ_INCLUDES := $(ZM_INCLUDES) $(ZDIR)
-PROJ_LIBS := $(ZM_LIBS) pthread
+PROJ_LIBS := $(ZM_LIBS)
 PROJ_LIB_DIRS := $(ZDIR) $(ZM_LIB_DIRS)
 PROJ_CFLAGS := $(ZM_CFLAGS)
 PROJ_LDFLAGS := $(ZM_LDFLAGS)
 PROJ_OBJS_DEPS := $(M)/Makefile $(ZM_OBJS_DEPS) $(ZDIR)/zusmodule.mk
-PROJ_EXTRA_OBJS := $(ZM_EXTRA_OBJS)
-PROJ_TARGET_DEPS += $(ZM_TARGET_DEPS) $(ZM_EXTRA_OBJS)
+PROJ_TARGET_DEPS += $(ZM_TARGET_DEPS)
 
-# A ZM_GENERIC==1 setting represnts a generic module that isn't a file system
-# library. (tests, mkfs programs, etc.)
-ifeq ($(strip $(ZM_GENERIC)),1)
+# ZM_TYPE==GENERIC means a generic binary that isn't a file system library
+# but still depends on libzus.
+# ZM_TYPE==STANDALONE means a binary that does not require libzus.
+# All other modules are assumed to be a filesystem library.
+ifeq ($(strip $(ZM_TYPE)),GENERIC)
 PROJ_TARGET := $(M)/$(ZM_NAME)
 PROJ_TARGET_TYPE := bin
-else
+PROJ_LIBS += zus pthread
+PROJ_TARGET_DEPS += $(ZDIR)/libzus.so
+else ifeq ($(strip $(ZM_TYPE)),STANDALONE)
+PROJ_TARGET := $(M)/$(ZM_NAME)
+PROJ_TARGET_TYPE := bin
+else # ZM_TYPE==LIB
 PROJ_TARGET := $(M)/lib$(ZM_NAME).so
-PROJ_TARGET_STATIC := $(M)/lib$(ZM_NAME).a
 PROJ_TARGET_TYPE := lib
 PROJ_CFLAGS := -fpic $(PROJ_CFLAGS)
 PROJ_LDFLAGS := -shared -Wl,-Tzus_ddbg.ld $(PROJ_LDFLAGS)
-endif
-
-ifeq ($(strip $(ZM_STATIC_LINK)),1)
-PROJ_EXTRA_OBJS += $(ZDIR)/libzus.a
-PROJ_TARGET_DEPS += $(ZDIR)/libzus.a
-else
-PROJ_LIBS += zus
+PROJ_LIBS += zus pthread
 PROJ_TARGET_DEPS += $(ZDIR)/libzus.so
 endif
 

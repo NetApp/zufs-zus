@@ -107,12 +107,7 @@ endef
 
 define LINK_CMD =
 	$(if $(Q),@echo "LD [$(BUILD_STR)] $(notdir $(PROJ_TARGET))",)
-	$(Q)$(CC) $(OBJS) $(PROJ_EXTRA_OBJS) $(LDFLAGS) -o $(PROJ_TARGET)
-endef
-
-define AR_CMD =
-	$(if $(Q),@echo "AR [$(BUILD_STR)] $(notdir $(PROJ_TARGET_STATIC))",)
-	$(Q)$(AR) rcs $(PROJ_TARGET_STATIC) $(OBJS)
+	$(Q)$(CC) $(OBJS) $(LDFLAGS) -o $(PROJ_TARGET)
 endef
 
 $(OBJS_DIR)/%.o: $(PROJ_DIR)%.c $(PROJ_OBJS_DEPS)
@@ -122,15 +117,8 @@ $(OBJS_DIR)/%.o: $(PROJ_DIR)%.c $(PROJ_OBJS_DEPS)
 $(PROJ_TARGET): $(PROJ_TARGET_DEPS) $(OBJS)
 	$(call LINK_CMD)
 
-ifeq ($(PROJ_TARGET_TYPE),lib)
-$(PROJ_TARGET): $(PROJ_TARGET_STATIC)
-endif
-
-$(PROJ_TARGET_STATIC): $(OBJS)
-	$(call AR_CMD)
-
 __clean: $(PROJ_CLEAN_DEPS)
-	@rm -f $(OBJS_DEPS) $(PROJ_TARGET) $(PROJ_TARGET_STATIC) $(OBJS)
+	@rm -f $(OBJS_DEPS) $(PROJ_TARGET) $(OBJS)
 
 -include $(OBJS_DEPS)
 
