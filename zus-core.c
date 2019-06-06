@@ -217,6 +217,13 @@ void zus_private_set(void *p)
 		zbt->private = p;
 }
 
+ulong zus_thread_self(void)
+{
+	struct zus_base_thread *zbt = pthread_getspecific(g_zts_id_key);
+
+	return (ulong) (zbt);
+}
+
 static int __zus_current_cpu(bool warn)
 {
 	struct zus_base_thread *zbt = pthread_getspecific(g_zts_id_key);

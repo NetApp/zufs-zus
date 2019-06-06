@@ -339,6 +339,7 @@ unsigned int zus_cpumask_next(int n, cpu_set_t *srcp);
 
 void *zus_private_get(void);
 void zus_private_set(void*);
+ulong zus_thread_self(void);
 
 struct zus_thread_params {
 	const char *name; /* only used for the duration of the call */
