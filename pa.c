@@ -189,7 +189,7 @@ static int _init_page_of_pages(struct zus_sb_info *sbi, struct pa *pa)
 	uint i;
 
 	/* Better check here before we SIG_BUS on access of data */
-	if (unlikely(PA_SIZE < pa->size * PAGE_SIZE)) {
+	if (unlikely(PA_SIZE < ((pa->size + PA_PAGES_AT_A_TIME) * PAGE_SIZE))) {
 		ERROR("PA_SIZE too small pa->size=0x%lx\n", pa->size);
 		return -ENOMEM;
 	}
