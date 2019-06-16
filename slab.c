@@ -467,6 +467,8 @@ static size_t __elem_size(void *addr)
 
 void *zus_malloc(size_t size)
 {
+	void *ptr;
+
 	if (unlikely(!g_gsa))
 		return NULL;
 
@@ -476,7 +478,18 @@ void *zus_malloc(size_t size)
 	if (PAGE_SIZE < size)
 		return malloc(size);
 
-	return _zus_gsa_malloc(size);
+	ptr = _zus_gsa_malloc(size);
+	if (unlikely(!ptr)) {
+		/* TODO(sagi): remove this code once we move to 128MB chunks */
+		int err;
+
+		/* exhausted slab: fallback to malloc + force cache-line align */
+		err = posix_memalign(&ptr, CACHELINE_SIZE, size);
+		if (unlikely(err))
+			return NULL;
+	}
+
+	return ptr;
 }
 
 void zus_free(void *ptr)
