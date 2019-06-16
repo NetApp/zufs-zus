@@ -20,11 +20,11 @@
 #include "zus.h"
 #include "zuf_call.h"
 
-/* PA_SIZE - 2GB  total allowed data held in pages */
+/* PA_SIZE - 4GB  total allowed data held in pages */
 /* TODO: get this param from FS
  * TODO2: grow dynamically
  */
-#define PA_SIZE		(1UL << 31)
+#define PA_SIZE		(1UL << 32)
 
 /* ~~~~ fba ~~~~ */
 
@@ -190,7 +190,7 @@ static int _init_page_of_pages(struct zus_sb_info *sbi, struct pa *pa)
 
 	/* Better check here before we SIG_BUS on access of data */
 	if (unlikely(PA_SIZE < ((pa->size + PA_PAGES_AT_A_TIME) * PAGE_SIZE))) {
-		ERROR("PA_SIZE too small pa->size=0x%lx\n", pa->size);
+		DBG("PA_SIZE too small pa->size=0x%lx\n", pa->size);
 		return -ENOMEM;
 	}
 

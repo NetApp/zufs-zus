@@ -256,7 +256,7 @@ static void *_slab_alloc(struct zus_slab *slab, size_t size)
 
 		err = _slab_increase(slab, slab_index);
 		if (unlikely(err)) {
-			ERROR("failed to increase slab => %d\n", err);
+			DBG("failed to increase slab => %d\n", err);
 			return NULL;
 		}
 	}
