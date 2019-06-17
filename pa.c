@@ -20,11 +20,53 @@
 #include "zus.h"
 #include "zuf_call.h"
 
-/* PA_SIZE - 4GB  total allowed data held in pages */
+/* PA_SIZE - allowed data held in pages; 4G by default, setup upon zusd init */
 /* TODO: get this param from FS
  * TODO2: grow dynamically
  */
-#define PA_SIZE		(1UL << 32)
+#define PA_SIZE		(g_pa_size.pa_size)
+#define MEGA		(1UL << 20)
+
+union _pa_size {
+	const size_t pa_size;
+	size_t __pa_size_wr;
+};
+static union _pa_size g_pa_size = { .pa_size = 1L << 32, };	/* 4GB */
+
+int zus_setup_pa_size(size_t size)
+{
+	const char *env_pa_size;
+	size_t avail_ram;
+	long p_size, pages;
+
+	/* user-defined size */
+	if (size)
+		goto out;
+
+	env_pa_size = getenv(ZUFS_PA_SIZE);
+	if (env_pa_size) {
+		size = atol(env_pa_size);
+		goto out;
+	}
+
+	/* defines PA_SIZE to be half of physical RAM  */
+	p_size = sysconf(_SC_PAGE_SIZE);
+	if (unlikely(p_size == -1))
+		return -errno;
+	pages = sysconf(_SC_PHYS_PAGES);
+	if (unlikely(pages == -1))
+		return -errno;
+
+	avail_ram = p_size * pages;
+	if (unlikely(avail_ram < (64 * MEGA)))
+		return -ENOMEM;
+	size = avail_ram / 2;
+
+out:
+	/* require PA_SIZE to be 2M aligned */
+	g_pa_size.__pa_size_wr = size & ~((2 * MEGA) - 1);
+	return 0;
+}
 
 /* ~~~~ fba ~~~~ */
 

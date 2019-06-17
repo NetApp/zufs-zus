@@ -398,6 +398,7 @@ int fba_punch_hole(struct fba *fba, ulong index, uint nump);
  * Gives users a page Allocator pa_pages are ref-counted last put
  * frees the page. (pa_free is just a pa_put_page
  */
+int zus_setup_pa_size(size_t size);
 int pa_init(struct zus_sb_info *sbi);
 void pa_fini(struct zus_sb_info *sbi);
 
@@ -588,6 +589,7 @@ static inline void *pa_addr(struct zus_sb_info *sbi, ulong offset)
 #define ZUS_LIBFS_MAX_PATH	256
 #define ZUS_LIBFS_DIR		"/usr/lib/zufs"
 #define ZUFS_LIBFS_LIST		"ZUFS_LIBFS_LIST"
+#define ZUFS_PA_SIZE		"ZUFS_PA_SIZE"
 
 /* declare so compiler will not complain */
 extern int register_fs(int fd);

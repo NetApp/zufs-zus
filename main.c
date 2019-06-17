@@ -74,13 +74,15 @@ int main(int argc, char *argv[])
 		{.name = "verbose", .has_arg = 2, .flag = NULL, .val = 'd'},
 		{.name = "mlock", .has_arg = 2, .flag = NULL, .val = 'l'},
 		{.name = "mcheck", .has_arg = 0, .flag = NULL, .val = 'm'},
+		{.name = "pa_size", .has_arg = 2, .flag = NULL, .val = 'p'},
 		{.name = 0, .has_arg = 0, .flag = 0, .val = 0},
 	};
-	const char *shortopt = "r::f::n::d::l::m";
+	const char *shortopt = "r::f::n::d::l::p::m";
 	char op;
 	struct zus_thread_params tp;
 	const char *path = NULL;
 	int err, flags = 0;
+	ssize_t pa_size = 0;
 
 	ZTP_INIT(&tp);
 	while ((op = getopt_long(argc, argv, shortopt, opt, NULL)) != -1) {
@@ -112,6 +114,10 @@ int main(int argc, char *argv[])
 			break;
 		case 'm':
 			mallopt(M_CHECK_ACTION, 3);
+			break;
+		case 'p':
+			if (optarg)
+				pa_size = atol(optarg);
 			break;
 		default:
 			/* Just ignore we are not the police */
@@ -154,6 +160,10 @@ int main(int argc, char *argv[])
 	zus_register_sigactions();
 
 	err = zus_increase_max_files();
+	if (unlikely(err))
+		return err;
+
+	err = zus_setup_pa_size(pa_size);
 	if (unlikely(err))
 		return err;
 
