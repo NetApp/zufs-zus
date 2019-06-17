@@ -277,7 +277,9 @@ void __pa_free(struct pa_page *page)
 	if (NEED_MLOCK) {
 		int err = munlock(pa_page_address(sbi, page), PAGE_SIZE);
 
-		ZUS_WARN_ON(err);
+		if (unlikely(err))
+			DBG("munlock failed pa=%p => %d\n",
+			    pa_page_address(sbi, page), -errno);
 	}
 	fba_punch_hole(&pa->data, pa_page_to_bn(sbi, page), 1);
 
