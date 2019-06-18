@@ -2,10 +2,10 @@ ZDIR := $(dir $(lastword $(MAKEFILE_LIST)))
 CONFIG := $(ZDIR).config
 ifeq ($(M),)
 PROJ_DIR := $(ZDIR)
-BUILD_STR := "Z"
+BUILD_STR := Z
 else
 PROJ_DIR := $(M)/
-BUILD_STR := "M"
+BUILD_STR := M
 endif
 
 OBJS_DIR := $(PROJ_DIR)objs
@@ -100,22 +100,14 @@ ifneq ($(CONFIG_BUILD_VERBOSE),1)
 	Q := @
 endif
 
-define BUILD_CMD =
-	$(if $(Q),@echo "CC [$(BUILD_STR)] $(notdir $(1))",)
-	$(Q)$(CC) $(CFLAGS) -c $(2) -o $(1)
-endef
-
-define LINK_CMD =
-	$(if $(Q),@echo "LD [$(BUILD_STR)] $(notdir $(PROJ_TARGET))",)
-	$(Q)$(CC) $(OBJS) $(LDFLAGS) -o $(PROJ_TARGET)
-endef
-
 $(OBJS_DIR)/%.o: $(PROJ_DIR)%.c $(PROJ_OBJS_DEPS)
 	@mkdir -p $(dir $@)
-	$(call BUILD_CMD,$@,$<)
+	$(if $(Q),$(info CC [$(BUILD_STR)] $(notdir $@)))
+	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
 $(PROJ_TARGET): $(PROJ_TARGET_DEPS) $(OBJS)
-	$(call LINK_CMD)
+	$(if $(Q),$(info LD [$(BUILD_STR)] $(notdir $(PROJ_TARGET))))
+	$(Q)$(CC) $(OBJS) $(LDFLAGS) -o $(PROJ_TARGET)
 
 __clean: $(PROJ_CLEAN_DEPS)
 	@rm -f $(OBJS_DEPS) $(PROJ_TARGET) $(OBJS)
