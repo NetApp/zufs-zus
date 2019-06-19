@@ -6,28 +6,41 @@ PROJ_NAME := $(ZM_NAME)
 PROJ_OBJS := $(ZM_OBJS)
 PROJ_CDEFS := $(ZM_CDEFS)
 PROJ_WARNS := $(ZM_WARNS)
-PROJ_INCLUDES := $(ZM_INCLUDES) $(ZDIR)
+PROJ_INCLUDES := $(ZM_INCLUDES)
 PROJ_LIBS := $(ZM_LIBS)
-PROJ_LIB_DIRS := $(ZDIR) $(ZM_LIB_DIRS)
+PROJ_LIB_DIRS := $(ZM_LIB_DIRS)
 PROJ_CFLAGS := $(ZM_CFLAGS)
 PROJ_LDFLAGS := $(ZM_LDFLAGS)
 PROJ_OBJS_DEPS := $(M)/Makefile $(ZM_OBJS_DEPS) $(ZDIR)/zusmodule.mk
 PROJ_TARGET_DEPS += $(ZM_TARGET_DEPS)
 
-# ZM_TYPE==GENERIC means a generic binary that isn't a file system library
-# but still depends on libzus.
-# ZM_TYPE==STANDALONE means a binary that does not require libzus.
-# All other modules are assumed to be a filesystem library.
-ifeq ($(strip $(ZM_TYPE)),GENERIC)
-PROJ_LIBS += zus pthread
+# ZM_TYPE can be one of the following:
+# FS means a ZUS filesystem libraray
+# ZUS_BIN means a binary that isn't a file system library but
+# still depends on libzus.
+# ZM_TYPE==GENERIC means a binary that does not require libzus.
+ifeq ($(ZM_TYPE),)
+ZM_TYPE := FS # default to ZUS_FS
+endif
+ZM_TYPE := $(strip $(ZM_TYPE))
+
+ifeq ($(filter $(ZM_TYPE),FS ZUS_BIN GENERIC),)
+$(error Unknown ZUS projec type $(ZM_TYPE))
+endif
+
+ifeq ($(filter $(ZM_TYPE),FS ZUS_BIN), $(ZM_TYPE))
+PROJ_INCLUDES += $(ZDIR)
+PROJ_LIB_DIRS += $(ZDIR)
+PROJ_LIBS += zus
+PROJ_CFLAGS := -pthread $(PROJ_CFLAGS)
+PROJ_LDFLAGS := -pthread $(PROJ_LDFLAGS)
 PROJ_TARGET_DEPS += $(ZDIR)/libzus.so
-else ifeq ($(strip $(ZM_TYPE)),STANDALONE)
-PROJ_TARGET_TYPE := $(ZM_TARGET_TYPE)
-else # ZM_TYPE==LIB
+ifeq ($(ZM_TYPE), FS)
 PROJ_TARGET_TYPE := lib
 PROJ_LDFLAGS := -Wl,-Tzus_ddbg.ld $(PROJ_LDFLAGS)
-PROJ_LIBS += zus pthread
-PROJ_TARGET_DEPS += $(ZDIR)/libzus.so
+endif
+else # Generic binary
+PROJ_TARGET_TYPE := $(ZM_TARGET_TYPE)
 endif
 
 module:
