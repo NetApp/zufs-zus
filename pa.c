@@ -302,7 +302,10 @@ rescan:
 out:
 	if (NEED_MLOCK && page) {
 		err = mlock(pa_page_address(sbi, page), npages * PAGE_SIZE);
-		ZUS_WARN_ON(err);
+
+		if (unlikely(err))
+			DBG("mlock failed pa=%p npages=%d => %d\n",
+			    pa_page_address(sbi, page), (int)npages, -errno);
 	}
 
 	pthread_spin_unlock(&pa->lock);
