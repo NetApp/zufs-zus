@@ -44,20 +44,13 @@ CWARNS += pointer-arith
 endif
 CWARNS := -W $(addprefix -W,$(CWARNS))
 
-
-CDEFS := KERNEL=0
 CDEFS += $(CONFIG_GLOBAL_CDEFS) $(PROJ_CDEFS)
-
-ifeq ($(CONFIG_FORTIFY_SORUCE),1)
-CDEFS += _FORTIFY_SOURCE=1
-endif
-
 CDEFS := $(addprefix -D,$(CDEFS))
 
 INCLUDES := $(CONFIG_GLOBAL_INCLUDES) $(PROJ_INCLUDES)
 INCLUDES := $(addprefix -I,$(INCLUDES))
 
-CFLAGS := -std=gnu11 -MMD -pthread $(CONFIG_GLOBAL_CFLAGS) $(PROJ_CFLAGS)
+CFLAGS := -std=gnu11 -MMD $(CONFIG_GLOBAL_CFLAGS) $(PROJ_CFLAGS)
 ifeq ($(DEBUG), 1)
 CFLAGS += -g -ggdb
 endif
@@ -93,12 +86,13 @@ endif
 
 $(OBJS_DIR)/%.o: $(PROJ_DIR)%.c $(PROJ_OBJS_DEPS)
 	@mkdir -p $(dir $@)
-	$(if $(Q),$(info CC [$(BUILD_STR)] $(notdir $@)))
+	$(if $(Q),@echo "CC [$(BUILD_STR)] $(notdir $@)")
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
 $(PROJ_TARGET): $(PROJ_TARGET_DEPS) $(OBJS)
-	$(if $(Q),$(info LD [$(BUILD_STR)] $(notdir $(PROJ_TARGET))))
+	$(if $(Q),@echo "LD [$(BUILD_STR)] $(notdir $(PROJ_TARGET))")
 	$(Q)$(CC) $(OBJS) $(LDFLAGS) -o $(PROJ_TARGET)
+	@echo
 
 __clean: $(PROJ_CLEAN_DEPS)
 	@rm -f $(OBJS_DEPS) $(PROJ_TARGET) $(OBJS)
