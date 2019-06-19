@@ -19,6 +19,16 @@ PROJ_CFLAGS := -fpic
 PROJ_LIBS := rt uuid unwind dl pthread
 PROJ_LDFLAGS += -shared
 
+ifeq ($(CONFIG_TRY_ANON_MMAP),1)
+PROJ_CDEFS += CONFIG_TRY_ANON_MMAP=1
+else
+PROJ_CDEFS += CONFIG_TRY_ANON_MMAP=0
+endif
+
+ifdef CONFIG_ZUF_DEF_PATH
+PROJ_CDEFS += CONFIG_ZUF_DEF_PATH=\"$(CONFIG_ZUF_DEF_PATH)\"
+endif
+
 ZUS_API_H := zus_api.h md_def.h md.h
 LINUX_STAT_H := linux/stat.h
 LINKED_HEADERS := $(ZUS_API_H) $(LINUX_STAT_H)
