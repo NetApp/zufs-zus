@@ -13,6 +13,7 @@ PROJ_CFLAGS := $(ZM_CFLAGS)
 PROJ_LDFLAGS := $(ZM_LDFLAGS)
 PROJ_OBJS_DEPS := $(M)/Makefile $(ZM_OBJS_DEPS) $(ZDIR)/zusmodule.mk
 PROJ_TARGET_DEPS += $(ZM_TARGET_DEPS)
+PROJ_LANG += $(ZM_LANG)
 
 # ZM_TYPE can be one of the following:
 # FS means a ZUS filesystem libraray

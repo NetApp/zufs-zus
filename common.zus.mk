@@ -16,20 +16,30 @@ ifeq ($(PROJ_NAME),)
 $(error no name for project)
 endif
 
+ifeq ($(PROJ_LANG),)
+PROJ_LANG=C
+endif
+
+ifeq ($(filter $(PROJ_LANG),C CPP),)
+$(error Unknown ZUS project languege $(PROJ_LANG))
+endif
+
 -include $(CONFIG)
 
 # What to warn about
-CWARNS := error all
-CWARNS += write-strings missing-prototypes undef cast-qual
-CWARNS += missing-declarations nested-externs strict-prototypes
-CWARNS += bad-function-cast cast-align old-style-definition extra
-CWARNS += unused shadow float-equal comment sign-compare address
-CWARNS += redundant-decls missing-include-dirs unknown-pragmas
+CWARNS := error all write-strings undef cast-qual missing-declarations
+CWARNS += cast-align extra unused shadow float-equal comment sign-compare
+CWARNS += address redundant-decls missing-include-dirs unknown-pragmas
 CWARNS += parentheses sequence-point unused-macros endif-labels
 CWARNS += overlength-strings unreachable-code missing-field-initializers
-CWARNS += aggregate-return declaration-after-statement init-self
-CWARNS += switch-default switch switch-enum
+CWARNS += aggregate-return init-self switch-default switch switch-enum
 CWARNS += frame-larger-than=4096 larger-than=4096
+
+ifeq ($(PROJ_LANG), C)
+CWARNS += missing-prototypes nested-externs bad-function-cast
+CWARNS += old-style-definition strict-prototypes declaration-after-statement
+endif
+
 CWARNS += $(PROJ_WARNS)
 # Turn off some warnings
 CWARNS += no-unused-parameter no-missing-field-initializers
@@ -54,7 +64,7 @@ CDEFS := $(addprefix -D,$(CDEFS))
 INCLUDES := $(realpath $(CONFIG_GLOBAL_INCLUDES) $(PROJ_INCLUDES))
 INCLUDES := $(addprefix -I,$(INCLUDES))
 
-CFLAGS := -std=gnu11 -MMD $(CONFIG_GLOBAL_CFLAGS) $(PROJ_CFLAGS)
+CFLAGS := -MMD $(CONFIG_GLOBAL_CFLAGS) $(PROJ_CFLAGS)
 ifeq ($(DEBUG), 1)
 CFLAGS += -g -ggdb
 endif
@@ -64,6 +74,15 @@ ifdef CONFIG_OPTIMIZE_LEVEL
 CFLAGS += -O$(CONFIG_OPTIMIZE_LEVEL)
 else
 CFLAGS += -O2
+endif
+
+ifeq ($(PROJ_LANG),CPP)
+CC=g++
+SRC_SUFFIX := cpp
+CFLAGS := -std=gnu++0x $(CFLAGS)
+else
+SRC_SUFFIX := c
+CFLAGS := -std=gnu11 $(CFLAGS)
 endif
 
 ifeq ($(CONFIG_PEDANTIC),1)
@@ -104,7 +123,7 @@ ifneq ($(CONFIG_BUILD_VERBOSE),1)
 	Q := @
 endif
 
-$(OBJS_DIR)/%.o: $(PROJ_DIR)%.c $(PROJ_OBJS_DEPS)
+$(OBJS_DIR)/%.o: $(PROJ_DIR)%.$(SRC_SUFFIX) $(PROJ_OBJS_DEPS)
 	@mkdir -p $(dir $@)
 	$(if $(Q),@echo "CC [$(BUILD_STR)] $(notdir $@)")
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
