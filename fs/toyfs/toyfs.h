@@ -108,15 +108,14 @@ struct toyfs_itable {
 	struct toyfs_inode_ref *imap[33377]; /* TODO: Variable size */
 };
 
-union toyfs_super_block_part {
+union toyfs_super_block_head {
 	struct md_dev_table dev_table;
 	uint8_t reserved[MDT_SIZE];
 };
 
 
 struct toyfs_super_block {
-	union toyfs_super_block_part part1;
-	union toyfs_super_block_part part2;
+	union toyfs_super_block_head head;
 };
 
 struct toyfs_sb_info {

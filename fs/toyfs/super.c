@@ -742,14 +742,9 @@ static int _read_pmem_sb_first_time(struct multi_devices *md)
 	const struct toyfs_super_block *sb;
 
 	sb = (const struct toyfs_super_block *)pmem_addr;
-	if (sb->part1.dev_table.s_magic != TOYFS_SUPER_MAGIC) {
+	if (sb->head.dev_table.s_magic != TOYFS_SUPER_MAGIC) {
 		ERROR("illegal magic1: %ld\n",
-		      (long)sb->part1.dev_table.s_magic);
-		return -EINVAL;
-	}
-	if (sb->part2.dev_table.s_magic != TOYFS_SUPER_MAGIC) {
-		ERROR("illegal magic2: %ld\n",
-		      (long)sb->part2.dev_table.s_magic);
+		      (long)sb->head.dev_table.s_magic);
 		return -EINVAL;
 	}
 	return 0;

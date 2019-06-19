@@ -105,14 +105,6 @@ static void toyfs_fill_dev_table(struct md_dev_table *dev_table,
 	dev_table->s_sum = md_calc_csum(dev_table);
 }
 
-static void toyfs_mirror_parts(struct toyfs_super_block *super_block)
-{
-	union toyfs_super_block_part *part1 = &super_block->part1;
-	union toyfs_super_block_part *part2 = &super_block->part2;
-
-	memcpy(part2, part1, sizeof(*part2));
-}
-
 static void
 toyfs_write_super_block(int fd, struct toyfs_super_block *super_block)
 {
@@ -176,8 +168,7 @@ int main(int argc, char *argv[])
 		error(EXIT_FAILURE, -1, "usage: mkfs <uuid> <device-path>");
 
 	fd = toyfs_open_blkdev(argv[2], &dev_size);
-	toyfs_fill_dev_table(&sb->part1.dev_table, dev_size, argv[1]);
-	toyfs_mirror_parts(sb);
+	toyfs_fill_dev_table(&sb->head.dev_table, dev_size, argv[1]);
 	toyfs_fill_root_inode(rooti);
 	toyfs_write_super_block(fd, sb);
 	toyfs_write_root_inode(fd, rooti);
