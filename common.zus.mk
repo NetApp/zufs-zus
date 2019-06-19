@@ -12,6 +12,10 @@ OBJS_DIR := $(PROJ_DIR)objs
 OBJS := $(addprefix $(OBJS_DIR)/, $(strip $(PROJ_OBJS)))
 OBJS_DEPS := $(OBJS:.o=.d)
 
+ifeq ($(PROJ_NAME),)
+$(error no name for project)
+endif
+
 -include $(CONFIG)
 
 # What to warn about
@@ -74,6 +78,22 @@ LDFLAGS += $(CONFIG_GLOBAL_LDFLAGS) $(PROJ_LDFLAGS) -Wl,--no-undefined
 LDFLAGS += $(addprefix -L,$(LIB_DIRS))
 LDFLAGS += $(addprefix -l,$(LIBS))
 
+ifeq ($(PROJ_TARGET_TYPE),)
+PROJ_TARGET_TYPE := exec
+endif
+
+ifeq ($(filter $(PROJ_TARGET_TYPE),exec lib),)
+$(error Invalid project type $(PROJ_TARGET_TYPE))
+endif
+
+ifeq ($(PROJ_TARGET_TYPE),lib)
+TARGET := $(PROJ_DIR)/lib$(PROJ_NAME).so
+CFLAGS := -fpic $(CFLAGS)
+LDFLAGS := -shared $(LDFLAGS)
+else
+TARGET := $(PROJ_DIR)/$(PROJ_NAME)
+endif
+
 # =============== common rules =================================================
 PROJ_OBJS_DEPS += $(ZDIR)/Makefile $(ZDIR)/common.zus.mk
 ifneq ($(realpath $(CONFIG)),)
@@ -89,15 +109,15 @@ $(OBJS_DIR)/%.o: $(PROJ_DIR)%.c $(PROJ_OBJS_DEPS)
 	$(if $(Q),@echo "CC [$(BUILD_STR)] $(notdir $@)")
 	$(Q)$(CC) $(CFLAGS) -c $< -o $@
 
-$(PROJ_TARGET): $(PROJ_TARGET_DEPS) $(OBJS)
-	$(if $(Q),@echo "LD [$(BUILD_STR)] $(notdir $(PROJ_TARGET))")
-	$(Q)$(CC) $(OBJS) $(LDFLAGS) -o $(PROJ_TARGET)
+$(TARGET): $(TARGET_DEPS) $(OBJS)
+	$(if $(Q),@echo "LD [$(BUILD_STR)] $(notdir $(TARGET))")
+	$(Q)$(CC) $(OBJS) $(LDFLAGS) -o $(TARGET)
 	@echo
 
 __clean: $(PROJ_CLEAN_DEPS)
-	@rm -f $(OBJS_DEPS) $(PROJ_TARGET) $(OBJS)
+	@rm -f $(OBJS_DEPS) $(TARGET) $(OBJS)
 
 -include $(OBJS_DEPS)
 
-.DEFAULT_GOAL := $(PROJ_TARGET)
+.DEFAULT_GOAL := $(TARGET)
 .PHONY: __clean

@@ -10,7 +10,7 @@
 #	Omer Caspi <omerc@netapp.com>
 #
 -include $(CURDIR)/.config
-PROJ_TARGET := zusd
+PROJ_NAME := zusd
 PROJ_OBJS := main.o signals.o
 PROJ_INCLUDES += .
 PROJ_LIBS := zus

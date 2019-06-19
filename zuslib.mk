@@ -10,14 +10,12 @@
 #	Omer Caspi <omerc@netapp.com>
 #
 -include $(CURDIR)/.config
-PROJ_TARGET := libzus.so
+PROJ_NAME := zus
 PROJ_TARGET_TYPE := lib
 PROJ_OBJS := zus-core.o zus-vfs.o module.o md_zus.o nvml_movnt.o utils.o fs-loader.o pa.o
 PROJ_OBJS += printz.o slab.o
 PROJ_INCLUDES := .
-PROJ_CFLAGS := -fpic
 PROJ_LIBS := rt uuid unwind dl pthread
-PROJ_LDFLAGS += -shared
 
 ifeq ($(CONFIG_TRY_ANON_MMAP),1)
 PROJ_CDEFS += CONFIG_TRY_ANON_MMAP=1

@@ -2,6 +2,7 @@ include $(M)/Makefile
 ZDIR ?=$(CURDIR)
 MAKEFLAGS := --no-print-directory
 
+PROJ_NAME := $(ZM_NAME)
 PROJ_OBJS := $(ZM_OBJS)
 PROJ_CDEFS := $(ZM_CDEFS)
 PROJ_WARNS := $(ZM_WARNS)
@@ -18,18 +19,13 @@ PROJ_TARGET_DEPS += $(ZM_TARGET_DEPS)
 # ZM_TYPE==STANDALONE means a binary that does not require libzus.
 # All other modules are assumed to be a filesystem library.
 ifeq ($(strip $(ZM_TYPE)),GENERIC)
-PROJ_TARGET := $(M)/$(ZM_NAME)
-PROJ_TARGET_TYPE := bin
 PROJ_LIBS += zus pthread
 PROJ_TARGET_DEPS += $(ZDIR)/libzus.so
 else ifeq ($(strip $(ZM_TYPE)),STANDALONE)
-PROJ_TARGET := $(M)/$(ZM_NAME)
-PROJ_TARGET_TYPE := bin
+PROJ_TARGET_TYPE := $(ZM_TARGET_TYPE)
 else # ZM_TYPE==LIB
-PROJ_TARGET := $(M)/lib$(ZM_NAME).so
 PROJ_TARGET_TYPE := lib
-PROJ_CFLAGS := -fpic $(PROJ_CFLAGS)
-PROJ_LDFLAGS := -shared -Wl,-Tzus_ddbg.ld $(PROJ_LDFLAGS)
+PROJ_LDFLAGS := -Wl,-Tzus_ddbg.ld $(PROJ_LDFLAGS)
 PROJ_LIBS += zus pthread
 PROJ_TARGET_DEPS += $(ZDIR)/libzus.so
 endif
