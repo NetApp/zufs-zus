@@ -29,7 +29,7 @@ static void _sigaction_sigbus_handler(int signum, siginfo_t *si, void *p)
 
 static void _sigaction_info_handler(int signum, siginfo_t *si, void *p)
 {
-	INFO("SIGNAL: signum=%d si_errno=%d\n", signum, si->si_errno);
+	DBG("SIGNAL: signum=%d si_errno=%d\n", signum, si->si_errno);
 }
 
 static void _sigaction_exit_handler(int signum, siginfo_t *si, void *p)

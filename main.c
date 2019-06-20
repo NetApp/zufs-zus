@@ -175,7 +175,7 @@ int main(int argc, char *argv[])
 	if (unlikely(err))
 		goto stop;
 
-	INFO("waiting for sigint ...\n");
+	DBG("waiting for sigint ...\n");
 	zus_join();
 
 stop:

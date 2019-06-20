@@ -712,7 +712,7 @@ static void *zus_mount_thread(void *callback_info)
 	if (g_mount.zbt.err)
 		goto out;
 
-	INFO("Mount thread Running fd=%d\n", g_mount.fd);
+	INFO("Mount thread Running [%s]\n", g_zus_root_path);
 
 	g_mount.zbt.err = zus_numa_map_init(g_mount.fd);
 	if (unlikely(g_mount.zbt.err)) {

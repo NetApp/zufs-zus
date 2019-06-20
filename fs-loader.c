@@ -120,7 +120,7 @@ static int _load_libfs(int fd)
 	int lib_no = 0;
 	int err = 0;
 
-	INFO("%s: %s\n", ZUFS_LIBFS_LIST, libfs_env);
+	DBG("%s: %s\n", ZUFS_LIBFS_LIST, libfs_env);
 	if (!libfs_env || !*libfs_env)
 		return 0;
 
