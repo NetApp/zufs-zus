@@ -62,7 +62,8 @@ toyfs_new_inode(struct zus_sb_info *zsbi,
 
 	tii =  Z2II(zii);
 	mode = zi->i_mode;
-	DBG("new_inode:sbi=%p tii=%p mode=%o\n", sbi, tii, mode);
+	DBG("new_inode:sbi=%p tii=%p mode=%o\n",
+		(void *)sbi, (void *)tii, mode);
 
 	if (!issupported(zi))
 		goto out_err;
@@ -185,7 +186,7 @@ int toyfs_iget(struct zus_sb_info *zsbi, ulong ino, struct zus_inode_info **zii)
 	++tii->ref;
 
 	*zii = &tii->zii;
-	DBG("iget: ino=%lu zi=%p\n", ino, tii->zii.zi);
+	DBG("iget: ino=%lu zi=%p\n", ino, (void *)tii->zii.zi);
 out:
 	toyfs_unlock_inodes(sbi);
 	return err;
@@ -220,15 +221,13 @@ out:
 	toyfs_unlock_inodes(sbi);
 }
 
-static int _setattr(struct toyfs_inode_info *tii,
-		    uint enable_bits, ulong truncate_size)
+static int _setattr(struct toyfs_inode_info *tii, uint enable_bits)
 {
 	int err = 0;
 	struct zus_inode *zi = tii->zii.zi;
 
 
-	DBG("setattr: ino=%lu enable_bits=%x truncate_size=%lu\n",
-	    tii->ino, enable_bits, truncate_size);
+	DBG("setattr: ino=%lu enable_bits=%x \n", tii->ino, enable_bits);
 
 	/* TODO: CL-FLUSH */
 	if (enable_bits & STATX_MODE)
@@ -242,16 +241,11 @@ static int _setattr(struct toyfs_inode_info *tii,
 		    (uint64_t)zi->i_atime,
 		    (uint64_t)zi->i_mtime,
 		    (uint64_t)zi->i_ctime);
-
-	if (enable_bits & STATX_SIZE)
-		err = toyfs_truncate(tii, truncate_size);
-
 	return err;
 }
 
-int toyfs_setattr(struct zus_inode_info *zii,
-		  uint enable_bits, ulong truncate_size)
+int toyfs_setattr(struct zus_inode_info *zii, uint enable_bits)
 {
-	return _setattr(Z2II(zii), enable_bits, truncate_size);
+	return _setattr(Z2II(zii), enable_bits);
 }
 

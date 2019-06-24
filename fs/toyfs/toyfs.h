@@ -227,7 +227,7 @@ toyfs_find_inode_ref_by_ino(struct toyfs_sb_info *sbi, ino_t ino);
 struct toyfs_dirent *toyfs_acquire_dirent(struct toyfs_sb_info *sbi);
 struct toyfs_pmemb *toyfs_acquire_pmemb(struct toyfs_sb_info *sbi);
 int toyfs_statfs(struct zus_sb_info *zsbi, struct zufs_ioc_statfs *ioc_statfs);
-int toyfs_sync(struct zus_inode_info *zii, struct zufs_ioc_range *ioc_range);
+int toyfs_sync(struct zus_inode_info *zii, struct zufs_ioc_sync *);
 struct toyfs_inode_info *toyfs_alloc_ii(struct toyfs_sb_info *sbi);
 struct zus_inode_info *toyfs_zii_alloc(struct zus_sb_info *zsbi);
 void toyfs_tii_free(struct toyfs_inode_info *zii);
@@ -247,8 +247,7 @@ toyfs_new_inode(struct zus_sb_info *zsbi,
 void toyfs_free_inode(struct toyfs_inode_info *zii);
 int toyfs_iget(struct zus_sb_info *zsbi, ulong ino,
 	       struct zus_inode_info **zii);
-int toyfs_setattr(struct zus_inode_info *zii,
-		  uint enable_bits, ulong truncate_size);
+int toyfs_setattr(struct zus_inode_info *zii, uint enable_bits);
 
 /* dir.c */
 int toyfs_add_dirent(struct toyfs_inode_info *dir_tii,
@@ -274,8 +273,7 @@ struct toyfs_list_head *toyfs_childs_list_of(struct toyfs_inode_info *dir_tii);
 int toyfs_read(void *buf, struct zufs_ioc_IO *ioc_io);
 int toyfs_pre_read(void *buf, struct zufs_ioc_IO *ioc_io);
 int toyfs_write(void *buf, struct zufs_ioc_IO *ioc_io);
-int toyfs_fallocate(struct zus_inode_info *zii,
-		    struct zufs_ioc_range *ioc_range);
+int toyfs_fallocate(struct zus_inode_info *zii, struct zufs_ioc_IO *);
 int toyfs_seek(struct zus_inode_info *zii, struct zufs_ioc_seek *zis);
 int toyfs_truncate(struct toyfs_inode_info *tii, size_t size);
 int toyfs_clone(struct zufs_ioc_clone *ioc_clone);

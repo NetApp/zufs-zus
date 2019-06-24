@@ -171,7 +171,7 @@ _acquire_dirent(struct toyfs_inode_info *dir_tii, size_t nlen)
 			goto out;
 		}
 		itr = itr->next;
-		d_off += ARRAY_SIZE(dentries->de);
+		d_off += (int64_t)ARRAY_SIZE(dentries->de);
 	}
 
 	pmemb = toyfs_acquire_pmemb(dir_tii->sbi);
@@ -296,7 +296,7 @@ static bool _filldir(struct toyfs_dir_context *dir_ctx, const char *name,
 		container_of(dir_ctx, struct toyfs_getdents_ctx, dir_ctx);
 
 	status = zufs_zde_emit(&ctx->rdi, ino, (uint8_t)dt,
-			       pos, name, (uint8_t)len);
+			       (uint64_t)pos, name, (uint8_t)len);
 	if (status)
 		ctx->emit_count++;
 	DBG("filldir: %.*s ino=%ld dt=%d emit_count=%d status=%d\n",

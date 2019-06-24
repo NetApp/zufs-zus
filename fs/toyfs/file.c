@@ -361,7 +361,7 @@ int toyfs_read(void *buf, struct zufs_ioc_IO *ioc_io)
 	if (unlikely(ret < 0))
 		return ret;
 
-	ioc_io->last_pos = ioc_io->filepos + ret;
+	ioc_io->last_pos = ioc_io->filepos + (ulong)ret;
 	return 0;
 }
 
@@ -475,7 +475,7 @@ int toyfs_write(void *buf, struct zufs_ioc_IO *ioc_io)
 	if (unlikely(ret < 0))
 		return ret;
 
-	ioc_io->last_pos = ioc_io->filepos + ret;
+	ioc_io->last_pos = ioc_io->filepos + (ulong)ret;
 	return 0;
 }
 
@@ -631,11 +631,19 @@ out:
 	return err;
 }
 
-int toyfs_fallocate(struct zus_inode_info *zii,
-		    struct zufs_ioc_range *ioc_range)
+int toyfs_fallocate(struct zus_inode_info *zii,struct zufs_ioc_IO *io)
 {
-	return _fallocate(Z2II(zii), (int)ioc_range->opflags,
-			  (loff_t)ioc_range->offset, (size_t)ioc_range->length);
+	loff_t pos, end_pos, len;
+	long mode = (long)io->rw;
+
+	if (mode & ZUFS_FL_TRUNCATE)
+		return toyfs_truncate(Z2II(zii), (loff_t)io->filepos);
+
+	pos = (loff_t)io->filepos;
+	end_pos = (loff_t)io->last_pos;
+	len = end_pos - pos;
+
+	return _fallocate(Z2II(zii), mode, pos, (size_t)len);
 }
 
 
@@ -646,7 +654,7 @@ static int _seek_block(struct toyfs_inode_info *tii, loff_t from,
 	const struct toyfs_pmemb *pmemb;
 
 	off = from;
-	end = tii->ti->i_size;
+	end = (loff_t)(tii->ti->i_size);
 	while (off < end) {
 		pmemb = _fetch_pmemb_by_offset(tii, off);
 		if ((pmemb && seek_exist) || (!pmemb && !seek_exist)) {
@@ -737,7 +745,7 @@ static int _zero_after(struct toyfs_inode_info *tii, loff_t pos)
 		return -ENOSPC;
 
 	poff = _off_in_page(pos);
-	_assign_zeros(pmemb, poff, PAGE_SIZE - poff);
+	_assign_zeros(pmemb, poff, (size_t)(PAGE_SIZE - poff));
 	return 0;
 }
 
@@ -901,8 +909,8 @@ static int _clone_sub_file_range(struct toyfs_inode_info *src_tii,
 		if (err)
 			break;
 
-		src_off += len;
-		dst_off += len;
+		src_off += (loff_t)len;
+		dst_off += (loff_t)len;
 	}
 	toyfs_sbi_unlock(sbi);
 	return err;
@@ -980,7 +988,7 @@ static int _fiemap(struct toyfs_inode_info *tii,
 		flags = 0;
 		length = 0;
 		logical = iblkref->off;
-		phys = physaddr_of(sbi, iblkref);
+		phys = (loff_t)physaddr_of(sbi, iblkref);
 		while (itr != iblkrefs) {
 			length += PAGE_SIZE;
 			itr = itr->next;
@@ -1021,7 +1029,7 @@ int toyfs_fiemap(void *app_ptr, struct zufs_ioc_fiemap *zif)
 		.fi_extents_start = app_ptr
 	};
 
-	err = _fiemap(Z2II(zii), &fieinfo, zif->start, zif->length);
+	err = _fiemap(Z2II(zii), &fieinfo, (loff_t)zif->start, zif->length);
 	zif->extents_mapped = fieinfo.fi_extents_mapped;
 	return err;
 }

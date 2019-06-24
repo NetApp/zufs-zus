@@ -25,7 +25,6 @@
 #include "iom_enc.h"
 #include "toyfs.h"
 
-#define GB_READ 0
 #define GB_WRITE 1
 
 
@@ -44,12 +43,12 @@ static int _get_block_rd(struct toyfs_inode_info *tii, loff_t off,
 	_zus_iom_init_4_ioc_io(&iomb, &tii->sbi->s_zus_sbi,
 				get_block, ZUS_MAX_OP_SIZE);
 	pmemb = toyfs_resolve_pmemb(tii, off);
-	get_block->gp_block.rw = GB_READ;
-	get_block->gp_block.ret_flags = 0;
 
 	_zus_iom_start(&iomb, NULL, NULL);
 	_ziom_enc_t1_bn(&iomb, _resolve_bn(tii, pmemb), 0);
 	_zus_iom_end(&iomb);
+	get_block->ret_flags = 0;
+	get_block->hdr.out_len = _ioc_IO_size(1);
 
 	return 0;
 }
@@ -66,23 +65,21 @@ static int _get_block_wr(struct toyfs_inode_info *tii, loff_t off,
 
 	pmemb = toyfs_resolve_pmemb(tii, off);
 	if (pmemb) {
-		get_block->gp_block.rw = GB_WRITE;
-		get_block->gp_block.ret_flags = 0;
-
 		_zus_iom_start(&iomb, NULL, NULL);
 		_ziom_enc_t1_bn(&iomb, _resolve_bn(tii, pmemb), 0);
 		_zus_iom_end(&iomb);
+		get_block->ret_flags = 0;
+		get_block->hdr.out_len = _ioc_IO_size(1);
 
 		return 0;
 	}
 	pmem_bn = toyfs_require_pmem_bn(tii, off);
 	if (pmem_bn) {
-		get_block->gp_block.rw = GB_WRITE;
-		get_block->gp_block.ret_flags = ZUFS_GBF_NEW;
-
 		_zus_iom_start(&iomb, NULL, NULL);
 		_ziom_enc_t1_bn(&iomb, pmem_bn, 0);
 		_zus_iom_end(&iomb);
+		get_block->ret_flags = ZUFS_RET_NEW;
+		get_block->hdr.out_len = _ioc_IO_size(1);
 
 		return 0;
 	}
@@ -100,7 +97,7 @@ int toyfs_get_block(struct zus_inode_info *zii,
 	if (!zi_isreg(tii->zii.zi))
 		return -ENOTSUP;
 
-	if (get_block->gp_block.rw & GB_WRITE)
+	if (get_block->rw & GB_WRITE)
 		err = _get_block_wr(tii, off, get_block);
 	else
 		err = _get_block_rd(tii, off, get_block);

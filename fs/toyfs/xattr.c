@@ -140,7 +140,7 @@ int toyfs_getxattr(struct zus_inode_info *zii,
 static size_t _nbytes_distance(struct toyfs_xattr_entry *beg,
 			       struct toyfs_xattr_entry *end)
 {
-	return (uint8_t *)end - (uint8_t *)beg;
+	return (size_t)((uint8_t *)end - (uint8_t *)beg);
 }
 
 static int _discard_xattr(const struct toyfs_inode_info *tii,
@@ -236,7 +236,7 @@ static void _copy_name_to_buf(const struct toyfs_xattr_entry *xe,
 {
 	memcpy(*buf, xe->data, xe->name_len);
 	(*buf)[xe->name_len] = '\0';
-	*size -= (xe->name_len + 1);
+	*size -= (size_t)xe->name_len + 1;
 }
 
 static ssize_t _do_listxattr(const struct toyfs_inode_info *tii,

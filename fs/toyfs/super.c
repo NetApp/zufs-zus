@@ -137,7 +137,7 @@ struct toyfs_inode_info *toyfs_alloc_ii(struct toyfs_sb_info *sbi)
 	sbi->s_statvfs.f_ffree--;
 	sbi->s_statvfs.f_favail--;
 
-	DBG("alloc_ii tii=%p files=%lu ffree=%lu\n", tii,
+	DBG("alloc_ii tii=%p files=%lu ffree=%lu\n", (void *)tii,
 	    sbi->s_statvfs.f_files, sbi->s_statvfs.f_ffree);
 
 out:
@@ -158,7 +158,7 @@ void toyfs_tii_free(struct toyfs_inode_info *tii)
 	struct toyfs_sb_info *sbi = tii->sbi;
 
 	toyfs_assert(tii->sbi != NULL);
-	DBG("free_ii tii=%p files=%lu ffree=%lu\n", tii,
+	DBG("free_ii tii=%p files=%lu ffree=%lu\n", (void *)tii,
 	    sbi->s_statvfs.f_files, sbi->s_statvfs.f_ffree);
 
 	memset(tii, 0xAB, sizeof(*tii));
@@ -580,7 +580,7 @@ struct zus_sb_info *toyfs_sbi_alloc(struct zus_fs_info *zfi)
 {
 	struct toyfs_sb_info *sbi;
 
-	INFO("sbi_alloc: zfi=%p\n", zfi);
+	INFO("sbi_alloc: zfi=%p\n", (void *)zfi);
 
 	sbi = (struct toyfs_sb_info *)zus_malloc(sizeof(*sbi));
 	if (!sbi)
@@ -599,7 +599,7 @@ void toyfs_sbi_free(struct zus_sb_info *zsbi)
 {
 	struct toyfs_sb_info *sbi = Z2SBI(zsbi);
 
-	INFO("sbi_free: sbi=%p\n", sbi);
+	INFO("sbi_free: sbi=%p\n", (void *)sbi);
 	zus_free(sbi);
 }
 
@@ -815,7 +815,7 @@ static int _sbi_init(struct toyfs_sb_info *sbi)
 	size_t pmem_total_blocks, msz = 0;
 	uint32_t pmem_kernel_id;
 
-	INFO("sbi_init: sbi=%p\n", sbi);
+	INFO("sbi_init: sbi=%p\n", (void *)sbi);
 	pmem_kernel_id = sbi->s_zus_sbi.md.pmem_info.pmem_kern_id;
 	if (!pmem_kernel_id) {
 		ERROR("pmem_kernel_id=%ld\n", (long)pmem_kernel_id);
@@ -856,7 +856,7 @@ int toyfs_sbi_init(struct zus_sb_info *zsbi, struct zufs_mount_info *zmi)
 	zmi->zus_sbi = &sbi->s_zus_sbi;
 	zmi->zus_ii = sbi->s_zus_sbi.z_root;
 	zmi->s_blocksize_bits = PAGE_SHIFT;
-	zmi->acl_on = 1;
+	zmi->fs_caps = ZUFS_FSC_ACL_ON;
 
 	return 0;
 }
@@ -865,7 +865,7 @@ int toyfs_sbi_fini(struct zus_sb_info *zsbi)
 {
 	struct toyfs_sb_info *sbi = Z2SBI(zsbi);
 
-	INFO("sbi_fini: sbi=%p\n", sbi);
+	INFO("sbi_fini: sbi=%p\n", (void *)sbi);
 
 	_pool_destroy(&sbi->s_pool);
 	_itable_destroy(&sbi->s_itable);
@@ -881,18 +881,18 @@ int toyfs_statfs(struct zus_sb_info *zsbi, struct zufs_ioc_statfs *ioc_statfs)
 	struct statfs64 *out = &ioc_statfs->statfs_out;
 	const struct statvfs *stvfs = &sbi->s_statvfs;
 
-	DBG("statfs sbi=%p\n", sbi);
+	DBG("statfs sbi=%p\n", (void *)sbi);
 
 	toyfs_sbi_lock(sbi);
-	out->f_bsize = stvfs->f_bsize;
+	out->f_bsize = (long)stvfs->f_bsize;
 	out->f_blocks = stvfs->f_blocks;
 	out->f_bfree = stvfs->f_bfree;
 	out->f_bavail = stvfs->f_bavail;
 	out->f_files = stvfs->f_files;
 	out->f_ffree = stvfs->f_ffree;
-	out->f_namelen = stvfs->f_namemax;
-	out->f_frsize = stvfs->f_frsize;
-	out->f_flags = stvfs->f_flag;
+	out->f_namelen = (long)stvfs->f_namemax;
+	out->f_frsize = (long)stvfs->f_frsize;
+	out->f_flags = (long)stvfs->f_flag;
 	toyfs_sbi_unlock(sbi);
 
 	DBG("statfs: bsize=%ld blocks=%ld bfree=%ld bavail=%ld "
@@ -903,13 +903,13 @@ int toyfs_statfs(struct zus_sb_info *zsbi, struct zufs_ioc_statfs *ioc_statfs)
 	return 0;
 }
 
-int toyfs_sync(struct zus_inode_info *zii, struct zufs_ioc_range *ioc_range)
+int toyfs_sync(struct zus_inode_info *zii, struct zufs_ioc_sync *ioc_sync)
 {
 	struct toyfs_inode_info *tii = Z2II(zii);
 
-	DBG("sync: ino=%lu offset=%lu length=%lu opflags=%u\n",
-	    tii->ino, (size_t)ioc_range->offset,
-	    (size_t)ioc_range->length, ioc_range->opflags);
+	DBG("sync: ino=%lu offset=%ld length=%ld flags=%ld\n",
+	    tii->ino, (long)ioc_sync->offset, (long)ioc_sync->length,
+	    (long)ioc_sync->flags);
 
 	/* TODO: CL_FLUSH for relevant pages */
 	return 0;
