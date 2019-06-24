@@ -865,8 +865,7 @@ int zus_alloc_exec_buff(struct zus_sb_info *sbi, uint max_bytes, uint pool_num,
 	if (unlikely(err))
 		return err;
 
-	err = _ioctl(fba->fd, ZU_IOC_ALLOC_BUFFER, &ab.hdr,
-		      "ZU_IOC_ALLOC_BUFFER");
+	err = _ioctl(fba->fd, ZU_IOC_ALLOC_BUFFER, &ab.hdr);
 	if (unlikely(err))
 		goto error;
 

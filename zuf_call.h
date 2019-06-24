@@ -19,7 +19,7 @@
 
 /* Just a wraper for the commom unexpected print */
 static inline
-int _ioctl(int fd, ulong zu_vect, struct zufs_ioc_hdr *hdr, const char *msg)
+int __ioctl(int fd, ulong zu_vect, struct zufs_ioc_hdr *hdr, const char *msg)
 {
 	int ret;
 
@@ -33,6 +33,8 @@ int _ioctl(int fd, ulong zu_vect, struct zufs_ioc_hdr *hdr, const char *msg)
 	return hdr->err;
 }
 
+#define _ioctl(fd, zu_vect, hdr) __ioctl(fd, zu_vect, hdr, #zu_vect)
+
 static inline
 int zuf_register_fs(int fd, struct zus_fs_info *zfi)
 {
@@ -41,26 +43,26 @@ int zuf_register_fs(int fd, struct zus_fs_info *zfi)
 		.rfi = zfi->rfi,
 	};
 
-	return _ioctl(fd, ZU_IOC_REGISTER_FS, &zirf.hdr, "ZU_IOC_REGISTER_FS");
+	return _ioctl(fd, ZU_IOC_REGISTER_FS, &zirf.hdr);
 }
 
 static inline
 int zuf_recieve_mount(int fd, struct  zufs_ioc_mount *zim)
 {
-	return _ioctl(fd, ZU_IOC_MOUNT, &zim->hdr, "ZU_IOC_MOUNT");
+	return _ioctl(fd, ZU_IOC_MOUNT, &zim->hdr);
 }
 
 static inline
 int zuf_numa_map(int fd, struct zufs_ioc_numa_map *zinm)
 {
-	return _ioctl(fd, ZU_IOC_NUMA_MAP, &zinm->hdr, "ZU_IOC_NUMA_MAP");
+	return _ioctl(fd, ZU_IOC_NUMA_MAP, &zinm->hdr);
 }
 
 static inline
 int zuf_grab_pmem(int fd, uint pmem_kern_id, struct zufs_ioc_pmem *zip)
 {
 	zip->pmem_kern_id = pmem_kern_id;
-	return _ioctl(fd, ZU_IOC_GRAB_PMEM, &zip->hdr, "ZU_IOC_GRAB_PMEM");
+	return _ioctl(fd, ZU_IOC_GRAB_PMEM, &zip->hdr);
 }
 
 static inline
@@ -72,13 +74,13 @@ int zuf_zt_init(int fd, int cpu_num, uint chan, uint max_command)
 		.max_command = max_command,
 	};
 
-	return _ioctl(fd, ZU_IOC_INIT_THREAD, &zii.hdr, "ZU_IOC_INIT_THREAD");
+	return _ioctl(fd, ZU_IOC_INIT_THREAD, &zii.hdr);
 }
 
 static inline
 int zuf_wait_opt(int fd, struct zufs_ioc_wait_operation *opt /*OUT*/)
 {
-	return _ioctl(fd, ZU_IOC_WAIT_OPT, &opt->hdr, "ZU_IOC_WAIT_OPT");
+	return _ioctl(fd, ZU_IOC_WAIT_OPT, &opt->hdr);
 }
 
 static inline
@@ -86,23 +88,23 @@ int zuf_break_all(int fd)
 {
 	struct zufs_ioc_break_all zba = {};
 
-	return _ioctl(fd, ZU_IOC_BREAK_ALL, &zba.hdr, "ZU_IOC_BREAK_ALL");
+	return _ioctl(fd, ZU_IOC_BREAK_ALL, &zba.hdr);
 }
 
 static inline
 int zuf_iomap_exec(int fd, struct zufs_ioc_iomap_exec *ziome)
 {
-	return _ioctl(fd, ZU_IOC_IOMAP_EXEC, &ziome->hdr, "ZU_IOC_IOMAP_EXEC");
+	return _ioctl(fd, ZU_IOC_IOMAP_EXEC, &ziome->hdr);
 }
 
 static inline
 int zuf_private_mount(int fd, struct zufs_ioc_mount_private *zip)
 {
-	return _ioctl(fd, ZU_IOC_PRIVATE_MOUNT, &zip->hdr, "ZU_IOC_PRIVATE_MOUNT");
+	return _ioctl(fd, ZU_IOC_PRIVATE_MOUNT, &zip->hdr);
 }
 
 static inline
 int zuf_private_umount(int fd, struct zufs_ioc_mount_private *zip)
 {
-	return _ioctl(fd, ZU_IOC_PRIVATE_UMOUNT, &zip->hdr, "ZU_IOC_PRIVATE_UMOUNT");
+	return _ioctl(fd, ZU_IOC_PRIVATE_UMOUNT, &zip->hdr);
 }
