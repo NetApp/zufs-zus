@@ -248,7 +248,6 @@ bool md_mdt_check(struct md_dev_table *mdt,
 		  struct md_dev_table *main_mdt, struct block_device *bdev,
 		  struct mdt_check *mc)
 {
-	struct md_dev_table *mdt2 = (void *)mdt + MDT_SIZE;
 	struct md_dev_id *dev_id;
 	ulong super_size;
 	int id_index;
@@ -257,16 +256,8 @@ bool md_mdt_check(struct md_dev_table *mdt,
 
 	/* Do sanity checks on the superblock */
 	if (le32_to_cpu(mdt->s_magic) != mc->magic) {
-		if (le32_to_cpu(mdt2->s_magic) != mc->magic) {
-			md_warn_cnd(mc->silent,
-				     "Can't find a valid partition\n");
-			return false;
-		}
-
-		md_warn_cnd(mc->silent,
-			     "Magic error in super block: using copy\n");
-		/* Try to auto-recover the super block */
-		memcpy_to_pmem(mdt, mdt2, sizeof(*mdt));
+		md_warn_cnd(mc->silent, "Magic error in super block: please run fsck\n");
+		return false;
 	}
 
 	if ((mc->major_ver != (uint)mdt_major_version(mdt)) ||
@@ -279,15 +270,8 @@ bool md_mdt_check(struct md_dev_table *mdt,
 	}
 
 	if (_csum_mismatch(mdt, mc->silent)) {
-		if (_csum_mismatch(mdt2, mc->silent)) {
-			md_warn_cnd(mc->silent, "checksum error in super block\n");
-			return false;
-		} else {
-			md_warn_cnd(mc->silent, "crc16 error in super block: using copy\n");
-			/* Try to auto-recover the super block */
-			memcpy_to_pmem(mdt, mdt2, MDT_SIZE);
-			/* TODO(sagi): copy fixed mdt to shadow */
-		}
+		md_warn_cnd(mc->silent, "crc16 error in super block: please run fsck\n");
+		return false;
 	}
 
 	if (main_mdt) {
