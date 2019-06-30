@@ -251,6 +251,7 @@ bool md_mdt_check(struct md_dev_table *mdt,
 	struct md_dev_table *mdt2 = (void *)mdt + MDT_SIZE;
 	struct md_dev_id *dev_id;
 	ulong super_size;
+	int id_index;
 
 // 	BUILD_BUG_ON(MDT_STATIC_SIZE(mdt) & (SMP_CACHE_BYTES - 1));
 
@@ -309,8 +310,17 @@ bool md_mdt_check(struct md_dev_table *mdt,
 			return false;
 	}
 
+	id_index = mdt->s_dev_list.id_index;
+
+	/* check id_index */
+	if (id_index < 0 ||
+	    mdt->s_dev_list.t1_count + mdt->s_dev_list.t2_count < id_index) {
+		md_warn_cnd(mc->silent, "invalid device index %d\n", id_index);
+		return false;
+	}
+
 	/* check alignment */
-	dev_id = &mdt->s_dev_list.dev_ids[mdt->s_dev_list.id_index];
+	dev_id = &mdt->s_dev_list.dev_ids[id_index];
 	super_size = md_p2o(__dev_id_blocks(dev_id));
 	if (unlikely(!super_size || super_size & mc->alloc_mask)) {
 		md_warn_cnd(mc->silent, "super_size(0x%lx) ! 2_M aligned\n",
@@ -405,8 +415,9 @@ static int __zus_iom_exec(int fd, struct zus_sb_info *sbi,
 	    ziome->ziom.iom_e[1], ziome->ziom.iom_e[2], ziome->ziom.iom_e[3]);
 
 	err = zuf_iomap_exec(fd, ziome);
+	if (unlikely(err && err != -EIO))
+		ZUS_WARN_ON_ONCE(err);
 
-	ZUS_WARN_ON_ONCE(err);
 	return err;
 }
 

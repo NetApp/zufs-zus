@@ -56,7 +56,7 @@ static int _pmem_unmap(struct multi_devices *md)
 	err = munmap(md->p_pmem_addr, size);
 	if (err == -1) {
 		ERROR("munmap failed=> %d: %s\n", errno, strerror(errno));
-		return errno;
+		return -errno;
 	}
 
 	return 0;
@@ -86,13 +86,14 @@ static int _pmem_grab(struct zus_sb_info *sbi, uint pmem_kern_id)
 		    pmem_kern_id, err);
 		return err;
 	}
+	md->dev_index = md->pmem_info.dev_index;
 
 	md->user_page_size = sbi->zfi->user_page_size;
 	if (!md->user_page_size)
 		return 0; /* User does not want pages */
 
-	err = fba_alloc_align(&md->pages,
-				md_t1_blocks(md) * md->user_page_size);
+	err = fba_alloc_align(&md->pages, md_t1_blocks(md) * md->user_page_size,
+			      CONFIG_TRY_ANON_MMAP);
 	return err;
 }
 
@@ -117,6 +118,115 @@ static void _zus_sbi_fini(struct zus_sb_info *sbi)
 	sbi->zfi->op->sbi_free(sbi);
 }
 
+int zus_private_mount(struct zus_fs_info *zfi, const char *options,
+		      struct zufs_ioc_mount_private **zip_out)
+{
+	struct zufs_ioc_mount_private *zip;
+	struct zus_sb_info *sbi = NULL;
+	int zip_len;
+	int err;
+
+	zip_len = sizeof(*zip) + strlen(options) + 1;
+
+	zip = calloc(1, zip_len);
+	if (!zip) {
+		ERROR("failed to allocate memory\n");
+		return -ENOMEM;
+	}
+
+	zip->zmi.zus_zfi = zfi;
+
+	err = zuf_root_open_tmp(&zip->mount_fd);
+	if (unlikely(err))
+		goto fail;
+
+	err = zus_numa_map_init(zip->mount_fd);
+	if (unlikely(err))
+		goto fail_fd;
+
+	err = zus_thread_current_init();
+	if (unlikely(err))
+		goto fail_fd;
+
+	sbi = zfi->op->sbi_alloc(zfi);
+	if (unlikely(!sbi)) {
+		err = -ENOMEM;
+		goto fail_alloc;
+	}
+
+	zip->hdr.in_len = zip_len;
+	zip->zmi.po.mount_options_len = strlen(options);
+	memcpy(&zip->zmi.po.mount_options, options,
+		zip->zmi.po.mount_options_len);
+	memcpy(&zip->rfi, &zfi->rfi, sizeof(struct register_fs_info));
+
+	err = zuf_private_mount(zip->mount_fd, zip);
+	if (unlikely(err))
+		goto fail_mount;
+
+	sbi->zfi = zip->zmi.zus_zfi;
+	sbi->kern_sb_id = zip->zmi.sb_id;
+	err = _pmem_grab(sbi, zip->zmi.pmem_kern_id);
+	if (unlikely(err))
+		goto fail_grab;
+
+	err = sbi->zfi->op->sbi_init(sbi, &zip->zmi);
+	if (unlikely(err)) {
+		zus_sbi_set_flag(sbi, ZUS_SBIF_ERROR);
+		goto fail_sbi_init;
+	}
+
+	zip->zmi.zus_sbi = sbi;
+	zip->zmi._zi = pmem_dpp_t(md_addr_to_offset(&sbi->md, sbi->z_root->zi));
+	zip->zmi.zus_ii = sbi->z_root;
+
+	DBG("[%lld] _zi 0x%lx zus_ii=%p\n",
+	    sbi->z_root->zi->i_ino, (ulong)zip->zmi._zi, zip->zmi.zus_ii);
+
+	*zip_out = zip;
+
+	return 0;
+
+fail_sbi_init:
+	if (sbi->z_root)
+		sbi->z_root->op->evict(sbi->z_root);
+	if (sbi->zfi->op->sbi_fini)
+		sbi->zfi->op->sbi_fini(sbi);
+	_pmem_ungrab(sbi);
+fail_grab:
+	zuf_private_umount(zip->mount_fd, zip);
+fail_mount:
+	zfi->op->sbi_free(sbi);
+fail_alloc:
+	zus_thread_current_fini();
+fail_fd:
+	close(zip->mount_fd);
+fail:
+	free(zip);
+
+	return err;
+}
+
+int zus_private_umount(struct zufs_ioc_mount_private *zip)
+{
+	struct zus_sb_info *sbi = zip->zmi.zus_sbi;
+	int err = 0;
+
+	/* evict root inode (done by VFS on regular mount) */
+	if (sbi->z_root)
+		sbi->z_root->op->evict(sbi->z_root);
+
+	if (sbi->zfi->op->sbi_fini)
+		err = sbi->zfi->op->sbi_fini(sbi);
+	_pmem_ungrab(sbi);
+	zuf_private_umount(zip->mount_fd, zip);
+	sbi->zfi->op->sbi_free(sbi);
+	zus_thread_current_fini();
+	close(zip->mount_fd);
+	free(zip);
+	return err;
+}
+
 int zus_mount(int fd, struct zufs_ioc_mount *zim)
 {
 	struct zus_fs_info *zfi = zim->zmi.zus_zfi;
@@ -125,8 +235,8 @@ int zus_mount(int fd, struct zufs_ioc_mount *zim)
 
 	sbi = zfi->op->sbi_alloc(zfi);
 	if (unlikely(!sbi)) {
-		err = -ENOMEM;
-		goto err;
+		zim->hdr.err = -ENOMEM;
+		return zim->hdr.err;
 	}
 	sbi->zfi = zim->zmi.zus_zfi;
 	sbi->kern_sb_id = zim->zmi.sb_id;
@@ -135,7 +245,7 @@ int zus_mount(int fd, struct zufs_ioc_mount *zim)
 	if (unlikely(err))
 		goto err;
 
-	err = sbi->zfi->op->sbi_init(sbi, zim);
+	err = sbi->zfi->op->sbi_init(sbi, &zim->zmi);
 	if (unlikely(err))
 		goto err;
 
@@ -165,7 +275,7 @@ int zus_remount(int fd, struct zufs_ioc_mount *zim)
 	struct zus_sb_info *sbi = zim->zmi.zus_sbi;
 
 	if (sbi->zfi->op->sbi_remount)
-		return sbi->zfi->op->sbi_remount(sbi, zim);
+		return sbi->zfi->op->sbi_remount(sbi, &zim->zmi);
 	return 0;
 }
 
@@ -488,12 +598,35 @@ static int _statfs(struct zufs_ioc_hdr *hdr)
 	return sbi->op->statfs(sbi, ioc_statfs);
 }
 
+static int _fiemap(void *app_ptr, struct zufs_ioc_hdr *hdr)
+{
+	struct zufs_ioc_fiemap *zif = (void *)hdr;
+	struct zus_inode_info *zii = zif->zus_ii;
+
+	if (!zii->op->fiemap)
+		return -ENOTSUP;
+
+	return zii->op->fiemap(app_ptr, zif);
+}
+
+static int _show_options(struct zufs_ioc_hdr *hdr)
+{
+	struct zufs_ioc_mount_options *ioc_mount_options = (void *)hdr;
+	struct zus_sb_info *sbi = ioc_mount_options->zus_sbi;
+
+	if (!sbi->op->show_options)
+		return 0;
+
+	return sbi->op->show_options(sbi, ioc_mount_options);
+}
+
 const char *ZUFS_OP_name(enum e_zufs_operation op)
 {
 #define CASE_ENUM_NAME(e) case e: return #e
 	switch (op) {
 		CASE_ENUM_NAME(ZUFS_OP_NULL);
 		CASE_ENUM_NAME(ZUFS_OP_STATFS);
+		CASE_ENUM_NAME(ZUFS_OP_SHOW_OPTIONS);
 		CASE_ENUM_NAME(ZUFS_OP_NEW_INODE);
 		CASE_ENUM_NAME(ZUFS_OP_FREE_INODE);
 		CASE_ENUM_NAME(ZUFS_OP_EVICT_INODE);
@@ -519,6 +652,7 @@ const char *ZUFS_OP_name(enum e_zufs_operation op)
 		CASE_ENUM_NAME(ZUFS_OP_XATTR_GET);
 		CASE_ENUM_NAME(ZUFS_OP_XATTR_SET);
 		CASE_ENUM_NAME(ZUFS_OP_XATTR_LIST);
+		CASE_ENUM_NAME(ZUFS_OP_FIEMAP);
 		CASE_ENUM_NAME(ZUFS_OP_BREAK);
 		CASE_ENUM_NAME(ZUFS_OP_MAX_OPT);
 	default:
@@ -578,6 +712,10 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 		return _ioc_xattr(hdr);
 	case ZUFS_OP_STATFS:
 		return _statfs(hdr);
+	case ZUFS_OP_FIEMAP:
+		return _fiemap(app_ptr, hdr);
+	case ZUFS_OP_SHOW_OPTIONS:
+		return _show_options(hdr);
 	case ZUFS_OP_BREAK:
 		break;
 	default:

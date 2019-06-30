@@ -23,14 +23,33 @@
 #include "zuf_call.h"
 #include "wtz.h"
 
+/* TODO: Maybe put ZUS_BUG_ON in zus.h ? */
+#define ZUS_BUILD_BUG_ON(expr) _Static_assert(!(expr), #expr)
+
 /* TODO: Where to put */
 typedef unsigned int uint;
 
 /* ~~~ zuf-root files ~~~ */
+#ifdef CONFIG_ZUF_DEF_PATH
+#define ZUF_DEF_PATH CONFIG_ZUF_DEF_PATH
+#else
+#define ZUF_DEF_PATH "/sys/fs/zuf"
+#endif
+
 char g_zus_root_path_stor[PATH_MAX];
 const char *g_zus_root_path = g_zus_root_path_stor;
 
 ulong g_DBGMASK;
+int g_mlock = MLOCK_CURRENT; /* default to MCL_CURRENT */
+
+/*
+ * Converts user-space error code to kernel conventions: change positive errno
+ * codes to negative.
+ */
+static __s32 _errno_UtoK(__s32 err)
+{
+	return (err < 0) ? err : -err;
+}
 
 int zuf_root_open_tmp(int *fd)
 {
@@ -41,7 +60,7 @@ int zuf_root_open_tmp(int *fd)
 	if (*fd < 0) {
 		ERROR("Error opening <%s>: flags=0x%x, %s\n",
 		      g_zus_root_path, o_flags, strerror(errno));
-		return errno;
+		return -errno;
 	}
 
 	return 0;
@@ -71,31 +90,105 @@ struct zus_base_thread {
 };
 
 static pthread_key_t g_zts_id_key;
-struct zufs_ioc_numa_map g_zus_numa_map;
 
-static int _numa_map_init(int fd)
+union zus_numa_map_page {
+	struct zufs_ioc_numa_map numa_map;
+	__u8 pad[PAGE_SIZE];
+} __aligned(64);
+
+static union zus_numa_map_page _zus_numa_map_page;
+struct zufs_ioc_numa_map *zus_numa_map;
+
+unsigned int zus_nr_cpu_ids;
+static cpu_set_t __zus_cpu_possible_mask;
+static cpu_set_t __zus_cpu_online_mask;
+cpu_set_t *zus_cpu_possible_mask = &__zus_cpu_possible_mask;
+cpu_set_t *zus_cpu_online_mask = &__zus_cpu_online_mask;
+
+unsigned int zus_cpumask_next(int cpu, cpu_set_t *srcp)
 {
-	return zuf_numa_map(fd, &g_zus_numa_map);
+	while (cpu < (int)zus_nr_cpu_ids) {
+		if (likely(CPU_ISSET(++cpu, srcp)))
+			return cpu;
+	}
+	return (unsigned int)(-1);
+}
+
+static void _set_cpumasks(void)
+{
+	unsigned int cpu, node;
+	cpu_set_t *cpusetp;
+	struct zufs_ioc_numa_map *numa_map = &_zus_numa_map_page.numa_map;
+
+	ZUS_BUILD_BUG_ON(sizeof(struct zufs_cpu_set) != sizeof(cpu_set_t));
+	ZUS_BUILD_BUG_ON(sizeof(cpusetp->__bits) !=
+			 sizeof(numa_map->cpu_set_per_node[0].bits));
+
+	for (cpu = 0; cpu < numa_map->possible_cpus; ++cpu) {
+		CPU_SET(cpu, zus_cpu_possible_mask);
+		for (node = 0; node < numa_map->possible_nodes; ++node) {
+			cpusetp =
+				(cpu_set_t*)(&numa_map->cpu_set_per_node[node]);
+
+			if (likely(CPU_ISSET(cpu, cpusetp)))
+				CPU_SET(cpu, zus_cpu_online_mask);
+		}
+	}
+
+	zus_nr_cpu_ids = (unsigned int)numa_map->possible_cpus;
+	zus_numa_map = numa_map;
+}
+
+bool zus_cpu_online(int cpu)
+{
+	return (likely((__u32)cpu < zus_nr_cpu_ids) &&
+		CPU_ISSET(cpu, zus_cpu_online_mask));
+}
+
+int zus_numa_map_init(int fd)
+{
+	int err;
+
+	err = zuf_numa_map(fd, &_zus_numa_map_page.numa_map);
+	if (unlikely(err))
+		return err;
+
+	_set_cpumasks();
+
+	return 0;
 }
 
 static inline bool ___BAD_CPU(uint cpu)
 {
 	/* TODO: WARN_ON_ONCE */
-	if (ZUS_WARN_ON(g_zus_numa_map.online_cpus < cpu)) {
+	if (ZUS_WARN_ON(zus_numa_map->possible_cpus <= cpu)) {
 		ERROR("Bad cpu=%u\n", cpu);
 		return true; /* yell, but do not crash */
 	}
-
+	if (ZUS_WARN_ON(!zus_cpu_online((int)cpu))) {
+		ERROR("offline cpu=%u\n", cpu);
+		return true;
+	}
 	return false;
 }
 #define BAD_CPU(cpu) (unlikely(___BAD_CPU(cpu)))
 
 int zus_cpu_to_node(int cpu)
 {
+	int node;
+
 	if (BAD_CPU(cpu))
 		return 0; /* Yell but don't crash */
 
-	return g_zus_numa_map.cpu_to_node[cpu];
+	for (node = 0; node < (int)zus_num_possible_nodes(); ++node) {
+		cpu_set_t *cpusetp =
+			(cpu_set_t*)(&zus_numa_map->cpu_set_per_node[node]);
+
+		if (likely(CPU_ISSET(cpu, cpusetp)))
+			return node;
+	}
+	ZUS_WARN_ON_ONCE(node);
+	return 0;
 }
 
 int zus_current_onecpu(void)
@@ -128,7 +221,8 @@ static int __zus_current_cpu(bool warn)
 {
 	struct zus_base_thread *zbt = pthread_getspecific(g_zts_id_key);
 
-	if (ZUS_WARN_ON(!zbt)) /* not created by us */
+	ZUS_WARN_ON(warn && !zbt);
+	if (!zbt) /* not created by us */
 		return sched_getcpu();
 
 	ZUS_WARN_ON_ONCE(warn && (zbt->one_cpu == ZUS_CPU_ALL));
@@ -141,6 +235,11 @@ static int __zus_current_cpu(bool warn)
 int zus_current_cpu(void)
 {
 	return __zus_current_cpu(true);
+}
+
+int zus_current_cpu_silent(void)
+{
+	return __zus_current_cpu(false);
 }
 
 int zus_current_nid(void)
@@ -159,25 +258,13 @@ int zus_current_nid(void)
 
 static int zus_set_numa_affinity(cpu_set_t *affinity, int nid)
 {
-	uint i;
-
-	CPU_ZERO(affinity);
-
-	for (i = 0; i < g_zus_numa_map.online_cpus; ++i) {
-		if (zus_cpu_to_node(i) == nid)
-			break;
-	}
-
-	if (i == g_zus_numa_map.online_cpus) {
+	if ((unsigned int)nid >= zus_numa_map->possible_nodes) {
 		ERROR("Wrong nid=%d\n", nid);
 		return -EINVAL;
 	}
+	memcpy(affinity, &zus_numa_map->cpu_set_per_node[nid],
+		sizeof(*affinity));
 
-	for (; i < g_zus_numa_map.online_cpus; ++i) {
-		if (zus_cpu_to_node(i) != nid)
-			break;
-		CPU_SET(i, affinity);
-	}
 	return 0;
 }
 
@@ -294,7 +381,7 @@ int __zus_thread_create(struct zus_base_thread *zbt,
 error:
 	pthread_attr_destroy(&attr);
 	zbt->thread = 0;
-	return zbt->err = err;
+	return zbt->err = _errno_UtoK(err);
 }
 
 int zus_thread_create(pthread_t *new_tread, struct zus_thread_params *tp,
@@ -317,6 +404,37 @@ int zus_thread_create(pthread_t *new_tread, struct zus_thread_params *tp,
 	return 0;
 }
 
+int zus_thread_current_init(void)
+{
+	struct zus_base_thread *zbt;
+
+	if (ZUS_WARN_ON(pthread_getspecific(g_zts_id_key)))
+		return -EEXIST;
+
+	zbt = calloc(1, sizeof(*zbt));
+	if (unlikely(!zbt))
+		return -ENOMEM;
+
+	zbt->one_cpu = sched_getcpu();
+	zbt->nid = zus_cpu_to_node(zbt->one_cpu);
+
+	pthread_setspecific(g_zts_id_key, zbt);
+
+	return 0;
+}
+
+void zus_thread_current_fini(void)
+{
+	struct zus_base_thread *zbt = pthread_getspecific(g_zts_id_key);
+
+	if (ZUS_WARN_ON(!zbt))
+		return;
+
+	pthread_setspecific(g_zts_id_key, NULL);
+
+	free(zbt);
+}
+
 /* ~~~ Zu Threads ZT(s) ~~~ */
 /* These are the zus-core dispatchers threads */
 
@@ -327,6 +445,7 @@ struct _zu_thread {
 	int fd;
 	void *api_mem;
 	volatile bool stop;
+	struct zufs_ioc_hdr *op_hdr;
 };
 
 struct zt_pool {
@@ -393,15 +512,6 @@ int _do_op(struct _zu_thread *zt, struct zufs_ioc_wait_operation *op)
 	return zus_do_command(app_ptr, &op->hdr);
 }
 
-/*
- * Converts user-space error code to kernel conventions: change positive errno
- * codes to negative.
- */
-static __s32 _errno_UtoK(__s32 err)
-{
-	return (err < 0) ? err : -err;
-}
-
 static void *_zu_thread(void *callback_info)
 {
 	struct _zu_thread *zt = callback_info;
@@ -409,22 +519,24 @@ static void *_zu_thread(void *callback_info)
 
 	zt->zbt.err = zuf_root_open_tmp(&zt->fd);
 	if (zt->zbt.err)
-		return NULL;
+		goto fail;
 
 	zt->zbt.err = zuf_zt_init(zt->fd, zt->no, zt->chan, ZUS_MAX_OP_SIZE);
 	if (zt->zbt.err)
-		return NULL; /* leak the file it is fine */
+		goto fail;
 
 	zt->zbt.err = _zu_mmap(zt);
 	if (zt->zbt.err)
-		return NULL; /* leak the file it is fine */
+		goto fail;
 
 	zt->zbt.err = _zu_ioc_buff_mmap(zt, (void **)&op);
 	if (zt->zbt.err)
-		return NULL;
+		goto fail;
 
 	DBG("[%u] thread Init fd=%d api_mem=%p\n",
 	     zt->no, zt->fd, zt->api_mem);
+
+	zt->op_hdr = &op->hdr;
 
 	wtz_release(&g_ztp.wtz);
 
@@ -447,20 +559,26 @@ static void *_zu_thread(void *callback_info)
 
 	DBG("[%u] thread Exit\n", zt->no);
 	return zt;
+
+fail:
+	/* It's OK to leak here, stop function will cleanup */
+	ERROR("ZT(%d.%d) create failed => %d\n", zt->no, zt->chan, zt->zbt.err);
+	wtz_release(&g_ztp.wtz);
+
+	return NULL;
 }
 
-static int _zus_start_chan_threads(struct zus_thread_params *tp, uint num_cpus,
-				   uint chan)
+static int _zus_start_chan_threads(struct zus_thread_params *tp, uint chan)
 {
 	uint i, err;
 
-	g_ztp.zts[chan] = calloc(num_cpus, sizeof(*g_ztp.zts[0]));
+	g_ztp.zts[chan] = calloc(zus_num_possible_cpus(), sizeof(*g_ztp.zts[0]));
 	if (!g_ztp.zts[chan])
 		return -ENOMEM;
 
-	wtz_arm(&g_ztp.wtz, num_cpus);
+	wtz_arm(&g_ztp.wtz, zus_num_online_cpus());
 
-	for (i = 0; i < num_cpus; ++i) {
+	zus_for_each_cpu(i, zus_cpu_online_mask) {
 		char zt_name[32];
 		struct _zu_thread *zt = &g_ztp.zts[chan][i];
 
@@ -469,6 +587,7 @@ static int _zus_start_chan_threads(struct zus_thread_params *tp, uint num_cpus,
 		zt->no = tp->one_cpu = i;
 		zt->chan = chan;
 		err = __zus_thread_create(&zt->zbt, tp, _zu_thread, zt);
+		tp->name = NULL;
 		if (err)
 			return err;
 	}
@@ -479,10 +598,9 @@ static int _zus_start_chan_threads(struct zus_thread_params *tp, uint num_cpus,
 /* forward declaration */
 static void zus_stop_all_threads(void);
 
-static int zus_start_all_threads(struct zus_thread_params *tp, uint num_cpus,
-				 uint num_chans)
+static int zus_start_all_threads(struct zus_thread_params *tp, uint num_chans)
 {
-	uint c;
+	uint c, num_cpus = zus_num_possible_cpus();
 	int err;
 
 	wtz_init(&g_ztp.wtz);
@@ -490,12 +608,26 @@ static int zus_start_all_threads(struct zus_thread_params *tp, uint num_cpus,
 	g_ztp.max_channels = num_chans;
 
 	for (c = 0; c < g_ztp.max_channels; ++c) {
-		err = _zus_start_chan_threads(tp, num_cpus, c);
+		err = _zus_start_chan_threads(tp, c);
 		if (unlikely(err))
 			goto fail;
 	}
 
 	wtz_wait(&g_ztp.wtz);
+
+	/* verify that all ZTs started successfully */
+	for (c = 0; c < g_ztp.max_channels; ++c) {
+		uint i;
+
+		for (i = 0; i < num_cpus; ++i) {
+			struct _zu_thread *zt = &g_ztp.zts[c][i];
+			if (unlikely(zt->zbt.err)) {
+				err = zt->zbt.err;
+				goto fail;
+			}
+		}
+	}
+
 	INFO("%u * %u ZT threads ready\n", num_cpus, num_chans);
 	return 0;
 
@@ -540,6 +672,20 @@ static void zus_stop_all_threads(void)
 	memset(&g_ztp, 0, sizeof(g_ztp));
 }
 
+int zus_zt_signal_pending(void)
+{
+	struct zus_base_thread *zbt = pthread_getspecific(g_zts_id_key);
+	struct _zu_thread *zt;
+
+	/* only ZTs are supported */
+	if (ZUS_WARN_ON(zbt->threadfn != _zu_thread))
+		return 0;
+
+	zt = container_of(zbt, typeof(*zt), zbt);
+
+	return (zt->op_hdr->flags & ZUFS_H_INTR);
+}
+
 /* ~~~~ mount thread ~~~~~ */
 struct _zu_mount_thread {
 	struct zus_base_thread zbt;
@@ -568,9 +714,9 @@ static void *zus_mount_thread(void *callback_info)
 
 	INFO("Mount thread Running fd=%d\n", g_mount.fd);
 
-	g_mount.zbt.err = _numa_map_init(g_mount.fd);
+	g_mount.zbt.err = zus_numa_map_init(g_mount.fd);
 	if (unlikely(g_mount.zbt.err)) {
-		ERROR("_numa_map_init => %d\n", g_mount.zbt.err);
+		ERROR("zus_numa_map_init => %d\n", g_mount.zbt.err);
 		goto out;
 	}
 
@@ -587,7 +733,6 @@ static void *zus_mount_thread(void *callback_info)
 
 		if (zim->hdr.operation == ZUFS_M_MOUNT && !g_ztp.num_zts) {
 			err = zus_start_all_threads(&g_mount.tp,
-						    g_zus_numa_map.online_cpus,
 						    zim->zmi.num_channels);
 			if (unlikely(err))
 				goto next;
@@ -623,14 +768,24 @@ out:
 	return (void *)((long)g_mount.zbt.err);
 }
 
+int zus_init_zuf(const char *zuf_path)
+{
+	const char *path = zuf_path ?: ZUF_DEF_PATH;
+
+	pthread_key_create(&g_zts_id_key, NULL);
+
+	strncpy(g_zus_root_path_stor, path,
+		sizeof(g_zus_root_path_stor) - 1);
+
+	return 0;
+}
+
 int zus_mount_thread_start(struct zus_thread_params *tp, const char *zuf_path)
 {
 	struct zus_thread_params mnttp = {};
 	int err;
 
-	pthread_key_create(&g_zts_id_key, NULL);
-	strncpy(g_zus_root_path_stor, zuf_path,
-		sizeof(g_zus_root_path_stor) - 1);
+	zus_init_zuf(zuf_path);
 	g_mount.tp = *tp; /* this is for the _zu threads */
 
 	ZTP_INIT(&mnttp); /* Just a Plain thread */
@@ -713,7 +868,6 @@ int zus_alloc_exec_buff(struct zus_sb_info *sbi, uint max_bytes, uint pool_num,
 	if (unlikely(err))
 		goto error;
 
-	fba->orig_ptr = fba->ptr;
 	return 0;
 
 error:

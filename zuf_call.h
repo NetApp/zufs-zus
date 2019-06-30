@@ -27,7 +27,7 @@ int _ioctl(int fd, ulong zu_vect, struct zufs_ioc_hdr *hdr, const char *msg)
 	if (ret) {
 		ERROR("Unexpected ioctl => %d errno=%d zu_n=%lx zu_s=%s hdr=%d\n",
 		      ret, errno, zu_vect, msg, hdr->err);
-		return ret;
+		return -errno;
 	}
 
 	return hdr->err;
@@ -93,4 +93,16 @@ static inline
 int zuf_iomap_exec(int fd, struct zufs_ioc_iomap_exec *ziome)
 {
 	return _ioctl(fd, ZU_IOC_IOMAP_EXEC, &ziome->hdr, "ZU_IOC_IOMAP_EXEC");
+}
+
+static inline
+int zuf_private_mount(int fd, struct zufs_ioc_mount_private *zip)
+{
+	return _ioctl(fd, ZU_IOC_PRIVATE_MOUNT, &zip->hdr, "ZU_IOC_PRIVATE_MOUNT");
+}
+
+static inline
+int zuf_private_umount(int fd, struct zufs_ioc_mount_private *zip)
+{
+	return _ioctl(fd, ZU_IOC_PRIVATE_UMOUNT, &zip->hdr, "ZU_IOC_PRIVATE_UMOUNT");
 }
