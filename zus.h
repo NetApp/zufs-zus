@@ -19,6 +19,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <sched.h>
+#include <sys/mman.h>
 
 /* On old GCC systems we do not yet have STATX stuff in sys/stat.h
  * so in this case include also the kernel header.
@@ -40,11 +41,6 @@
 #include "zus_api.h"
 #include "_pr.h"
 #include "a_list.h"
-
-#ifndef likely
-#define likely(x_)	__builtin_expect(!!(x_), 1)
-#define unlikely(x_)	__builtin_expect(!!(x_), 0)
-#endif
 
 #include "md.h"
 #include "movnt.h"
@@ -151,6 +147,7 @@ struct zus_zii_operations {
 			struct zufs_ioc_xattr *ioc_xattr);
 	int (*listxattr)(struct zus_inode_info *zii,
 			 struct zufs_ioc_xattr *ioc_xattr);
+	int (*fiemap)(void *app_ptr, struct zufs_ioc_fiemap *zif);
 };
 
 struct zus_inode_info {
@@ -178,6 +175,8 @@ struct zus_sbi_operations {
 	int (*clone)(struct zufs_ioc_clone *ioc_clone);
 	int (*statfs)(struct zus_sb_info *sbi,
 		      struct zufs_ioc_statfs *ioc_statfs);
+	int (*show_options)(struct zus_sb_info *sbi,
+			    struct zufs_ioc_mount_options *zim);
 };
 
 #define ZUS_MAX_POOLS	7
@@ -216,13 +215,27 @@ static inline int zus_sbi_test_flag(struct zus_sb_info *sbi, int flag)
 	return (sbi->flags & (1 << flag));
 }
 
+static inline int _buf_puts(char **buffer, ssize_t *size, const char *option)
+{
+	ssize_t len = strlen(option);
+
+	if (*size + len > ZUFS_MO_MAX)
+		return 0;
+
+	*size += len;
+	memcpy(*buffer, option, len);
+	*buffer += len;
+
+	return len;
+}
+
 struct zus_zfi_operations {
 	struct zus_sb_info *(*sbi_alloc)(struct zus_fs_info *zfi);
 	void (*sbi_free)(struct zus_sb_info *sbi);
 
-	int (*sbi_init)(struct zus_sb_info *sbi, struct zufs_ioc_mount *zim);
+	int (*sbi_init)(struct zus_sb_info *sbi, struct zufs_mount_info *zmi);
 	int (*sbi_fini)(struct zus_sb_info *sbi);
-	int (*sbi_remount)(struct zus_sb_info *sbi, struct zufs_ioc_mount *zim);
+	int (*sbi_remount)(struct zus_sb_info *sbi, struct zufs_mount_info *zmi);
 };
 
 struct zus_fs_info {
@@ -283,6 +296,10 @@ static inline void zus_std_remove_dentry(struct zus_inode *dir_zi,
 
 /* zus-core */
 
+int zus_zt_signal_pending(void);
+
+int zus_numa_map_init(int fd);
+int zus_init_zuf(const char *zuf_path);
 /* Open an O_TMPFILE on the zuf-root we belong to */
 int zuf_root_open_tmp(int *fd);
 void zuf_root_close(int *fd);
@@ -296,16 +313,30 @@ void zuf_root_close(int *fd);
 #define ZUS_NUMA_NO_NID	(~0U)
 #define ZUS_CPU_ALL	(~0U)
 
-extern struct zufs_ioc_numa_map g_zus_numa_map;
+extern struct zufs_ioc_numa_map *zus_numa_map;
+extern unsigned int zus_nr_cpu_ids;
+extern cpu_set_t *zus_cpu_possible_mask;
+extern cpu_set_t *zus_cpu_online_mask;
 int zus_cpu_to_node(int cpu);
+bool zus_cpu_online(int cpu);
 int zus_current_onecpu(void);
 int zus_current_cpu(void);
+int zus_current_cpu_silent(void);
 int zus_current_nid(void);
+unsigned int zus_cpumask_next(int n, cpu_set_t *srcp);
+
+#define zus_num_possible_nodes() (zus_numa_map->possible_nodes)
+#define zus_num_possible_cpus()  (zus_numa_map->possible_cpus)
+#define zus_num_online_nodes()   (zus_numa_map->online_nodes)
+#define zus_num_online_cpus()    (zus_numa_map->online_cpus)
+
+#define zus_for_each_cpu(cpu, mask)			\
+	for ((cpu) = -1;				\
+		(cpu) = zus_cpumask_next((cpu), (mask)),\
+		(cpu) < zus_nr_cpu_ids;)
+
 void *zus_private_get(void);
 void zus_private_set(void*);
-
-int zus_get_cpu(void);
-void zus_put_cpu(int cpu);
 
 struct zus_thread_params {
 	const char *name; /* only used for the duration of the call */
@@ -325,6 +356,8 @@ struct zus_thread_params {
 typedef void *(*__start_routine) (void *); /* pthread programming style NOT */
 int zus_thread_create(pthread_t *new_tread, struct zus_thread_params *params,
 		      __start_routine fn, void *user_arg);
+int zus_thread_current_init(void);
+void zus_thread_current_fini(void);
 int zus_alloc_exec_buff(struct zus_sb_info *sbi, uint max_bytes, uint pool_num,
 			struct fba *fba);
 
@@ -340,6 +373,9 @@ struct zus_inode_info *zus_iget(struct zus_sb_info *sbi, ulong ino);
 int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr);
 const char *ZUFS_OP_name(enum e_zufs_operation op);
 
+int zus_private_mount(struct zus_fs_info *zfi, const char *options,
+		      struct zufs_ioc_mount_private **zip_out);
+int zus_private_umount(struct zufs_ioc_mount_private *zip);
 
 /* dyn_pr.c */
 int zus_add_module_ddbg(const char *fs_name, void *handle);
@@ -354,7 +390,7 @@ int zus_ddbg_write(struct zufs_ddbg_info *zdi);
  * The size is round up to 4K alignment.
  */
 int  fba_alloc(struct fba *fba, size_t size);
-int  fba_alloc_align(struct fba *fba, size_t size);
+int  fba_alloc_align(struct fba *fba, size_t size, bool huge);
 void fba_free(struct fba *fba);
 int fba_punch_hole(struct fba *fba, ulong index, uint nump);
 
@@ -373,7 +409,13 @@ struct pa_page {
 	int			units;
 	int			refcount;
 
-	struct a_list_head	list;
+	union {
+		struct a_list_head	list;
+		struct slab_info {
+			int	slab_uc;
+			int	slab_cpu;
+		} sinfo;
+	};
 
 	unsigned long		private;
 	void			*private2;
@@ -552,5 +594,29 @@ extern int register_fs(int fd);
 /* below two need to match. C is not bash */
 #define REGISTER_FS_FN		 register_fs
 #define REGISTER_FS_NAME	"register_fs"
+
+enum zus_mlock_mode {
+	MLOCK_NONE = 0,	/* do not call mlock */
+	MLOCK_CURRENT,	/* mlockall(MCL_CURRENT) and mlock per alloc */
+	MLOCK_ALL,	/* mlockall(MCL_CURRENT | MCL_FUTURE) */
+};
+
+extern int g_mlock;
+#define NEED_MLOCK	(g_mlock == MLOCK_CURRENT)
+
+/* ~~~ memory allocator ~~~ */
+#define ZUS_ZERO 1
+
+int zus_slab_init(void);
+void zus_slab_fini(void);
+void *zus_malloc(size_t size);
+void *zus_calloc(size_t nmemb, size_t size);
+void *zus_realloc(void *ptr, size_t size);
+void zus_free(void *ptr);
+struct pa_page *zus_alloc_page(int mask);
+void zus_free_page(struct pa_page *);
+void *zus_page_address(struct pa_page *page);
+void *zus_virt_to_page(void *addr);
+struct zus_sb_info *zus_global_sbi(void);
 
 #endif /* define __ZUS_H__ */

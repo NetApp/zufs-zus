@@ -20,6 +20,9 @@ CONFIG_PEDANTIC = 0
 # Set optimization level (unset, will default to 2)
 CONFIG_OPTIMIZE_LEVEL = 2
 
+# Try Using Anonymous mmap
+CONFIG_TRY_ANON_MMAP = 1
+
 # Fortify source
 CONFIG_FORTIFY_SORUCE = 0
 

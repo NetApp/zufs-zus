@@ -22,19 +22,19 @@
 	fprintf(stderr, LOG_STR(LOG_ERR) \
 		"zus: [%s:%d]: " fmt, __func__, __LINE__, ##a)
 #define INFO(fmt, a...) \
-	fprintf(stderr, LOG_STR(LOG_INFO) "~info~ zus: " fmt, ##a)
+	fprintf(stderr, LOG_STR(LOG_INFO) "zus: ~info~ " fmt, ##a)
 
 extern ulong g_DBGMASK;
 #define ZUS_DBGPRNT  (g_DBGMASK & 1)
 
 #define DBG(fmt, a...) \
-	do { if (ZUS_DBGPRNT) \
+	do { if (unlikely(ZUS_DBGPRNT)) \
 		fprintf(stderr, LOG_STR(LOG_INFO) \
 			"zus: [%s:%d]: " fmt, __func__, __LINE__, ##a); \
 	} while (0)
 
 #define DBGCONT(fmt, a...) \
-	do { if (ZUS_DBGPRNT) fprintf(stderr, fmt, ##a); } while (0)
+	do { if (unlikely(ZUS_DBGPRNT)) fprintf(stderr, fmt, ##a); } while (0)
 
 #define md_dbg_err DBG
 #define md_warn_cnd(silent, s, args ...) \

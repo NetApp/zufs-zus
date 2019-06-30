@@ -20,6 +20,12 @@
 #include "zus.h"
 #include "zuf_call.h"
 
+/* PA_SIZE - 2GB  total allowed data held in pages */
+/* TODO: get this param from FS
+ * TODO2: grow dynamically
+ */
+#define PA_SIZE		(1UL << 31)
+
 /* ~~~~ fba ~~~~ */
 
 /*
@@ -28,7 +34,7 @@
  */
 #define FBA_ALIGNSIZE	(ZUFS_ALLOC_MASK + 1)
 
-int  fba_alloc(struct fba *fba, size_t size)
+static int _fba_alloc(struct fba *fba, size_t size, int flags)
 {
 	int err;
 
@@ -36,59 +42,118 @@ int  fba_alloc(struct fba *fba, size_t size)
 	 */
 	fba->fd = open("/dev/shm/", O_RDWR | O_TMPFILE | O_EXCL, 0666);
 	if (fba->fd < 0) {
-		ERROR("Error opening <%s>: %s\n", "/tmp/", strerror(errno));
-		return errno;
+		if (!(flags & MAP_HUGETLB))
+			ERROR("Error opening <%s>: %s\n","/tmp/",
+			      strerror(errno));
+		return errno ? -errno : -EPERM;
 	}
 
 	err = ftruncate(fba->fd, size);
 	if (unlikely(err)) {
 		err = -errno;
-		ERROR("ftruncate failed size=0x%lx => %d\n", size, err);
+		if (!(flags & MAP_HUGETLB))
+			ERROR("ftruncate failed size=0x%lx => %d\n", size, err);
 		close(fba->fd);
 		return err;
 	}
 
-	fba->ptr = mmap(NULL, size, PROT_WRITE | PROT_READ, MAP_SHARED,
+	fba->ptr = mmap(NULL, size, PROT_WRITE | PROT_READ, flags,
 			fba->fd, 0);
 	if (fba->ptr == MAP_FAILED) {
-		ERROR("mmap failed=> %d: %s\n", errno, strerror(errno));
+		if (!(flags & MAP_HUGETLB))
+			ERROR("mmap failed=> %d: %s\n", errno, strerror(errno));
 		fba_free(fba);
-		return errno ?: ENOMEM;
+		return errno ? -errno: -ENOMEM;
 	}
 
 	err = madvise(fba->ptr, size, MADV_DONTDUMP);
-	if (err == -1)
+	if (err == -1 && !(flags & MAP_HUGETLB))
 		ERROR("madvise(DONTDUMP) failed=> %d: %s\n", errno,
 		      strerror(errno));
 
-	fba->orig_ptr = fba->ptr;
 	fba->size = size;
+
+	DBG("fba allocated flags=0x%x fd=%d ptr=%p size=0x%lx\n", flags,
+	    fba->fd, fba->ptr, size);
 
 	return 0;
 }
-int  fba_alloc_align(struct fba *fba, size_t size)
+
+int fba_alloc(struct fba *fba, size_t size)
 {
+	int err = _fba_alloc(fba, size, MAP_SHARED);
+
+	if (err)
+		return err;
+
+	if (NEED_MLOCK && size < PA_SIZE) {
+		err = mlock(fba->ptr, size);
+		ZUS_WARN_ON(err);
+	}
+	return err;
+}
+
+static int _fba_alloc_huge(struct fba *fba, size_t size)
+{
+	int err;
+
+	err = _fba_alloc(fba, size, MAP_ANONYMOUS | MAP_SHARED | MAP_HUGETLB);
+	if (unlikely(err)) {
+		/* fallback to 4k pages */
+		INFO("mmap failed huge=> %d: %s\n", errno, strerror(errno));
+		return _fba_alloc(fba, size, MAP_SHARED);
+	}
+
+	return 0;
+}
+
+int fba_alloc_align(struct fba *fba, size_t size, bool huge)
+{
+	size_t aligned_size;
 	ulong addr;
 	int err;
 
-	size = ALIGN(size + FBA_ALIGNSIZE, FBA_ALIGNSIZE);
-	err = fba_alloc(fba, size);
+	aligned_size = ALIGN(size + FBA_ALIGNSIZE, FBA_ALIGNSIZE);
+
+	if (huge)
+		err = _fba_alloc_huge(fba, aligned_size);
+	else
+		err = _fba_alloc(fba, aligned_size, MAP_SHARED);
+
 	if (unlikely(err))
 		return err;
 
 	addr = ALIGN((ulong)fba->ptr, FBA_ALIGNSIZE);
 	if (fba->ptr != (void *)addr) {
-		DBG("fba: fd=%d mmap-addr=0x%lx addr=0x%lx msize=0x%lx\n",
-			fba->fd, (ulong)fba->ptr, addr, size);
+		size_t start_len, end_len;
+
+		DBG("fba: fd=%d mmap-addr=0x%lx addr=0x%lx msize=0x%lx aligned_size=0x%lx\n",
+		    fba->fd, (ulong)fba->ptr, addr, size, aligned_size);
+
+		/* unmap the unaligned edges and fix the ptr and size */
+		start_len = addr - (ulong)fba->ptr;
+		end_len = ((ulong)fba->ptr + aligned_size) - (addr + size) -
+								start_len;
+
+		munmap(fba->ptr, start_len);
+		munmap((void *)(addr + size), end_len);
+
 		fba->ptr = (void *)addr;
+		fba->size = size;
 	}
+
+	if (NEED_MLOCK && size < PA_SIZE) {
+		err = mlock(fba->ptr, size);
+		ZUS_WARN_ON(err);
+	}
+
 	return 0;
 }
 
 void fba_free(struct fba *fba)
 {
 	if (fba->fd >= 0) {
-		munmap(fba->orig_ptr, fba->size);
+		munmap(fba->ptr, fba->size);
 		close(fba->fd);
 		fba->fd = -1;
 	}
@@ -105,12 +170,6 @@ int fba_punch_hole(struct fba *fba, ulong index, uint nump)
 }
 
 /* ~~~ pa - Page Allocator ~~~ */
-
-/* PA_SIZE - 2GB  total allowed data held in pages */
-/* TODO: get this param from FS
- * TODO2: grow dynamically
- */
-#define PA_SIZE		(1UL << 31)
 
 /* 2MB worth of pages (= 32k pages) */
 #define PA_PAGES_AT_A_TIME ((1UL << 21) / sizeof(struct pa_page))
@@ -199,6 +258,11 @@ rescan:
 	goto rescan;
 
 out:
+	if (NEED_MLOCK && page) {
+		err = mlock(pa_page_address(sbi, page), npages * PAGE_SIZE);
+		ZUS_WARN_ON(err);
+	}
+
 	pthread_spin_unlock(&pa->lock);
 
 	return page;
@@ -210,6 +274,11 @@ void __pa_free(struct pa_page *page)
 	struct zus_sb_info *sbi = (void *)((ulong)page->owner & ~ZUS_SBI_MASK);
 	struct pa *pa = &sbi->pa[POOL_NUM];
 
+	if (NEED_MLOCK) {
+		int err = munlock(pa_page_address(sbi, page), PAGE_SIZE);
+
+		ZUS_WARN_ON(err);
+	}
 	fba_punch_hole(&pa->data, pa_page_to_bn(sbi, page), 1);
 
 	pthread_spin_lock(&pa->lock);
@@ -250,6 +319,14 @@ fail:
 void pa_fini(struct zus_sb_info *sbi)
 {
 	struct pa *pa = &sbi->pa[POOL_NUM];
+	struct pa_page *page;
+	ulong free_p = 0;
+
+	a_list_for_each_entry(page, &pa->head, list) {
+		++free_p;
+	}
+	if (unlikely(free_p != pa->size))
+		ERROR("pa leaks %lu pages\n", pa->size - free_p);
 
 	fba_free(&pa->pages);
 	fba_free(&pa->data);
