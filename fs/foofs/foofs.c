@@ -168,14 +168,14 @@ static void foofs_sbi_free(struct zus_sb_info *sbi)
 }
 
 static
-int foofs_sbi_init(struct zus_sb_info *sbi, struct zufs_ioc_mount *zim)
+int foofs_sbi_init(struct zus_sb_info *sbi, struct zufs_mount_info *zmi)
 {
 	_init_root(sbi);
 	sbi->z_root = zus_iget(sbi, FOOFS_ROOT_NO);
 	if (unlikely(!sbi->z_root))
 		return -ENOMEM;
 
-	zim->zmi.s_blocksize_bits = PAGE_SHIFT;
+	zmi->s_blocksize_bits = PAGE_SHIFT;
 	return 0;
 }
 
@@ -320,8 +320,8 @@ static int foofs_add_dentry(struct zus_inode_info *dir_ii,
 
 	de = _find_empty_de(dir_ii);
 	if (unlikely(!de)) {
-		DBG("[%ld] [%.*s] ino=%ld\n",
-		    zi_ino(dir_ii->zi), str->len, str->name, de->ino);
+		DBG("[%ld] [%.*s] => -ENOSPC\n",
+		    zi_ino(dir_ii->zi), str->len, str->name);
 		return -ENOSPC;
 	}
 
