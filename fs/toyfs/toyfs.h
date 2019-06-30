@@ -210,7 +210,7 @@ void toyfs_sbi_lock(struct toyfs_sb_info *sbi);
 void toyfs_sbi_unlock(struct toyfs_sb_info *sbi);
 void toyfs_lock_inodes(struct toyfs_sb_info *sbi);
 void toyfs_unlock_inodes(struct toyfs_sb_info *sbi);
-int toyfs_sbi_init(struct zus_sb_info *zsbi, struct zufs_ioc_mount *zim);
+int toyfs_sbi_init(struct zus_sb_info *zsbi, struct zufs_mount_info *zim);
 int toyfs_sbi_fini(struct zus_sb_info *zsbi);
 struct zus_sb_info *toyfs_sbi_alloc(struct zus_fs_info *zfi);
 void toyfs_sbi_free(struct zus_sb_info *zsbi);
@@ -280,6 +280,7 @@ int toyfs_fallocate(struct zus_inode_info *zii,
 int toyfs_seek(struct zus_inode_info *zii, struct zufs_ioc_seek *zis);
 int toyfs_truncate(struct toyfs_inode_info *tii, size_t size);
 int toyfs_clone(struct zufs_ioc_clone *ioc_clone);
+int toyfs_fiemap(void *app_ptr, struct zufs_ioc_fiemap *zif);
 struct toyfs_list_head *toyfs_iblkrefs_list_of(struct toyfs_inode_info *tii);
 struct toyfs_pmemb *toyfs_resolve_pmemb(struct toyfs_inode_info *tii,
 					loff_t off);

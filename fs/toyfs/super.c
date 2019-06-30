@@ -122,7 +122,7 @@ struct toyfs_inode_info *toyfs_alloc_ii(struct toyfs_sb_info *sbi)
 	if (!sbi->s_statvfs.f_ffree || !sbi->s_statvfs.f_favail)
 		goto out;
 
-	tii = (struct toyfs_inode_info *)malloc(sizeof(*tii));
+	tii = (struct toyfs_inode_info *)zus_malloc(sizeof(*tii));
 	if (!tii)
 		goto out;
 
@@ -158,16 +158,17 @@ void toyfs_tii_free(struct toyfs_inode_info *tii)
 	struct toyfs_sb_info *sbi = tii->sbi;
 
 	toyfs_assert(tii->sbi != NULL);
+	DBG("free_ii tii=%p files=%lu ffree=%lu\n", tii,
+	    sbi->s_statvfs.f_files, sbi->s_statvfs.f_ffree);
+
 	memset(tii, 0xAB, sizeof(*tii));
 	tii->zii.op = NULL;
 	tii->ti = NULL;
 	tii->sbi = NULL;
 	tii->valid = false;
-	free(tii);
+	zus_free(tii);
 	sbi->s_statvfs.f_ffree++;
 	sbi->s_statvfs.f_favail++;
-	DBG("free_ii tii=%p files=%lu ffree=%lu\n", tii,
-	    sbi->s_statvfs.f_files, sbi->s_statvfs.f_ffree);
 }
 
 static void _pool_init(struct toyfs_pool *pool)
@@ -501,7 +502,7 @@ static void _itable_insert(struct toyfs_itable *itable,
 	struct toyfs_inode_ref **ient;
 	struct toyfs_inode_ref *tir;
 
-	tir = (struct toyfs_inode_ref *)calloc(1, sizeof(*tir));
+	tir = (struct toyfs_inode_ref *)zus_calloc(1, sizeof(*tir));
 	toyfs_assert(tir != NULL);
 
 	_itable_lock(itable);
@@ -534,12 +535,16 @@ static void _itable_remove(struct toyfs_itable *itable,
 		pp = &(*pp)->next;
 	}
 	toyfs_assert(tir != NULL);
+	if (!tir) { /* Make clang-scan happy */
+		_itable_unlock(itable);
+		return;
+	}
 	*pp = tir->next;
 	itable->icount--;
 	_itable_unlock(itable);
 
 	memset(tir, 0, sizeof(*tir));
-	free(tir);
+	zus_free(tir);
 }
 
 void toyfs_i_track(struct toyfs_inode_info *tii)
@@ -577,7 +582,7 @@ struct zus_sb_info *toyfs_sbi_alloc(struct zus_fs_info *zfi)
 
 	INFO("sbi_alloc: zfi=%p\n", zfi);
 
-	sbi = (struct toyfs_sb_info *)malloc(sizeof(*sbi));
+	sbi = (struct toyfs_sb_info *)zus_malloc(sizeof(*sbi));
 	if (!sbi)
 		return NULL;
 
@@ -595,7 +600,7 @@ void toyfs_sbi_free(struct zus_sb_info *zsbi)
 	struct toyfs_sb_info *sbi = Z2SBI(zsbi);
 
 	INFO("sbi_free: sbi=%p\n", sbi);
-	free(sbi);
+	zus_free(sbi);
 }
 
 struct toyfs_pmemb *toyfs_acquire_pmemb(struct toyfs_sb_info *sbi)
@@ -703,8 +708,10 @@ static int _new_root_inode(struct toyfs_sb_info *sbi,
 		return -ENOMEM;
 
 	root_ti = _pool_pop_inode(&sbi->s_pool);
-	if (!root_ti)
+	if (!root_ti) {
+		toyfs_tii_free(root_tii);
 		return -ENOSPC;
+	}
 
 	memset(root_ti, 0, sizeof(*root_ti));
 	root_tii->ti = root_ti;
@@ -842,7 +849,7 @@ static int _sbi_init(struct toyfs_sb_info *sbi)
 	return 0;
 }
 
-int toyfs_sbi_init(struct zus_sb_info *zsbi, struct zufs_ioc_mount *zim)
+int toyfs_sbi_init(struct zus_sb_info *zsbi, struct zufs_mount_info *zmi)
 {
 	int err;
 	struct toyfs_sb_info *sbi = Z2SBI(zsbi);
@@ -851,10 +858,10 @@ int toyfs_sbi_init(struct zus_sb_info *zsbi, struct zufs_ioc_mount *zim)
 	if (err)
 		return err;
 
-	zim->zmi.zus_sbi = &sbi->s_zus_sbi;
-	zim->zmi.zus_ii = sbi->s_zus_sbi.z_root;
-	zim->zmi.s_blocksize_bits = PAGE_SHIFT;
-	zim->zmi.acl_on = 1;
+	zmi->zus_sbi = &sbi->s_zus_sbi;
+	zmi->zus_ii = sbi->s_zus_sbi.z_root;
+	zmi->s_blocksize_bits = PAGE_SHIFT;
+	zmi->acl_on = 1;
 
 	return 0;
 }

@@ -852,7 +852,6 @@ static int _clone_range(struct toyfs_inode_info *src_tii,
 
 	toyfs_assert(_is_entire_page(src_off, dst_off, len));
 	src_iblkref = _fetch_iblkref(src_tii, src_off);
-	dst_iblkref = _fetch_iblkref(dst_tii, dst_off);
 
 	if (src_iblkref) {
 		dst_iblkref = _require_iblkref(dst_tii, dst_off);
@@ -945,3 +944,84 @@ int toyfs_clone(struct zufs_ioc_clone *ioc_clone)
 		      (size_t)ioc_clone->len);
 }
 
+static zu_dpp_t physaddr_of(struct toyfs_sb_info *sbi,
+			    const struct toyfs_iblkref *iblkref)
+{
+	return toyfs_page2dpp(sbi, toyfs_bn2pmemb(sbi, iblkref->dblkref->bn));
+}
+
+static int _fiemap(struct toyfs_inode_info *tii,
+		   struct zufs_fiemap_extent_info *fieinfo,
+		   loff_t offset, size_t len)
+{
+	int err = 0;
+	uint32_t flags = 0;
+	uint64_t length;
+	loff_t logical, phys;
+	struct toyfs_list_head *iblkrefs, *itr;
+	struct toyfs_iblkref *iblkref, *iblkref_next;
+	struct zus_inode *zi = tii->zii.zi;
+	struct toyfs_sb_info *sbi = tii->sbi;
+
+	DBG("fiemap: ino=%ld offset=%ld len=%lu\n", tii->ino, offset, len);
+
+	if (!S_ISREG(zi->i_mode))
+		return -ENOTSUP;
+
+	toyfs_sbi_lock(sbi);
+	iblkrefs = toyfs_iblkrefs_list_of(tii);
+	iblkref = _fetch_iblkref_from(tii, offset);
+	if (!iblkref)
+		goto out;
+
+	itr = &iblkref->head;
+	while ((itr != iblkrefs) && !(flags & FIEMAP_EXTENT_LAST)) {
+		iblkref = iblkref_of(itr);
+		flags = 0;
+		length = 0;
+		logical = iblkref->off;
+		phys = physaddr_of(sbi, iblkref);
+		while (itr != iblkrefs) {
+			length += PAGE_SIZE;
+			itr = itr->next;
+			if (iblkref->dblkref->refcnt > 1)
+				flags |= FIEMAP_EXTENT_SHARED;
+			if (itr == iblkrefs)
+				flags |= FIEMAP_EXTENT_LAST;
+			if (flags)
+				break;
+
+			iblkref_next = iblkref_of(itr);
+			if (iblkref_next->off > (iblkref->off + PAGE_SIZE))
+				break;
+		}
+		err = zufs_fiemap_fill_next_extent(fieinfo, (__u64)logical,
+						   (__u64)phys, length, flags);
+		if (err) {
+			if (err == 1)
+				err = 0;
+			break;
+		}
+	}
+out:
+	toyfs_sbi_unlock(sbi);
+	DBG("fiemap: ino=%ld extents_max=%u extents_mapped=%u\n",
+		tii->ino, fieinfo->fi_extents_max, fieinfo->fi_extents_mapped);
+	return err;
+}
+
+int toyfs_fiemap(void *app_ptr, struct zufs_ioc_fiemap *zif)
+{
+	int err;
+	struct zus_inode_info *zii = zif->zus_ii;
+	struct zufs_fiemap_extent_info fieinfo = {
+		.fi_flags = zif->flags,
+		.fi_extents_mapped = 0,
+		.fi_extents_max = zif->extents_max,
+		.fi_extents_start = app_ptr
+	};
+
+	err = _fiemap(Z2II(zii), &fieinfo, zif->start, zif->length);
+	zif->extents_mapped = fieinfo.fi_extents_mapped;
+	return err;
+}
