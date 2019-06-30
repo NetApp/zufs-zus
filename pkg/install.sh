@@ -4,7 +4,8 @@ SCRIPT_PATH="$(readlink -f ${BASH_SOURCE[0]})"
 SCRIPT_DIR=$(dirname $SCRIPT_PATH)
 ZUS_DIR=${SCRIPT_DIR}/..
 
-DEST_DIR=$1
+DEST_DIR=${1}
+PKG_TYPE=${2:-rpm}
 
 ZUS_LIB=${ZUS_DIR}/libzus.so
 ZUS_BIN=${ZUS_DIR}/zusd
@@ -19,7 +20,12 @@ SYSTEMD_DEPS_DIR=${DEST_DIR}/etc/systemd/system/multi-user.target.wants
 ZUFS_LIB_DIR=${DEST_DIR}/usr/lib/zufs
 ZUFS_LOG_DIR=${DEST_DIR}/var/log/zufs
 SBIN_DIR=${DEST_DIR}/sbin
-LIB64_DIR=${DEST_DIR}/usr/lib64
+
+if [[ "${PKG_TYPE}" == "rpm" ]] ; then
+	LIB64_DIR=${DEST_DIR}/usr/lib64
+else
+	LIB64_DIR=${DEST_DIR}/usr/lib/x86_64-linux-gnu
+fi
 
 mkdir -p $(dirname ${SYSTEMD_SERVICE_DEST}) ${SYSTEMD_DEPS_DIR} ${ZUFS_LIB_DIR} \
 	 ${ZUFS_LOG_DIR} ${SBIN_DIR} ${LIB64_DIR}
