@@ -319,13 +319,6 @@ void __pa_free(struct pa_page *page)
 	struct zus_sb_info *sbi = (void *)((ulong)page->owner & ~ZUS_SBI_MASK);
 	struct pa *pa = &sbi->pa[POOL_NUM];
 
-	if (NEED_MLOCK) {
-		int err = munlock(pa_page_address(sbi, page), PAGE_SIZE);
-
-		if (unlikely(err))
-			DBG("munlock failed pa=%p => %d\n",
-			    pa_page_address(sbi, page), -errno);
-	}
 	fba_punch_hole(&pa->data, pa_page_to_bn(sbi, page), 1);
 
 	pthread_spin_lock(&pa->lock);
