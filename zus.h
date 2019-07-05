@@ -134,12 +134,11 @@ struct zus_zii_operations {
 	int (*mmap_close)(struct zus_inode_info *zii,
 			 struct zufs_ioc_mmap_close *mmap_close);
 	int (*get_symlink)(struct zus_inode_info *zii, void **symlink);
-	int (*setattr)(struct zus_inode_info *zii,
-		       uint enable_bits, ulong truncate_size);
+	int (*setattr)(struct zus_inode_info *zii, uint attr_bits);
 	int (*sync)(struct zus_inode_info *zii,
-		    struct zufs_ioc_range *ioc_range);
+		    struct zufs_ioc_sync *ioc_range);
 	int (*fallocate)(struct zus_inode_info *zii,
-			 struct zufs_ioc_range *ioc_range);
+			 struct zufs_ioc_IO *ioc_IO);
 	int (*seek)(struct zus_inode_info *zii, struct zufs_ioc_seek *ioc_seek);
 	int (*ioctl)(struct zus_inode_info *zii,
 		     struct zufs_ioc_ioctl *ioc_ioctl);

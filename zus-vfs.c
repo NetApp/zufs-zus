@@ -530,13 +530,12 @@ static int _setattr(struct zufs_ioc_hdr *hdr)
 	if (!zii->op->setattr)
 		return 0; /* This is fine no flushing needed */
 
-	return zii->op->setattr(zii, ioc_attr->zuf_attr,
-				 ioc_attr->truncate_size);
+	return zii->op->setattr(zii, ioc_attr->zuf_attr);
 }
 
 static int _sync(struct zufs_ioc_hdr *hdr)
 {
-	struct zufs_ioc_range *ioc_range = (void *)hdr;
+	struct zufs_ioc_sync *ioc_range = (void *)hdr;
 	struct zus_inode_info *zii = ioc_range->zus_ii;
 
 	if (!zii->op->sync)
@@ -547,13 +546,13 @@ static int _sync(struct zufs_ioc_hdr *hdr)
 
 static int _fallocate(struct zufs_ioc_hdr *hdr)
 {
-	struct zufs_ioc_range *ioc_range = (void *)hdr;
-	struct zus_inode_info *zii = ioc_range->zus_ii;
+	struct zufs_ioc_IO *ioc_IO = (void *)hdr;
+	struct zus_inode_info *zii = ioc_IO->zus_ii;
 
 	if (!zii->op->fallocate)
 		return -ENOTSUP;
 
-	return zii->op->fallocate(zii, ioc_range);
+	return zii->op->fallocate(zii, ioc_IO);
 }
 
 static int _seek(struct zufs_ioc_hdr *hdr)
