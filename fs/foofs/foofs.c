@@ -21,6 +21,7 @@
 
 #include "zus.h"
 #include "b-minmax.h"
+#include "iom_enc.h"
 
 // #define FOO_DEF_SBI_MODE (S_IRUGO | S_IXUGO | S_IWUSR)
 #define FOOFS_ROOT_NO 1
@@ -366,11 +367,11 @@ static int foofs_readdir(void *app_ptr, struct zufs_ioc_readdir *zir)
 	DBG("[0x%ld] pos 0x%lx\n", zi_ino(zir->dir_ii->zi), zir->pos);
 
 	if (zir->pos == 0) {
-		zufs_zde_emit(&rdi, zir->dir_ii->zi->i_ino, DT_DIR, 0, ".", 1);
+		zufs_zde_emit(&rdi, zir->dir_ii->zi->i_ino, DT_DIR, 0, ".", 2);
 		zir->pos = 1;
 	}
 	if (zir->pos == 1) {
-		zufs_zde_emit(&rdi, zir->dir_ii->zi->i_ino, DT_DIR, 1, "..", 2);
+		zufs_zde_emit(&rdi, zir->dir_ii->zi->i_ino, DT_DIR, 1, "..", 3);
 		zir->pos = 2;
 	}
 
@@ -384,7 +385,7 @@ static int foofs_readdir(void *app_ptr, struct zufs_ioc_readdir *zir)
 			continue;
 
 		ok = zufs_zde_emit(&rdi, de->ino, 1, zir->pos,
-				   de->name, strlen(de->name));
+				   de->name, strlen(de->name) + 1);
 		if (unlikely(!ok)) {
 			DBG("long dir\n");
 			break;
@@ -448,9 +449,14 @@ static int foofs_write(void *ptr, struct zufs_ioc_IO *op)
 static int foofs_get_block(struct zus_inode_info *zii,
 			   struct zufs_ioc_IO *get_block)
 {
-//	get_block->gp_block.pmem_bn = _file_bn(zii) + get_block->index % _foo_file_max(zii->sbi);
+	struct zus_iomap_build iomb = {};
 	/* foo-fs stands for foo-l */
-	get_block->gp_block.pmem_bn = zii->zi->i_ino + 1;
+	ulong bn =  zii->zi->i_ino + 1;
+
+	_zus_iom_init_4_ioc_io(&iomb, NULL, get_block, ZUS_MAX_OP_SIZE);
+	_zus_iom_start(&iomb, NULL, NULL);
+	_ziom_enc_t1_bn(&iomb, bn, 0);
+	get_block->hdr.out_len = _ioc_IO_size(1);
 	return 0;
 }
 
