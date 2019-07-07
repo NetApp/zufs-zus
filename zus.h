@@ -375,7 +375,7 @@ struct zus_inode_info *zus_iget(struct zus_sb_info *sbi, ulong ino);
 int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr);
 const char *ZUFS_OP_name(enum e_zufs_operation op);
 
-int zus_private_mount(struct zus_fs_info *zfi, const char *options,
+int zus_private_mount(struct zus_fs_info *zfi, const char *options, ulong flags,
 		      struct zufs_ioc_mount_private **zip_out);
 int zus_private_umount(struct zufs_ioc_mount_private *zip);
 

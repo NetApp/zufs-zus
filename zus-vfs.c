@@ -117,7 +117,7 @@ static void _zus_sbi_fini(struct zus_sb_info *sbi)
 	sbi->zfi->op->sbi_free(sbi);
 }
 
-int zus_private_mount(struct zus_fs_info *zfi, const char *options,
+int zus_private_mount(struct zus_fs_info *zfi, const char *options, ulong flags,
 		      struct zufs_ioc_mount_private **zip_out)
 {
 	struct zufs_ioc_mount_private *zip;
@@ -154,6 +154,7 @@ int zus_private_mount(struct zus_fs_info *zfi, const char *options,
 	}
 
 	zip->hdr.in_len = zip_len;
+	zip->zmi.po.mount_flags = flags;
 	zip->zmi.po.mount_options_len = strlen(options);
 	memcpy(&zip->zmi.po.mount_options, options,
 		zip->zmi.po.mount_options_len);
