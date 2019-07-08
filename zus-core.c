@@ -462,7 +462,7 @@ struct zt_pool {
 	uint max_channels;
 };
 
-static struct zt_pool g_ztp;
+static struct zt_pool g_ztp = {};
 
 static int _zu_mmap(struct _zu_thread *zt)
 {
@@ -824,7 +824,9 @@ void zus_mount_thread_stop(void)
 	zus_stop_all_threads();
 
 	g_mount.stop = true;
-	pthread_join(g_mount.zbt.thread, &tret);
+
+	if (g_mount.zbt.thread)
+		pthread_join(g_mount.zbt.thread, &tret);
 	g_mount.zbt.thread = 0;
 
 	zus_unregister_all();
