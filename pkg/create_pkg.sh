@@ -19,9 +19,9 @@ GIT_HASH=$(git rev-parse HEAD)
 
 DEPENDS="-d zufs-zuf -d lsof"
 if [[ "${PKG_TYPE}" == "rpm" ]] ; then
-	DEPENDS+=" -d libunwind -d libuuid -d procps-ng"
+	DEPENDS+=" -d libunwind -d libuuid -d procps-ng -d systemd"
 elif [[ "${PKG_TYPE}" == "deb" ]] ; then
-	DEPENDS+=" -d libunwind8 -d libuuid1 -d procps"
+	DEPENDS+=" -d libunwind8 -d libuuid1 -d procps -d systemd"
 fi
 
 fpm -s dir -t ${PKG_TYPE} -n zufs-zus -v ${VER} -C ${TMPDIR} \

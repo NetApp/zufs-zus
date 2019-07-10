@@ -17,6 +17,7 @@
 #include <sys/mman.h>
 #include <asm-generic/mman.h>
 #include <linux/limits.h>
+#include <systemd/sd-daemon.h>
 
 #include "zus.h"
 #include "zusd.h"
@@ -732,6 +733,8 @@ static void *zus_mount_thread(void *callback_info)
 		ERROR("zus_register_all => %d\n", g_mount.zbt.err);
 		goto out;
 	}
+
+	sd_notify(0, "READY=1");
 
 	while (!g_mount.stop) {
 		g_mount.zbt.err = zuf_recieve_mount(g_mount.fd, zim);

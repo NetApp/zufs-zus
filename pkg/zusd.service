@@ -18,7 +18,7 @@ ConditionPathExistsGlob=|/usr/lib/zufs/extra/zuf*.ko
 After=local-fs.target
 
 [Service]
-Type=simple
+Type=notify
 SyslogIdentifier=zusd
 EnvironmentFile=-/etc/zufs.conf
 LimitCORE=100M

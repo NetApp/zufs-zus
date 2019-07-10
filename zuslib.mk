@@ -15,7 +15,7 @@ PROJ_TARGET_TYPE := lib
 PROJ_OBJS := zus-core.o zus-vfs.o module.o md_zus.o nvml_movnt.o utils.o fs-loader.o pa.o
 PROJ_OBJS += printz.o slab.o
 PROJ_INCLUDES := .
-PROJ_LIBS := rt uuid unwind dl pthread
+PROJ_LIBS := rt uuid unwind dl pthread systemd
 
 ifeq ($(CONFIG_TRY_ANON_MMAP),1)
 PROJ_CDEFS += CONFIG_TRY_ANON_MMAP=1
