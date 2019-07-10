@@ -62,7 +62,7 @@ static int _pmem_unmap(struct multi_devices *md)
 	return 0;
 }
 
-static int _pmem_grab(struct zus_sb_info *sbi, uint pmem_kern_id)
+static int _pmem_grab(struct zus_sb_info *sbi, __u64 sb_id)
 {
 	struct multi_devices *md = &sbi->md;
 	int err;
@@ -72,7 +72,7 @@ static int _pmem_grab(struct zus_sb_info *sbi, uint pmem_kern_id)
 	if (unlikely(err))
 		return err;
 
-	err = zuf_grab_pmem(md->fd, pmem_kern_id, &md->pmem_info);
+	err = zuf_grab_pmem(md->fd, sb_id, &md->pmem_info);
 	if (unlikely(err))
 		return err;
 
@@ -82,8 +82,7 @@ static int _pmem_grab(struct zus_sb_info *sbi, uint pmem_kern_id)
 
 	err = md_init_from_pmem_info(md);
 	if (unlikely(err)) {
-		ERROR("md_init_from_pmem_info pmem_kern_id=%u => %d\n",
-		    pmem_kern_id, err);
+		ERROR("md_init_from_pmem_info sb_id=%llu => %d\n", sb_id, err);
 		return err;
 	}
 	md->dev_index = md->pmem_info.dev_index;
@@ -102,7 +101,7 @@ static void _pmem_ungrab(struct zus_sb_info *sbi)
 	/* Kernel makes free easy (close couple files) */
 	fba_free(&sbi->md.pages);
 
-	md_fini(&sbi->md, NULL);
+	md_fini(&sbi->md, true);
 
 	_pmem_unmap(&sbi->md);
 	zuf_root_close(&sbi->md.fd);
@@ -166,7 +165,7 @@ int zus_private_mount(struct zus_fs_info *zfi, const char *options,
 
 	sbi->zfi = zip->zmi.zus_zfi;
 	sbi->kern_sb_id = zip->zmi.sb_id;
-	err = _pmem_grab(sbi, zip->zmi.pmem_kern_id);
+	err = _pmem_grab(sbi, zip->zmi.sb_id);
 	if (unlikely(err))
 		goto fail_grab;
 
@@ -241,7 +240,7 @@ int zus_mount(int fd, struct zufs_ioc_mount *zim)
 	sbi->zfi = zim->zmi.zus_zfi;
 	sbi->kern_sb_id = zim->zmi.sb_id;
 
-	err = _pmem_grab(sbi, zim->zmi.pmem_kern_id);
+	err = _pmem_grab(sbi, zim->zmi.sb_id);
 	if (unlikely(err))
 		goto err;
 

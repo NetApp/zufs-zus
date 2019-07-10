@@ -185,7 +185,7 @@ int md_init_from_pmem_info(struct multi_devices *md)
 	return 0;
 }
 
-void md_fini(struct multi_devices *md, struct block_device *s_bdev)
+void md_fini(struct multi_devices *md, bool put_all)
 {
 	if (md->t2_count)
 		free(md->t2a.map);

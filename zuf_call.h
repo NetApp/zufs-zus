@@ -59,9 +59,9 @@ int zuf_numa_map(int fd, struct zufs_ioc_numa_map *zinm)
 }
 
 static inline
-int zuf_grab_pmem(int fd, uint pmem_kern_id, struct zufs_ioc_pmem *zip)
+int zuf_grab_pmem(int fd, __u64 sb_id, struct zufs_ioc_pmem *zip)
 {
-	zip->pmem_kern_id = pmem_kern_id;
+	zip->sb_id = sb_id;
 	return _ioctl(fd, ZU_IOC_GRAB_PMEM, &zip->hdr);
 }
 
