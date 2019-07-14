@@ -303,9 +303,15 @@ out:
 	if (NEED_MLOCK && page) {
 		err = mlock(pa_page_address(sbi, page), npages * PAGE_SIZE);
 
-		if (unlikely(err))
+		if (unlikely(err)) {
 			DBG("mlock failed pa=%p npages=%d => %d\n",
 			    pa_page_address(sbi, page), (int)npages, -errno);
+			fba_punch_hole(&pa->data, pa_page_to_bn(sbi, page),
+				       npages);
+			for (i = 0; i < npages; ++i, ++page)
+				a_list_add(&page->list, &pa->head);
+			page = NULL;
+		}
 	}
 
 	pthread_spin_unlock(&pa->lock);
