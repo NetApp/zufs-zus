@@ -25,6 +25,11 @@ static inline void a_clflushopt(void *p)
 	asm volatile(".byte 0x66; clflush %0" : "+m" (*(volatile char *)p));
 }
 
+static inline void a_clwb(void *p)
+{
+	asm volatile(".byte 0x66; xsaveopt %0" : "+m" (*(volatile char *)p));
+}
+
 static inline void cl_flush(void *buf, uint32_t len)
 {
 	uint32_t i;
@@ -32,6 +37,23 @@ static inline void cl_flush(void *buf, uint32_t len)
 	len = len + ((unsigned long)(buf) & (CACHELINE_SIZE - 1));
 	for (i = 0; i < len; i += CACHELINE_SIZE)
 		_mm_clflush(buf + i);
+}
+
+/*
+ * clwb writes back cachelines concurrently and require a store
+ * barrier (sfence) to verify completeness.
+ *
+ * WARNING: don't use directly, will crash old unsupported CPUs!
+ */
+static inline void __cl_flush_wb(void *buf, uint32_t len)
+{
+	uint32_t i;
+
+	len = len + ((unsigned long)(buf) & (CACHELINE_SIZE - 1));
+	for (i = 0; i < len; i += CACHELINE_SIZE)
+		a_clwb(buf + i);
+
+	_mm_sfence();
 }
 
 /*
@@ -52,6 +74,7 @@ static inline void __cl_flush_opt(void *buf, uint32_t len)
 }
 
 extern void (*cl_flush_opt)(void *buf, uint32_t len);
+extern void (*cl_flush_wb)(void *buf, uint32_t len);
 
 /* TODO use AVX-512 instructions if available PXS-245 */
 static inline void _memzero_nt_cachelines(void *dst, size_t cachelines)

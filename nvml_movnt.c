@@ -45,6 +45,9 @@
 #define CLFLUSHOPT_FUNC		0x7
 #define CLFLUSHOPT_BIT		(1 << 23)
 
+#define CLWB_FUNC		0x7
+#define CLWB_BIT		(1 << 24)
+
 #define CACHELINE_ALIGN ((uintptr_t)64)
 #define CACHELINE_MASK	(CACHELINE_ALIGN - 1)
 
@@ -347,12 +350,23 @@ static int clflushopt_avail(void)
 	return cpuid_check(CLFLUSHOPT_FUNC, EBX_IDX, CLFLUSHOPT_BIT);
 }
 
-/* Old processors don't support clflushopt, so we default to clflush */
+static int clwb_avail(void)
+{
+	return cpuid_check(CLWB_FUNC, EBX_IDX, CLWB_BIT);
+}
+
+/* Old processors don't support clflushopt/clwb, so we default to clflush */
 void (*cl_flush_opt)(void *buf, uint32_t len) = cl_flush;
+void (*cl_flush_wb)(void *buf, uint32_t len) = cl_flush;
 
 __attribute__((constructor))
-static void clflush_init(void) 
+static void clflush_init(void)
 {
-	if (clflushopt_avail())
+	if (clwb_avail()) {
+		cl_flush_wb =  __cl_flush_wb;
+		cl_flush_opt =  __cl_flush_opt;
+	} else if (clflushopt_avail()) {
+		cl_flush_wb =  __cl_flush_opt;
 		cl_flush_opt = __cl_flush_opt;
+	}
 }
