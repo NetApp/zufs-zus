@@ -213,7 +213,7 @@ static inline void zus_sbi_set_flag(struct zus_sb_info *sbi, int flag)
 
 static inline int zus_sbi_test_flag(struct zus_sb_info *sbi, int flag)
 {
-	return (sbi->flags & (1 << flag));
+	return (sbi->flags & (1UL << flag));
 }
 
 static inline int _buf_puts(char **buffer, ssize_t *size, const char *option)
