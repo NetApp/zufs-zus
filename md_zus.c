@@ -317,6 +317,8 @@ bool md_mdt_check(struct md_dev_table *mdt,
 
 static void _done(struct zus_iomap_build *iomb)
 {
+	if (unlikely(iomb->err))
+		ERROR("T2 I/O failed => %d\n", iomb->err);
 }
 
 static struct fba g_io_fba;
@@ -399,8 +401,6 @@ static int __zus_iom_exec(int fd, struct zus_sb_info *sbi,
 	    ziome->ziom.iom_e[1], ziome->ziom.iom_e[2], ziome->ziom.iom_e[3]);
 
 	err = zuf_iomap_exec(fd, ziome);
-	if (unlikely(err && err != -EIO))
-		ZUS_WARN_ON_ONCE(err);
 
 	return err;
 }
