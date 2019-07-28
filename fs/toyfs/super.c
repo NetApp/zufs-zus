@@ -813,14 +813,8 @@ static int _sbi_init(struct toyfs_sb_info *sbi)
 	int err;
 	void *mem = NULL;
 	size_t pmem_total_blocks, msz = 0;
-	uint32_t pmem_kernel_id;
 
 	INFO("sbi_init: sbi=%p\n", (void *)sbi);
-	pmem_kernel_id = sbi->s_zus_sbi.md.pmem_info.pmem_kern_id;
-	if (!pmem_kernel_id) {
-		ERROR("pmem_kernel_id=%ld\n", (long)pmem_kernel_id);
-		return -EINVAL;
-	}
 	pmem_total_blocks = md_t1_blocks(&sbi->s_zus_sbi.md);
 	if (pmem_total_blocks < 1024) {
 		ERROR("pmem_total_blocks=%ld\n", (long)pmem_total_blocks);
