@@ -50,19 +50,14 @@ static void usage(int argc, char *argv[])
 	"	FILE_PATH is the path to a mounted zuf-root directory\n"
 	"\n"
 	};
-	char spf[2048];
-	char *m = spf;
-	uint s = sizeof(spf);
-	int i, l;
+	FILE *fp = stderr;
+	int i;
 
-	fprintf(stderr, "%s", msg);
-	l = snprintf(m, s, "got: %s ", argv[0]);
-	m += l; s -= l;
-	for (i = 1; i < argc; ++i) {
-		l = snprintf(m, s, "%s ", argv[i]);
-		m += l; s -= l;
-	}
-	fprintf(stderr, "%s\n", spf);
+	fprintf(fp, "%s", msg);
+	fprintf(fp, "got: %s ", argv[0]);
+	for (i = 1; i < argc; ++i)
+		fprintf(fp, "%s ", argv[i]);
+	fputs("\n", fp);
 }
 
 int main(int argc, char *argv[])
