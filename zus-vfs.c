@@ -135,7 +135,7 @@ int zus_private_mount(struct zus_fs_info *zfi, const char *options,
 
 	zip->zmi.zus_zfi = zfi;
 
-	err = zuf_root_open_tmp(&zip->mount_fd);
+	err = zuf_root_open_tmp((int *)&zip->mount_fd);
 	if (unlikely(err))
 		goto fail;
 

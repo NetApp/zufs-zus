@@ -69,7 +69,6 @@ static inline
 int zuf_zt_init(int fd, int cpu_num, uint chan, uint max_command)
 {
 	struct zufs_ioc_init zii = {
-		.affinity = cpu_num,
 		.channel_no = chan,
 		.max_command = max_command,
 	};
