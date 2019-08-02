@@ -99,11 +99,13 @@ int zuf_iomap_exec(int fd, struct zufs_ioc_iomap_exec *ziome)
 static inline
 int zuf_private_mount(int fd, struct zufs_ioc_mount_private *zip)
 {
+	zip->is_umount = false;
 	return _ioctl(fd, ZU_IOC_PRIVATE_MOUNT, &zip->hdr);
 }
 
 static inline
 int zuf_private_umount(int fd, struct zufs_ioc_mount_private *zip)
 {
-	return _ioctl(fd, ZU_IOC_PRIVATE_UMOUNT, &zip->hdr);
+	zip->is_umount = true;
+	return _ioctl(fd, ZU_IOC_PRIVATE_MOUNT, &zip->hdr);
 }
