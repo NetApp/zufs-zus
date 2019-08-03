@@ -463,25 +463,6 @@ static int _io_write(ulong *app_ptr, struct zufs_ioc_hdr *hdr)
 	return zii->op->write(app_ptr, io);
 }
 
-static int _get_put_block(struct zufs_ioc_hdr *hdr)
-{
-	struct zufs_ioc_IO *get_block = (void *)hdr;
-	struct zus_inode_info *zii = get_block->zus_ii;
-
-	if (hdr->operation == ZUFS_OP_PUT_BLOCK) {
-		if (unlikely(!zii->op->put_block))
-			return 0; /* Cool put is optional */
-		return zii->op->put_block(zii, get_block);
-	}
-
-	if (unlikely(!zii->op->get_block)) {
-		ERROR("No get_block operation set\n");
-		return -EIO;
-	}
-
-	return	zii->op->get_block(zii, get_block);
-}
-
 static int _get_put_multy(struct zufs_ioc_hdr *hdr)
 {
 	struct zufs_ioc_IO *io = (void *)hdr;
@@ -652,8 +633,6 @@ const char *ZUFS_OP_name(enum e_zufs_operation op)
 		CASE_ENUM_NAME(ZUFS_OP_READ);
 		CASE_ENUM_NAME(ZUFS_OP_PRE_READ);
 		CASE_ENUM_NAME(ZUFS_OP_WRITE);
-		CASE_ENUM_NAME(ZUFS_OP_GET_BLOCK);
-		CASE_ENUM_NAME(ZUFS_OP_PUT_BLOCK);
 		CASE_ENUM_NAME(ZUFS_OP_MMAP_CLOSE);
 		CASE_ENUM_NAME(ZUFS_OP_GET_SYMLINK);
 		CASE_ENUM_NAME(ZUFS_OP_SETATTR);
@@ -726,9 +705,6 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 		return _io_pre_read(app_ptr, hdr);
 	case ZUFS_OP_WRITE:
 		return _io_write(app_ptr, hdr);
-	case ZUFS_OP_GET_BLOCK:
-	case ZUFS_OP_PUT_BLOCK:
-		return _get_put_block(hdr);
 	case ZUFS_OP_MMAP_CLOSE:
 		return _mmap_close(hdr);
 	case ZUFS_OP_GET_SYMLINK:
