@@ -487,22 +487,6 @@ static int _mmap_close(struct zufs_ioc_hdr *hdr)
 	return zii->op->mmap_close(zii, mmap_close);
 }
 
-static int _symlink(struct zufs_ioc_hdr *hdr)
-{
-	struct zufs_ioc_get_link *ioc_sym = (void *)hdr;
-	struct zus_inode_info *zii = ioc_sym->zus_ii;
-	void *sym;
-	int err;
-
-	err = zii->op->get_symlink(zii, &sym);
-	if (unlikely(err))
-		return err;
-
-	if (sym)
-		ioc_sym->_link = md_addr_to_offset(&zii->sbi->md, sym);
-	return 0;
-}
-
 static int _setattr(struct zufs_ioc_hdr *hdr)
 {
 	struct zufs_ioc_attr *ioc_attr = (void *)hdr;
@@ -634,7 +618,6 @@ const char *ZUFS_OP_name(enum e_zufs_operation op)
 		CASE_ENUM_NAME(ZUFS_OP_PRE_READ);
 		CASE_ENUM_NAME(ZUFS_OP_WRITE);
 		CASE_ENUM_NAME(ZUFS_OP_MMAP_CLOSE);
-		CASE_ENUM_NAME(ZUFS_OP_GET_SYMLINK);
 		CASE_ENUM_NAME(ZUFS_OP_SETATTR);
 		CASE_ENUM_NAME(ZUFS_OP_SYNC);
 		CASE_ENUM_NAME(ZUFS_OP_FALLOCATE);
@@ -707,8 +690,6 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 		return _io_write(app_ptr, hdr);
 	case ZUFS_OP_MMAP_CLOSE:
 		return _mmap_close(hdr);
-	case ZUFS_OP_GET_SYMLINK:
-		return _symlink(hdr);
 	case ZUFS_OP_SETATTR:
 		return _setattr(hdr);
 	case ZUFS_OP_SYNC:
