@@ -174,8 +174,7 @@ int fba_alloc_align(struct fba *fba, size_t size, bool huge)
 
 		/* unmap the unaligned edges and fix the ptr and size */
 		start_len = addr - (ulong)fba->ptr;
-		end_len = ((ulong)fba->ptr + aligned_size) - (addr + size) -
-								start_len;
+		end_len = aligned_size - size - start_len;
 
 		munmap(fba->ptr, start_len);
 		munmap((void *)(addr + size), end_len);
