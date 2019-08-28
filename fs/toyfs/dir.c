@@ -383,7 +383,7 @@ int toyfs_iterate_dir(struct toyfs_inode_info *dir_tii,
 	zir->more = _iterate_dir(dir_tii, &ctx.dir_ctx);
 	zir->pos = ctx.dir_ctx.pos;
 	DBG("iterate_dir: dir-ino=%lu emit_count=%lu more=%d pos=%ld\n",
-	    dir_tii->ino, ctx.emit_count, (int)zir->more, zir->pos);
+	    dir_tii->ino, ctx.emit_count, (int)zir->more, (long)zir->pos);
 	return 0;
 }
 

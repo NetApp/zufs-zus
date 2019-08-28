@@ -298,8 +298,7 @@ int toyfs_listxattr(struct zus_inode_info *zii, struct zufs_ioc_xattr *);
 void toyfs_drop_xattr(struct toyfs_inode_info *tii);
 
 /* mmap.c */
-int toyfs_get_block(struct zus_inode_info *zii, struct zufs_ioc_IO *get_block);
-int toyfs_put_block(struct zus_inode_info *zii, struct zufs_ioc_IO *get_block);
+int toyfs_get_put_multy(struct zus_inode_info *zii, struct zufs_ioc_IO *io);
 int toyfs_mmap_close(struct zus_inode_info *zii,
 		     struct zufs_ioc_mmap_close *mmap_close);
 

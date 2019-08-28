@@ -29,7 +29,7 @@
 
 
 static uint64_t _resolve_bn(const struct toyfs_inode_info *tii,
-				struct toyfs_pmemb *pmemb)
+			    struct toyfs_pmemb *pmemb)
 {
 	return pmemb ? toyfs_addr2bn(tii->sbi, (void *)pmemb) : 0;
 }
@@ -41,7 +41,7 @@ static int _get_block_rd(struct toyfs_inode_info *tii, loff_t off,
 	struct zus_iomap_build iomb = {};
 
 	_zus_iom_init_4_ioc_io(&iomb, &tii->sbi->s_zus_sbi,
-				get_block, ZUS_MAX_OP_SIZE);
+			       get_block, ZUS_MAX_OP_SIZE);
 	pmemb = toyfs_resolve_pmemb(tii, off);
 
 	_zus_iom_start(&iomb, NULL, NULL);
@@ -61,7 +61,7 @@ static int _get_block_wr(struct toyfs_inode_info *tii, loff_t off,
 	struct zus_iomap_build iomb = {};
 
 	_zus_iom_init_4_ioc_io(&iomb, &tii->sbi->s_zus_sbi,
-				get_block, ZUS_MAX_OP_SIZE);
+			       get_block, ZUS_MAX_OP_SIZE);
 
 	pmemb = toyfs_resolve_pmemb(tii, off);
 	if (pmemb) {
@@ -86,36 +86,49 @@ static int _get_block_wr(struct toyfs_inode_info *tii, loff_t off,
 	return -ENOSPC;
 }
 
-
-int toyfs_get_block(struct zus_inode_info *zii,
-		    struct zufs_ioc_IO *get_block)
+static int _get_multy(struct zus_inode_info *zii, struct zufs_ioc_IO *io)
 {
 	int err;
-	const loff_t off = (loff_t)get_block->filepos;
+	const loff_t off = (loff_t)io->filepos;
 	struct toyfs_inode_info *tii = Z2II(zii);
 
 	if (!zi_isreg(tii->zii.zi))
 		return -ENOTSUP;
 
-	if (get_block->rw & GB_WRITE)
-		err = _get_block_wr(tii, off, get_block);
+	if (!(io->rw & ZUFS_RW_MMAP))
+		return -ENOTSUP;
+
+	if (io->rw & GB_WRITE)
+		err = _get_block_wr(tii, off, io);
 	else
-		err = _get_block_rd(tii, off, get_block);
+		err = _get_block_rd(tii, off, io);
 
 	DBG("get_block: ino=%ld off=%ld err=%d\n",
-	    (long)tii->ino, (long)get_block->filepos, err);
+	    (long)tii->ino, (long)io->filepos, err);
 
 	return err;
 }
 
-int toyfs_put_block(struct zus_inode_info *zii, struct zufs_ioc_IO *get_block)
+static int _put_multy(struct zus_inode_info *zii, struct zufs_ioc_IO *io)
 {
 	struct toyfs_inode_info *tii = Z2II(zii);
 
 	DBG("put_block: ino=%ld off=%ld\n",
-	    (long)tii->ino, (long)get_block->filepos);
+	    (long)tii->ino, (long)io->filepos);
+
+	if (!(io->rw & ZUFS_RW_MMAP))
+		return -ENOTSUP;
 
 	return 0;
+}
+
+int toyfs_get_put_multy(struct zus_inode_info *zii,
+			struct zufs_ioc_IO *io)
+{
+	if (io->hdr.operation == ZUFS_OP_GET_MULTY)
+		return _get_multy(zii, io);
+
+	return _put_multy(zii, io);
 }
 
 int toyfs_mmap_close(struct zus_inode_info *zii,
