@@ -659,10 +659,8 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 	DBG("[%s] OP=%d off=0x%x len=0x%x\n", ZUFS_OP_name(hdr->operation),
 		hdr->operation, hdr->offset, hdr->len);
 
-	if (hdr->flags & ZUFS_H_HAS_PIGY_PUT) {
+	if (hdr->flags & ZUFS_H_HAS_PIGY_PUT)
 		_some_pigy_put(hdr);
-		hdr->flags &= ~ZUFS_H_HAS_PIGY_PUT;
-	}
 
 	switch (hdr->operation) {
 	case ZUFS_OP_NEW_INODE:
