@@ -182,19 +182,20 @@ static void _slab_page_fini(struct zus_slab *slab,
 
 /* ~~~~~ SLAB alloc ~~~~~ */
 
+static bool _slab_size_valid(size_t size)
+{
+	return (0 < size) && (size <= ZUS_BLOCK_SIZE);
+}
+
 static int _slab_list_index(size_t size)
 {
 	int slab_index;
-
-	if (unlikely(!size || (ZUS_BLOCK_SIZE < size)))
-		return -EINVAL;
 
 	if (unlikely(size <= ZUS_MIN_SLAB_SIZE))
 		return 0;
 
 	slab_index = (32 - (__builtin_clz((size - 1) >> ZUS_MIN_SLAB_SHIFT)));
-	if (unlikely(ZUS_SLAB_LISTS <= slab_index))
-		return -EINVAL;
+	ZUS_WARN_ON(ZUS_SLAB_LISTS <= slab_index);
 
 	return slab_index;
 }
@@ -223,7 +224,7 @@ static bool _slab_iscold(const struct zus_slab *slab, size_t size)
 	const struct zus_slab_list *slab_list;
 
 	if (unlikely(_slab_check_list_index(slab_index)))
-		return NULL;
+		return false;
 
 	slab_list = &slab->list[slab_index];
 	return !slab_list->nfree && !slab_list->nused;
@@ -475,7 +476,7 @@ void *zus_malloc(size_t size)
 	if (unlikely(!size))
 		return NULL;
 
-	if (PAGE_SIZE < size)
+	if (!_slab_size_valid(size))
 		return malloc(size);
 
 	ptr = _zus_gsa_malloc(size);
@@ -515,7 +516,7 @@ void *zus_calloc(size_t nmemb, size_t elemsz)
 	if (unlikely(!g_gsa))
 		return NULL;
 
-	if (PAGE_SIZE < size)
+	if (!_slab_size_valid(size))
 		return calloc(nmemb, elemsz);
 
 	ptr = zus_malloc(size);
@@ -543,7 +544,7 @@ void *zus_realloc(void *ptr, size_t size)
 	}
 
 	if (_zus_gsa_cpu_of(ptr) < 0) {
-		if (PAGE_SIZE < size)
+		if (!_slab_size_valid(size))
 			return realloc(ptr, size);
 	} else {
 		if (size <= __elem_size(ptr))
