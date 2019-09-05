@@ -124,6 +124,23 @@ static inline int _zus_iom_enc_wbinv(struct zus_iomap_build *iomb)
 	return 0;
 }
 
+static inline int _zus_iom_enc_discard(struct zus_iomap_build *iomb,
+				       __u64 t2_bn, __u64 num_pages)
+{
+	struct zufs_iom_t2_io_len *iom_io_range = iomb->cur_iom_e;
+	void *next_iom_e = iom_io_range + 1;
+
+	if (unlikely(iomb->end_iom_e < next_iom_e))
+		return -ENOSPC;
+
+	_zus_iom_enc_type_val((__u64*)iom_io_range, IOM_DISCARD, t2_bn);
+	iom_io_range->num_pages = num_pages;
+
+	iomb->cur_iom_e = next_iom_e;
+
+	return 0;
+}
+
 static inline int _zus_iom_enc_unmap(struct zus_iomap_build *iomb, ulong index,
 				     ulong n, ulong ino)
 {
