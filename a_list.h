@@ -13,7 +13,10 @@
 #ifndef _LINUX_ZUFS_A_LIST_H
 #define _LINUX_ZUFS_A_LIST_H
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
+
 #include <stdlib.h>
 //#include <stdarg.h>
 #include <stdio.h>

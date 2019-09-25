@@ -10,7 +10,9 @@
  *	Boaz Harrosh <boazh@netapp.com>
  */
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include <fcntl.h>
 #include <sys/ioctl.h>
