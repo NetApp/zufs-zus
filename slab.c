@@ -555,7 +555,7 @@ void *zus_realloc(void *ptr, size_t size)
 	if (unlikely(!newptr))
 		return NULL;
 
-	memcpy(newptr, ptr, size);
+	memcpy(newptr, ptr, __elem_size(ptr));
 	zus_free(ptr);
 
 	return newptr;
