@@ -81,7 +81,7 @@ load()
 	local zuf_mod=/usr/lib/zufs/extra/zuf.ko
 	local kver=$(uname -r)
 	local kabi=$(echo ${kver} | sed -e 's|\([0-9.]*-[0-9]*\).*|\1|')
-	local destdir
+	local destdir src_mod
 
 	# cleanup previous loads
 	if grep -qw zuf /proc/self/mounts ; then
@@ -103,7 +103,12 @@ load()
 	# in case we booted a new kernel that isn't familiar with zuf
 	# link it hoping the kernel ABI still matches
 	if ! modinfo zuf >/dev/null ; then
-		ln -sf ${zuf_mod%.ko}.*${kabi}*.ko ${destdir}/zuf.ko
+		src_mod=$(echo ${zuf_mod%.ko}.*${kabi}*.ko)
+		if [[ ! -f ${src_mod} ]] ; then
+			echo "Error: failed to find a matching zuf module for ${kabi}" >&2
+			return 1
+		fi
+		ln -sf ${src_mod%% *} ${destdir}/zuf.ko
 		depmod
 	fi
 

@@ -10,4 +10,4 @@ fi
 ldconfig
 
 systemctl daemon-reload
-systemctl restart zusd
+systemctl restart zusd &>/dev/null || :
