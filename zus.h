@@ -46,7 +46,7 @@
 #include "movnt.h"
 
 #define MAX_LFS_FILESIZE 	((loff_t)0x7fffffffffffffffLL)
-#define ZUS_MAX_OP_SIZE		(PAGE_SIZE * 8)
+#define ZUS_MAX_OP_SIZE		(PAGE_SIZE * 16)
 
 /* Time-stamps in zufs at inode and device-table are of this format */
 #ifndef NSEC_PER_SEC
