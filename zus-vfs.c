@@ -18,6 +18,7 @@
 
 #include "zus.h"
 #include "zuf_call.h"
+#include "iom_enc.h"
 
 /* ~~~ mount stuff ~~~ */
 
@@ -597,11 +598,27 @@ static int _show_options(struct zufs_ioc_hdr *hdr)
 	return sbi->op->show_options(sbi, ioc_mount_options);
 }
 
+static int _iom_done(struct zufs_ioc_hdr *hdr)
+{
+	struct zufs_ioc_iomap_done *ziid = (void *)hdr;
+
+	if (unlikely(!(ziid->iomd && ziid->iomd->done))) {
+		ERROR("iom_done is %p %p\n", ziid->iomd, 
+		      ziid->iomd ? ziid->iomd->done: NULL);
+		return -EINVAL;
+	}
+
+	DBG("%p\n", ziid->iomd);
+	ziid->iomd->done(ziid->iomd, hdr->err);
+	return 0;
+}
+
 const char *ZUFS_OP_name(enum e_zufs_operation op)
 {
 #define CASE_ENUM_NAME(e) case e: return #e
 	switch (op) {
 		CASE_ENUM_NAME(ZUFS_OP_NULL);
+		CASE_ENUM_NAME(ZUFS_OP_BREAK);
 		CASE_ENUM_NAME(ZUFS_OP_STATFS);
 		CASE_ENUM_NAME(ZUFS_OP_SHOW_OPTIONS);
 		CASE_ENUM_NAME(ZUFS_OP_NEW_INODE);
@@ -630,7 +647,7 @@ const char *ZUFS_OP_name(enum e_zufs_operation op)
 		CASE_ENUM_NAME(ZUFS_OP_GET_MULTY);
 		CASE_ENUM_NAME(ZUFS_OP_PUT_MULTY);
 		CASE_ENUM_NAME(ZUFS_OP_NOOP);
-		CASE_ENUM_NAME(ZUFS_OP_BREAK);
+		CASE_ENUM_NAME(ZUFS_OP_IOM_DONE);
 		CASE_ENUM_NAME(ZUFS_OP_MAX_OPT);
 	default:
 		return "UNKNOWN";
@@ -712,6 +729,8 @@ int zus_do_command(void *app_ptr, struct zufs_ioc_hdr *hdr)
 	case ZUFS_OP_GET_MULTY:
 	case ZUFS_OP_PUT_MULTY:
 		return _get_put_multy(hdr);
+	case ZUFS_OP_IOM_DONE:
+		return _iom_done(hdr);
 
 	case ZUFS_OP_NOOP:
 	case ZUFS_OP_BREAK:

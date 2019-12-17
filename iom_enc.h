@@ -19,12 +19,17 @@
 
 #include "zus.h"
 
-typedef void (*iomb_done_fn)(struct zus_iomap_build *iomb);
+
+typedef void (*iomd_done_fn)(struct zus_iomap_done *iomd, int err);
+struct zus_iomap_done {
+	iomd_done_fn done;
+};
+
+struct zus_iomap_build;
 typedef void (*iomb_submit_fn)(struct zus_iomap_build *iomb, bool sync);
 struct zus_iomap_build {
-	iomb_done_fn		done;
 	iomb_submit_fn		submit;
-	void			*priv;
+	struct zus_iomap_done	*iomd;
 	struct zus_sb_info	*sbi;		/* needed if for ioc_exec */
 	int			fd;
 	int			err;
@@ -93,14 +98,13 @@ static inline void _zus_iom_init_4_ioc_io(struct zus_iomap_build *iomb,
 	iomb->ioc_io = ioc_io;
 }
 
-static inline void _zus_iom_start(struct zus_iomap_build *iomb, void *priv,
-				  iomb_done_fn done)
+static inline void _zus_iom_start(struct zus_iomap_build *iomb,
+				  struct zus_iomap_done *iomd)
 {
 	iomb->cur_iom_e = iomb->ziom->iom_e;
 	iomb->ziom->iom_n = 0;
 	iomb->ziom->iom_e[0] = 0;
-	iomb->done = done;
-	iomb->priv = priv;
+	iomb->iomd = iomd;
 }
 static inline void _zus_iom_end(struct zus_iomap_build *iomb)
 {
