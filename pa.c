@@ -299,6 +299,8 @@ rescan:
 	goto rescan;
 
 out:
+	pthread_spin_unlock(&pa->lock);
+
 	if (NEED_MLOCK && page) {
 		err = mlock(pa_page_address(sbi, page), npages * PAGE_SIZE);
 
@@ -307,13 +309,15 @@ out:
 			    pa_page_address(sbi, page), (int)npages, -errno);
 			fba_punch_hole(&pa->data, pa_page_to_bn(sbi, page),
 				       npages);
+
+			pthread_spin_lock(&pa->lock);
 			for (i = 0; i < npages; ++i, ++page)
 				a_list_add(&page->list, &pa->head);
+			pthread_spin_unlock(&pa->lock);
+
 			page = NULL;
 		}
 	}
-
-	pthread_spin_unlock(&pa->lock);
 
 	return page;
 }
