@@ -33,7 +33,7 @@ CWARNS += address redundant-decls missing-include-dirs unknown-pragmas
 CWARNS += parentheses sequence-point unused-macros endif-labels
 CWARNS += overlength-strings unreachable-code missing-field-initializers
 CWARNS += aggregate-return init-self switch-default switch switch-enum
-CWARNS += frame-larger-than=4096 larger-than=4096 no-address-of-packed-member
+CWARNS += frame-larger-than=4096 larger-than=4096
 
 ifeq ($(PROJ_LANG), C)
 CWARNS += missing-prototypes nested-externs bad-function-cast
