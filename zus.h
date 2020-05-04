@@ -420,6 +420,52 @@ struct pa_page {
 	void			*private2;
 } __aligned(64);
 
+/* page-flags operations */
+#ifdef __BITS_PER_LONG
+#define ZUS_BITS_PER_LONG __BITS_PER_LONG
+#else
+#define ZUS_BITS_PER_LONG (ULONG_MAX == 0xFFFFFFFFUL ? 32 : 64)
+#endif
+#define ZUS_BIT_MASK(nr)	(1UL << ((nr) % ZUS_BITS_PER_LONG))
+#define ZUS_BIT_WORD(nr)	((nr) / ZUS_BITS_PER_LONG)
+
+
+static inline int _zus_test_bit(long nr, volatile unsigned long *addr)
+{
+	return (1UL & (addr[ZUS_BIT_WORD(nr)]) >>
+			(nr & (ZUS_BITS_PER_LONG - 1)));
+}
+
+static inline void _zus_set_bit(int nr, volatile unsigned long *addr)
+{
+	unsigned long mask = ZUS_BIT_MASK(nr);
+	volatile unsigned long *p = addr + ZUS_BIT_WORD(nr);
+
+	__atomic_or_fetch(p, mask, __ATOMIC_SEQ_CST);
+}
+
+static inline void _zus_clear_bit(int nr, volatile unsigned long *addr)
+{
+	unsigned long mask = ZUS_BIT_MASK(nr);
+	volatile unsigned long *p = addr + ZUS_BIT_WORD(nr);
+
+	__atomic_and_fetch(p, ~mask, __ATOMIC_SEQ_CST);
+}
+
+static inline bool zus_test_pf(struct pa_page *p, long nr)
+{
+	return _zus_test_bit(nr, &p->flags);
+}
+
+static inline void zus_set_pf(struct pa_page *p, long nr)
+{
+	_zus_set_bit(nr, &p->flags);
+}
+
+static inline void zus_clear_pf(struct pa_page *p, long nr)
+{
+	_zus_clear_bit(nr, &p->flags);
+}
 
 #define PA_MAX_ORDER 5
 
