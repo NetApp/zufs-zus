@@ -402,11 +402,11 @@ void pa_fini(struct zus_sb_info *sbi);
 
 struct pa_page {
 	unsigned long		flags;
-	void			*owner;
-
-	unsigned long		index;
 	int			use_count;
 	int			refcount;
+
+	unsigned long		index;
+	void			*owner;
 
 	union {
 		struct a_list_head	list;
