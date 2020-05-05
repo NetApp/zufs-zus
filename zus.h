@@ -552,6 +552,21 @@ static inline int pa_page_count(struct pa_page *page)
 	return __atomic_load_n(&page->refcount, __ATOMIC_SEQ_CST);
 }
 
+static inline void pa_page_count_set(struct pa_page *page, int v)
+{
+	__atomic_store_n(&page->refcount, v, __ATOMIC_SEQ_CST);
+}
+
+static inline int pa_page_count_inc(struct pa_page *page)
+{
+	return __atomic_add_fetch(&page->refcount, 1, __ATOMIC_SEQ_CST);
+}
+
+static inline int pa_page_count_dec(struct pa_page *page)
+{
+	return __atomic_sub_fetch(&page->refcount, 1, __ATOMIC_SEQ_CST);
+}
+
 static inline int pa_page_use_count(struct pa_page *page)
 {
 	return __atomic_load_n(&page->use_count, __ATOMIC_SEQ_CST);
