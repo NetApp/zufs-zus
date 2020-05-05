@@ -78,21 +78,21 @@ static void _slab_unlock(struct zus_slab *slab)
 
 static void _page_set_slab(struct pa_page *page, int slab_index, int cpu)
 {
-	page->use_count = slab_index + 1;
+	_pa_page_meta_set(page, slab_index + 1);
 	page->sinfo.slab_cpu = cpu;
 	page->sinfo.slab_uc = 0;
 }
 
 static void _page_clear_slab(struct pa_page *page)
 {
-	page->use_count = 0;
+	_pa_page_meta_set(page, 0);
 	page->sinfo.slab_cpu = 0;
 	page->sinfo.slab_uc = 0;
 }
 
-static int _page_slab_index(const struct pa_page *page)
+static int _page_slab_index(struct pa_page *page)
 {
-	return page->use_count - 1;
+	return _pa_page_meta(page) - 1;
 }
 
 static int _page_slab_cpu(const struct pa_page *page)

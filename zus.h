@@ -587,6 +587,17 @@ static inline int pa_page_use_count_dec(struct pa_page *page)
 	return __atomic_sub_fetch(&page->use_count, 1, __ATOMIC_SEQ_CST);
 }
 
+/* Allow using 'page->use_count' as private meta-info when not in use */
+static inline int _pa_page_meta(struct pa_page *page)
+{
+	return page->use_count;
+}
+
+static inline void _pa_page_meta_set(struct pa_page *page, int v)
+{
+	page->use_count = v;
+}
+
 /* Return true if the refcount droped to 0 */
 static inline int pa_put_page(struct pa_page *page)
 {
