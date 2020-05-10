@@ -337,10 +337,35 @@ void __pa_free(struct pa_page *page)
 	pthread_spin_unlock(&pa->lock);
 }
 
+#define BUILD_BUG_ON_PA_KP(pa_page, pa_mem, zus_page, kmem)	\
+        BUILD_BUG_ON((offsetof(typeof(*pa_page), pa_mem) !=	\
+		      offsetof(typeof(*zus_page), kmem)) ||	\
+		     (sizeof(pa_page->pa_mem) != sizeof(zus_page->kmem)))
+
+static void _require_equal(void)
+{
+	const struct pa_page *pa_page = NULL;
+	const struct zus_page *zus_page = NULL;
+
+	BUILD_BUG_ON(sizeof(*pa_page) != 64);
+	BUILD_BUG_ON(sizeof(*pa_page) != sizeof(*zus_page));
+
+	BUILD_BUG_ON_PA_KP(pa_page, flags, zus_page, flags);
+	BUILD_BUG_ON_PA_KP(pa_page, use_count, zus_page, use_count);
+	BUILD_BUG_ON_PA_KP(pa_page, refcount, zus_page, refcount);
+	BUILD_BUG_ON_PA_KP(pa_page, index, zus_page, index);
+	BUILD_BUG_ON_PA_KP(pa_page, owner, zus_page, owner);
+	BUILD_BUG_ON_PA_KP(pa_page, list, zus_page, list_head);
+	BUILD_BUG_ON_PA_KP(pa_page, private, zus_page, private1);
+	BUILD_BUG_ON_PA_KP(pa_page, private2, zus_page, private2);
+}
+
 int pa_init(struct zus_sb_info *sbi)
 {
 	struct pa *pa = &sbi->pa[POOL_NUM];
 	int err;
+
+	_require_equal();
 
 	pa->size = 0;
 	a_list_init(&pa->head);

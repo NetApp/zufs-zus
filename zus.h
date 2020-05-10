@@ -87,6 +87,10 @@ int zus_increase_max_files(void);
 	unlikely(__ret_bug_on); \
 })
 
+#ifndef BUILD_BUG_ON
+#	define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2*!!(condition)]))
+#endif
+
 static inline __le32 le32_add(__le32 *val, __s16 add)
 {
 	return *val = cpu_to_le32(le32_to_cpu(*val) + add);
@@ -174,6 +178,12 @@ struct zus_sbi_operations {
 		      struct zufs_ioc_statfs *ioc_statfs);
 	int (*show_options)(struct zus_sb_info *sbi,
 			    struct zufs_ioc_mount_options *zim);
+};
+
+struct fba {
+	int fd; void *ptr;
+	size_t size;
+	void *orig_ptr;
 };
 
 #define ZUS_MAX_POOLS	7
@@ -400,6 +410,7 @@ int zus_setup_pa_size(size_t size);
 int pa_init(struct zus_sb_info *sbi);
 void pa_fini(struct zus_sb_info *sbi);
 
+/* This must be the same as struct zus_page */
 struct pa_page {
 	unsigned long		flags;
 	int			use_count;
@@ -418,7 +429,7 @@ struct pa_page {
 
 	unsigned long		private;
 	void			*private2;
-} __aligned(64);
+};
 
 /* page-flags operations */
 #ifdef __BITS_PER_LONG

@@ -22,15 +22,22 @@
 
 /* ~~~ mount stuff ~~~ */
 
-static int _pmem_mmap(struct multi_devices *md)
+/* TODO: Perhaps an md_shadow_size(md) */
+static ulong _pmem_map_size(struct multi_devices *md)
 {
-	size_t size = md_p2o(md_t1_blocks(md));
-	int prot = PROT_WRITE | PROT_READ;
-	int flags = MAP_SHARED;
-	int err;
+	size_t size = md_p2o(md_t1_blocks(md));\
 
 	if (unlikely(md->pmem_info.mdt.s_flags & MDT_F_SHADOW))
 		size += size;
+	return size;
+}
+
+static int _pmem_mmap(struct multi_devices *md)
+{
+	size_t size = _pmem_map_size(md);
+	int prot = PROT_WRITE | PROT_READ;
+	int flags = MAP_SHARED;
+	int err;
 
 	md->p_pmem_addr = mmap(NULL, size, prot, flags, md->fd, 0);
 	if (md->p_pmem_addr == MAP_FAILED) {
@@ -48,11 +55,8 @@ static int _pmem_mmap(struct multi_devices *md)
 
 static int _pmem_unmap(struct multi_devices *md)
 {
-	size_t size = md_p2o(md_t1_blocks(md));
+	size_t size = _pmem_map_size(md);
 	int err;
-
-	if (unlikely(md->pmem_info.mdt.s_flags & MDT_F_SHADOW))
-		size += size;
 
 	err = munmap(md->p_pmem_addr, size);
 	if (err == -1) {
@@ -62,6 +66,52 @@ static int _pmem_unmap(struct multi_devices *md)
 
 	return 0;
 }
+
+static inline size_t _zpages_mmap_size(struct multi_devices *md)
+{
+	/* We must map 2M aligned size so zuf will give us a 2M aligned
+	 * vm pointer. Some FSs bug if this is not so.
+	 */
+	return ALIGN(md_t1_blocks(md) * sizeof(struct zus_page), ZUFS_2M_SIZE);
+}
+
+static int _zpages_mmap(struct multi_devices *md)
+{
+	size_t size = _zpages_mmap_size(md);
+	size_t pmem_size = _pmem_map_size(md);
+	int prot = PROT_WRITE | PROT_READ;
+	int flags = MAP_SHARED;
+
+	md->pages = mmap(NULL, size, prot, flags, md->fd,
+			       pmem_size + ZUFS_2M_SIZE);
+	if (md->pages == MAP_FAILED) {
+		ERROR("mmap failed=> %d: %s\n", errno, strerror(errno));
+		md->pages = NULL;
+		return -(errno ?: ENOMEM);
+	}
+
+	/* NOTE: It is nice to have the pages state in the mem-dump */
+
+	return 0;
+}
+
+static int _zpages_unmap(struct multi_devices *md)
+{
+	size_t size = _zpages_mmap_size(md);
+	int err;
+
+	if (unlikely(!md->pages))
+		return 0;
+
+	err = munmap(md->pages, size);
+	if (err == -1) {
+		ERROR("munmap failed=> %d: %s\n", errno, strerror(errno));
+		return -errno;
+	}
+
+	return 0;
+}
+
 
 static int _pmem_grab(struct zus_sb_info *sbi, __u64 sb_id)
 {
@@ -91,16 +141,17 @@ static int _pmem_grab(struct zus_sb_info *sbi, __u64 sb_id)
 	md->user_page_size = sbi->zfi->user_page_size;
 	if (!md->user_page_size)
 		return 0; /* User does not want pages */
+	if (ZUS_WARN_ON(md->user_page_size != sizeof(struct zus_page)))
+		return EINVAL;
 
-	err = fba_alloc_align(&md->pages, md_t1_blocks(md) * md->user_page_size,
-			      CONFIG_TRY_ANON_MMAP);
+	err = _zpages_mmap(md);
 	return err;
 }
 
 static void _pmem_ungrab(struct zus_sb_info *sbi)
 {
 	/* Kernel makes free easy (close couple files) */
-	fba_free(&sbi->md.pages);
+	_zpages_unmap(&sbi->md);
 
 	md_fini(&sbi->md, true);
 
