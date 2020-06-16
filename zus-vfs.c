@@ -358,12 +358,12 @@ static int _new_inode(void *app_ptr, struct zufs_ioc_hdr *hdr)
 	 */
 	ioc_new->zi.i_nlink = 0;
 
-	zii = sbi->op->new_inode(sbi, app_ptr, ioc_new);
-	if (unlikely(!zii))
-		return -EINVAL;
+	err = sbi->op->new_inode(sbi, app_ptr, ioc_new);
+	if (unlikely(err))
+		return err;
 
+	zii = ioc_new->zus_ii;
 	ioc_new->_zi = md_addr_to_offset(&sbi->md, zii->zi);
-	ioc_new->zus_ii = zii;
 
 	if (ioc_new->flags & ZI_TMPFILE)
 		return 0;
@@ -654,7 +654,7 @@ static int _iom_done(struct zufs_ioc_hdr *hdr)
 	struct zufs_ioc_iomap_done *ziid = (void *)hdr;
 
 	if (unlikely(!(ziid->iomd && ziid->iomd->done))) {
-		ERROR("iom_done is %p %p\n", ziid->iomd, 
+		ERROR("iom_done is %p %p\n", ziid->iomd,
 		      ziid->iomd ? ziid->iomd->done: NULL);
 		return -EINVAL;
 	}

@@ -159,9 +159,8 @@ struct zus_inode_info {
 };
 
 struct zus_sbi_operations {
-	struct zus_inode_info* (*new_inode)(struct zus_sb_info *sbi,
-				void *app_ptr,
-				struct zufs_ioc_new_inode *ioc_new);
+	int (*new_inode)(struct zus_sb_info *sbi, void *app_ptr,
+			 struct zufs_ioc_new_inode *ioc_new);
 	void (*free_inode)(struct zus_inode_info *zii);
 
 	ulong (*lookup)(struct zus_inode_info *dir_ii, struct zufs_str *str);
